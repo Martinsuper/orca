@@ -1325,6 +1325,9 @@ export type PreloadApi = {
     getCwd: (id: string) => Promise<string>
     getSize: (id: string) => Promise<{ cols: number; rows: number } | null>
     listSessions: () => Promise<{ id: string; cwd: string; title: string }[]>
+    getAuthoritativeBufferSnapshotCapabilities?: (
+      ids: string[]
+    ) => { id: string; authoritative: boolean | null }[]
     hasPty: (id: string) => Promise<boolean | null>
     getMainBufferSnapshot: (
       id: string,
@@ -3183,6 +3186,7 @@ export type PreloadApi = {
           supported: true
           port: number
           ruleAllowed: boolean
+          blockingRuleDetected: boolean
           privateFirewallEnabled: boolean
           networkCategory: 'private' | 'public' | 'domain' | 'unknown'
           inspectionAvailable: boolean
