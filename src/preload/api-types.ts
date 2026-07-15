@@ -214,7 +214,9 @@ import type {
   WorktreeSetupLaunch,
   WorktreeStartupLaunch,
   WorkspaceSessionPatch,
-  WorkspaceSessionState
+  WorkspaceSessionState,
+  PlantumlRenderArgs,
+  PlantumlRenderResult
 } from '../shared/types'
 import type { PtyModelRestoreNeededEvent } from '../shared/pty-model-restore-marker'
 import type {
@@ -1419,6 +1421,9 @@ export type PreloadApi = {
       githubEmail: string | null
     }) => Promise<{ ok: true } | { ok: false; status: number | null; error: string }>
   }
+  plantuml: {
+    render: (args: PlantumlRenderArgs) => Promise<PlantumlRenderResult>
+  }
   crashReports: {
     getLatestPending: () => Promise<CrashReportRecord | null>
     getLatestReport: () => Promise<CrashReportRecord | null>
@@ -2221,6 +2226,7 @@ export type PreloadApi = {
     openFileUri: (uri: string) => Promise<void>
     pathExists: (path: string) => Promise<boolean>
     pickAttachment: () => Promise<string | null>
+    pickJarFile: () => Promise<string | null>
     pickImage: () => Promise<string | null>
     pickRepoIconImage: () => Promise<{ dataUrl: string; fileName: string } | null>
     pickAudio: () => Promise<string | null>

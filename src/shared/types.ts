@@ -119,6 +119,17 @@ export type Project = {
   updatedAt: number
 }
 
+export type PlantumlRenderArgs = {
+  source: string
+  jarPath: string
+}
+
+/** Result of rendering PlantUML source. Exactly one field is set: `svg` on
+ *  success, `error` on failure (never throws so the preview can fall back). */
+export type PlantumlRenderResult =
+  | { svg: string; error?: undefined }
+  | { svg?: undefined; error: string }
+
 export type ProjectUpdateArgs = {
   projectId: string
   updates: Partial<Pick<Project, 'localWindowsRuntimePreference'>>
@@ -2529,6 +2540,10 @@ export type GlobalSettings = {
   richMarkdownSpellcheckEnabled?: boolean
   /** Whether local markdown review note controls and the review panel are shown. */
   markdownReviewToolsEnabled: boolean
+  /** Absolute path to a local plantuml.jar used to render ```plantuml fenced
+   *  blocks in markdown preview. Empty/unset disables PlantUML rendering, which
+   *  keeps diagram source on the local machine (no remote PlantUML server). */
+  plantumlJarPath?: string
   /** Why: mirrors terminal selection-paste muscle memory without mutating the
    *  normal system clipboard; Linux and macOS enable it by default, Windows
    *  leaves middle-click semantics unchanged unless the user opts in. */

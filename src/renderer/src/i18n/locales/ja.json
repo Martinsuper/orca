@@ -161,7 +161,8 @@
             "36761d9604": "不明なキーバインド 操作「{{value0}}」は無視されました。",
             "d2e43e426a": "{{value0}} はオブジェクトでなければなりません。",
             "fb290366b2": "ウェブでは利用できません。",
-            "76122208ca": "「{{value0}}」のショートカットは無視されました: {{value1}}"
+            "76122208ca": "「{{value0}}」のショートカットは無視されました: {{value1}}",
+            "plantumlunavailable": "PlantUML rendering is only available in the desktop app."
           }
         },
         "runtime": {
@@ -5393,7 +5394,13 @@
           "b82f86d7d2": "Rich Markdown Spellcheck",
           "5195f0b9ef": "Show browser spelling underlines and suggestions while editing rich Markdown.",
           "7ddd66fede": "エディターのワードラップ",
-          "9b18de6eea": "水平スクロールを使わずに、ファイルエディターで長い行を折り返します。"
+          "9b18de6eea": "水平スクロールを使わずに、ファイルエディターで長い行を折り返します。",
+          "plantumltitle": "PlantUML Rendering",
+          "plantumldesc": "Render ```plantuml diagrams in markdown preview using a local plantuml.jar. Requires Java. Diagram source stays on your machine — no PlantUML server is contacted. Leave empty to disable.",
+          "plantumlhint": "Path to a local plantuml.jar. Requires Java on your PATH. Leave empty to disable.",
+          "plantumlplaceholder": "No jar selected",
+          "plantumlbrowse": "Browse…",
+          "plantumlclear": "Clear"
         },
         "AdvancedNetworkSettingsSection": {
           "3e431564b5": "ローカルホスト、127.0.0.1、*.internal",
@@ -7710,7 +7717,9 @@
             "d2d2d929c0": "Rich Markdown Spellcheck",
             "4497e2e2bb": "Show browser spelling underlines and suggestions while editing rich Markdown.",
             "e61157e926": "エディターのワードラップ",
-            "005be5c699": "水平スクロールを使わずに、ファイルエディターで長い行を折り返します。"
+            "005be5c699": "水平スクロールを使わずに、ファイルエディターで長い行を折り返します。",
+            "plantumltitle": "PlantUML Rendering",
+            "plantumldesc": "Render ```plantuml diagrams in markdown preview using a local plantuml.jar."
           }
         },
         "git": {
@@ -11690,7 +11699,10 @@
           "026653f21f": "CSS",
           "4daed43ae3": "C++",
           "4227cf50fe": "Bash",
-          "13822cdfda": "プレーンテキスト"
+          "13822cdfda": "プレーンテキスト",
+          "plantuml": "PlantUML",
+          "plantumlcollapse": "Click to hide source",
+          "plantumlexpand": "Click to edit source"
         },
         "RichMarkdownDocLinkMenu": {
           "e17b987473": "↑↓ 移動 ↵ 選択 esc 閉じる",
@@ -11973,6 +11985,10 @@
         },
         "richMarkdownSourceOwningCutFeedback": {
           "selectLessContent": "保持されたHTML引用を切り取るには、選択範囲を小さくするかコードモードを使用してください。"
+        },
+        "PlantUmlBlock": {
+          "notconfigured": "PlantUML rendering is off. Set a plantuml.jar path in Settings → Editor.",
+          "error": "Diagram error:"
         }
       },
       "diff": {

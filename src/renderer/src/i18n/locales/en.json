@@ -161,7 +161,8 @@
             "36761d9604": "Unknown keybinding action \"{{value0}}\" was ignored.",
             "d2e43e426a": "{{value0}} must be an object.",
             "fb290366b2": "Unavailable on web.",
-            "76122208ca": "Shortcut for \"{{value0}}\" was ignored: {{value1}}"
+            "76122208ca": "Shortcut for \"{{value0}}\" was ignored: {{value1}}",
+            "plantumlunavailable": "PlantUML rendering is only available in the desktop app."
           }
         },
         "runtime": {
@@ -5408,7 +5409,13 @@
           "b82f86d7d2": "Rich Markdown Spellcheck",
           "5195f0b9ef": "Show browser spelling underlines and suggestions while editing rich Markdown.",
           "7ddd66fede": "Editor Word Wrap",
-          "9b18de6eea": "Wrap long lines in file editors instead of requiring horizontal scrolling."
+          "9b18de6eea": "Wrap long lines in file editors instead of requiring horizontal scrolling.",
+          "plantumltitle": "PlantUML Rendering",
+          "plantumldesc": "Render ```plantuml diagrams in markdown preview using a local plantuml.jar. Requires Java. Diagram source stays on your machine — no PlantUML server is contacted. Leave empty to disable.",
+          "plantumlhint": "Path to a local plantuml.jar. Requires Java on your PATH. Leave empty to disable.",
+          "plantumlplaceholder": "No jar selected",
+          "plantumlbrowse": "Browse…",
+          "plantumlclear": "Clear"
         },
         "AdvancedNetworkSettingsSection": {
           "3e431564b5": "localhost, 127.0.0.1, *.internal",
@@ -7725,7 +7732,9 @@
             "d2d2d929c0": "Rich Markdown Spellcheck",
             "4497e2e2bb": "Show browser spelling underlines and suggestions while editing rich Markdown.",
             "e61157e926": "Editor Word Wrap",
-            "005be5c699": "Wrap long lines in file editors instead of requiring horizontal scrolling."
+            "005be5c699": "Wrap long lines in file editors instead of requiring horizontal scrolling.",
+            "plantumltitle": "PlantUML Rendering",
+            "plantumldesc": "Render ```plantuml diagrams in markdown preview using a local plantuml.jar."
           }
         },
         "git": {
@@ -11690,7 +11699,10 @@
           "026653f21f": "CSS",
           "4daed43ae3": "C++",
           "4227cf50fe": "Bash",
-          "13822cdfda": "Plain text"
+          "13822cdfda": "Plain text",
+          "plantuml": "PlantUML",
+          "plantumlcollapse": "Click to hide source",
+          "plantumlexpand": "Click to edit source"
         },
         "RichMarkdownDocLinkMenu": {
           "e17b987473": "↑↓ navigate&nbsp;&nbsp;↵ select&nbsp;&nbsp;esc dismiss",
@@ -11973,6 +11985,10 @@
         },
         "richMarkdownSourceOwningCutFeedback": {
           "selectLessContent": "Select less content or use code mode to cut preserved HTML citations."
+        },
+        "PlantUmlBlock": {
+          "notconfigured": "PlantUML rendering is off. Set a plantuml.jar path in Settings → Editor.",
+          "error": "Diagram error:"
         }
       },
       "diff": {

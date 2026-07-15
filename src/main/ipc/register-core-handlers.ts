@@ -17,6 +17,7 @@ import { registerHostedReviewHandlers } from './hosted-review'
 import { registerLinearHandlers } from './linear'
 import { registerJiraHandlers } from './jira'
 import { registerFeedbackHandlers } from './feedback'
+import { registerPlantumlHandlers } from './plantuml'
 import { registerCrashReportingHandlers } from './crash-reporting'
 import { registerExportHandlers } from './export'
 import { registerStatsHandlers } from './stats'
@@ -137,6 +138,7 @@ export function registerCoreHandlers(
   registerLinearHandlers()
   registerJiraHandlers()
   registerFeedbackHandlers()
+  registerPlantumlHandlers()
   if (crashReports) {
     registerCrashReportingHandlers(crashReports)
   }

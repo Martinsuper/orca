@@ -48,6 +48,8 @@ import type {
   NestedRepoScanResult,
   OnboardingState,
   PersistedUIState,
+  PlantumlRenderArgs,
+  PlantumlRenderResult,
   FloatingTerminalCwdRequest,
   MarkdownDocument,
   SearchResult,
@@ -1173,6 +1175,11 @@ const api = {
       ipcRenderer.invoke('feedback:submit', args)
   },
 
+  plantuml: {
+    render: (args: PlantumlRenderArgs): Promise<PlantumlRenderResult> =>
+      ipcRenderer.invoke('plantuml:render', args)
+  },
+
   crashReports: {
     getLatestPending: () => ipcRenderer.invoke('crashReports:getLatestPending'),
     getLatestReport: () => ipcRenderer.invoke('crashReports:getLatestReport'),
@@ -2183,6 +2190,7 @@ const api = {
     pathExists: (path: string): Promise<boolean> => ipcRenderer.invoke('shell:pathExists', path),
 
     pickAttachment: (): Promise<string | null> => ipcRenderer.invoke('shell:pickAttachment'),
+    pickJarFile: (): Promise<string | null> => ipcRenderer.invoke('shell:pickJarFile'),
 
     pickImage: (): Promise<string | null> => ipcRenderer.invoke('shell:pickImage'),
 

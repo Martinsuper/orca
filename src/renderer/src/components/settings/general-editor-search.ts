@@ -129,5 +129,18 @@ export const getGeneralEditorSearchEntries = createLocalizedCatalog(() => [
       ),
       ...translateSearchKeyword('auto.components.settings.general.search.baa263d6d8', 'agents')
     ]
+  },
+  {
+    title: translate('auto.components.settings.general.search.plantumltitle', 'PlantUML Rendering'),
+    description: translate(
+      'auto.components.settings.general.search.plantumldesc',
+      'Render ```plantuml diagrams in markdown preview using a local plantuml.jar.'
+    ),
+    keywords: [
+      ...translateSearchKeyword('auto.components.settings.general.search.plantuml', 'plantuml'),
+      ...translateSearchKeyword('auto.components.settings.general.search.diagram', 'diagram'),
+      ...translateSearchKeyword('auto.components.settings.general.search.uml', 'uml'),
+      ...translateSearchKeyword('auto.components.settings.general.search.d05f629d2c', 'markdown')
+    ]
   }
 ])

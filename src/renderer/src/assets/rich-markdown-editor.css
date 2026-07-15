@@ -858,10 +858,27 @@
   color: var(--foreground);
 }
 
-/* Live mermaid diagram preview rendered below the editable source */
-.mermaid-preview {
+/* Live mermaid/plantuml diagram preview rendered below the editable source */
+.mermaid-preview,
+.plantuml-preview {
   padding: 12px 18px;
   border-top: 1px solid color-mix(in srgb, var(--foreground) 8%, transparent);
+}
+
+/* PlantUML: diagram is primary, source collapses by default. Clicking the
+   diagram toggles the source (see RichMarkdownCodeBlock). When collapsed, hide
+   the editable source + toolbar (kept mounted for TipTap) and drop the border so
+   only the diagram shows. */
+.plantuml-preview {
+  cursor: pointer;
+}
+.plantuml-source-collapsed > pre,
+.plantuml-source-collapsed > select.rich-markdown-code-block-lang,
+.plantuml-source-collapsed > .code-block-copy-btn {
+  display: none;
+}
+.plantuml-source-collapsed > .plantuml-preview {
+  border-top: none;
 }
 
 .rich-markdown-editor pre {

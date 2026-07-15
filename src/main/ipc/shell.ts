@@ -228,6 +228,19 @@ export function registerShellHandlers(): void {
     return result.filePaths[0]
   })
 
+  // Why: lets the user pick a local plantuml.jar for markdown PlantUML rendering;
+  // filtering to .jar keeps the picker focused on the expected artifact.
+  ipcMain.handle('shell:pickJarFile', async (): Promise<string | null> => {
+    const result = await dialog.showOpenDialog({
+      properties: ['openFile'],
+      filters: [{ name: 'JAR', extensions: ['jar'] }]
+    })
+    if (result.canceled || result.filePaths.length === 0) {
+      return null
+    }
+    return result.filePaths[0]
+  })
+
   // Why: window.prompt() and <input type="file"> are unreliable in Electron,
   // so we use the native OS dialog to let the user pick an image file.
   ipcMain.handle('shell:pickImage', async (): Promise<string | null> => {

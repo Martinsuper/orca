@@ -5,6 +5,7 @@ import type { NodeViewProps } from '@tiptap/react'
 import { Copy, Check } from 'lucide-react'
 import { useAppStore } from '@/store'
 import MermaidBlock from './MermaidBlock'
+import PlantUmlBlock from './PlantUmlBlock'
 import { translate } from '@/i18n/i18n'
 
 /**
@@ -99,6 +100,12 @@ const LANGUAGES = [
     }
   },
   {
+    value: 'plantuml',
+    get label() {
+      return translate('auto.components.editor.RichMarkdownCodeBlock.plantuml', 'PlantUML')
+    }
+  },
+  {
     value: 'python',
     get label() {
       return translate('auto.components.editor.RichMarkdownCodeBlock.2391f9cda9', 'Python')
@@ -177,6 +184,13 @@ export function RichMarkdownCodeBlock({
     (settings?.theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
 
   const isMermaid = language === 'mermaid'
+  const isPlantuml = language === 'plantuml'
+  const hasPlantumlDiagram = isPlantuml && node.textContent.trim() !== ''
+  // Why: for PlantUML the diagram is the primary artifact, so the editable
+  // source is collapsed by default and the user clicks the diagram to reveal it
+  // for editing. The <pre> stays mounted (hidden via CSS) because it is TipTap's
+  // editing anchor — removing it from the tree would break the code block.
+  const [sourceExpanded, setSourceExpanded] = useState(false)
 
   const clearCopiedResetTimer = useCallback((): void => {
     if (copiedResetTimerRef.current !== null) {
@@ -227,7 +241,11 @@ export function RichMarkdownCodeBlock({
   )
 
   return (
-    <NodeViewWrapper className="rich-markdown-code-block-wrapper">
+    <NodeViewWrapper
+      className={`rich-markdown-code-block-wrapper${
+        hasPlantumlDiagram && !sourceExpanded ? ' plantuml-source-collapsed' : ''
+      }`}
+    >
       <select
         className="rich-markdown-code-block-lang"
         contentEditable={false}
@@ -276,6 +294,29 @@ export function RichMarkdownCodeBlock({
       {isMermaid && node.textContent.trim() && (
         <div contentEditable={false} className="mermaid-preview">
           <MermaidBlock content={node.textContent.trim()} isDark={isDark} htmlLabels={false} />
+        </div>
+      )}
+      {/* Why: PlantUML has no browser renderer; the live preview pipes source
+          through the local plantuml.jar (via IPC) and shows the returned SVG.
+          The diagram is clickable to toggle the (collapsed-by-default) source. */}
+      {isPlantuml && node.textContent.trim() && (
+        <div
+          contentEditable={false}
+          className="plantuml-preview"
+          onClick={() => setSourceExpanded((prev) => !prev)}
+          title={
+            sourceExpanded
+              ? translate(
+                  'auto.components.editor.RichMarkdownCodeBlock.plantumlcollapse',
+                  'Click to hide source'
+                )
+              : translate(
+                  'auto.components.editor.RichMarkdownCodeBlock.plantumlexpand',
+                  'Click to edit source'
+                )
+          }
+        >
+          <PlantUmlBlock content={node.textContent.trim()} />
         </div>
       )}
     </NodeViewWrapper>

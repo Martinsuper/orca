@@ -161,7 +161,8 @@
             "36761d9604": "Se ignoró la acción de atajo desconocida \"{{value0}}\".",
             "d2e43e426a": "{{value0}} debe ser un objeto.",
             "fb290366b2": "No está disponible en la web.",
-            "76122208ca": "Se ignoró el atajo para \"{{value0}}\": {{value1}}"
+            "76122208ca": "Se ignoró el atajo para \"{{value0}}\": {{value1}}",
+            "plantumlunavailable": "PlantUML rendering is only available in the desktop app."
           }
         },
         "runtime": {
@@ -5408,7 +5409,13 @@
           "b82f86d7d2": "Corrector ortográfico de Rich Markdown",
           "5195f0b9ef": "Muestra subrayados y sugerencias ortográficas del navegador al editar Rich Markdown.",
           "7ddd66fede": "Ajuste de línea en el editor",
-          "9b18de6eea": "Ajusta las líneas largas en editores de archivos en lugar de requerir desplazamiento horizontal."
+          "9b18de6eea": "Ajusta las líneas largas en editores de archivos en lugar de requerir desplazamiento horizontal.",
+          "plantumltitle": "PlantUML Rendering",
+          "plantumldesc": "Render ```plantuml diagrams in markdown preview using a local plantuml.jar. Requires Java. Diagram source stays on your machine — no PlantUML server is contacted. Leave empty to disable.",
+          "plantumlhint": "Path to a local plantuml.jar. Requires Java on your PATH. Leave empty to disable.",
+          "plantumlplaceholder": "No jar selected",
+          "plantumlbrowse": "Browse…",
+          "plantumlclear": "Clear"
         },
         "AdvancedNetworkSettingsSection": {
           "3e431564b5": "localhost, 127.0.0.1, *.internal",
@@ -7688,7 +7695,9 @@
             "d2d2d929c0": "Corrector ortográfico de Rich Markdown",
             "4497e2e2bb": "Muestra subrayados y sugerencias ortográficas del navegador al editar Rich Markdown.",
             "e61157e926": "Ajuste de línea en el editor",
-            "005be5c699": "Ajusta las líneas largas en editores de archivos en lugar de requerir desplazamiento horizontal."
+            "005be5c699": "Ajusta las líneas largas en editores de archivos en lugar de requerir desplazamiento horizontal.",
+            "plantumltitle": "PlantUML Rendering",
+            "plantumldesc": "Render ```plantuml diagrams in markdown preview using a local plantuml.jar."
           }
         },
         "git": {
@@ -11690,7 +11699,10 @@
           "026653f21f": "CSS",
           "4daed43ae3": "C++",
           "4227cf50fe": "Bash",
-          "13822cdfda": "Texto sin formato"
+          "13822cdfda": "Texto sin formato",
+          "plantuml": "PlantUML",
+          "plantumlcollapse": "Click to hide source",
+          "plantumlexpand": "Click to edit source"
         },
         "RichMarkdownDocLinkMenu": {
           "e17b987473": "↑↓ navegar  ↵ seleccionar  esc descartar",
@@ -11973,6 +11985,10 @@
         },
         "richMarkdownSourceOwningCutFeedback": {
           "selectLessContent": "Selecciona menos contenido o usa el modo de código para cortar citas HTML conservadas."
+        },
+        "PlantUmlBlock": {
+          "notconfigured": "PlantUML rendering is off. Set a plantuml.jar path in Settings → Editor.",
+          "error": "Diagram error:"
         }
       },
       "diff": {

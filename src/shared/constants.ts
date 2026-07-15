@@ -211,6 +211,7 @@ export function getDefaultSettings(homedir: string): GlobalSettings {
     editorWordWrap: true,
     richMarkdownSpellcheckEnabled: true,
     markdownReviewToolsEnabled: true,
+    plantumlJarPath: '',
     primarySelectionMiddleClickPaste: getDefaultPrimarySelectionMiddleClickPaste(),
     primarySelectionMiddleClickPasteDefaultedForLinux:
       typeof process !== 'undefined' && process.platform === 'linux',

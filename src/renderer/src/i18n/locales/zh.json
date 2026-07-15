@@ -161,7 +161,8 @@
             "36761d9604": "未知的键绑定操作“{{value0}}”被忽略。",
             "d2e43e426a": "{{value0}} 必须是一个对象。",
             "fb290366b2": "无法在网络上使用。",
-            "76122208ca": "“{{value0}}”的快捷方式被忽略：{{value1}}"
+            "76122208ca": "“{{value0}}”的快捷方式被忽略：{{value1}}",
+            "plantumlunavailable": "PlantUML rendering is only available in the desktop app."
           }
         },
         "runtime": {
@@ -5393,7 +5394,13 @@
           "b82f86d7d2": "Rich Markdown Spellcheck",
           "5195f0b9ef": "在编辑富 Markdown 时显示浏览器拼写下划线和建议。",
           "7ddd66fede": "编辑器自动换行",
-          "9b18de6eea": "在文件编辑器中自动换行长行，而无需水平滚动。"
+          "9b18de6eea": "在文件编辑器中自动换行长行，而无需水平滚动。",
+          "plantumltitle": "PlantUML Rendering",
+          "plantumldesc": "Render ```plantuml diagrams in markdown preview using a local plantuml.jar. Requires Java. Diagram source stays on your machine — no PlantUML server is contacted. Leave empty to disable.",
+          "plantumlhint": "Path to a local plantuml.jar. Requires Java on your PATH. Leave empty to disable.",
+          "plantumlplaceholder": "No jar selected",
+          "plantumlbrowse": "Browse…",
+          "plantumlclear": "Clear"
         },
         "AdvancedNetworkSettingsSection": {
           "3e431564b5": "本地主机，127.0.0.1，*.internal",
@@ -7673,7 +7680,9 @@
             "d2d2d929c0": "Rich Markdown Spellcheck",
             "4497e2e2bb": "在编辑富 Markdown 时显示浏览器拼写下划线和建议。",
             "e61157e926": "编辑器自动换行",
-            "005be5c699": "在文件编辑器中自动换行长行，而无需水平滚动。"
+            "005be5c699": "在文件编辑器中自动换行长行，而无需水平滚动。",
+            "plantumltitle": "PlantUML Rendering",
+            "plantumldesc": "Render ```plantuml diagrams in markdown preview using a local plantuml.jar."
           }
         },
         "git": {
@@ -11690,7 +11699,10 @@
           "026653f21f": "CSS",
           "4daed43ae3": "C++",
           "4227cf50fe": "Bash",
-          "13822cdfda": "纯文本"
+          "13822cdfda": "纯文本",
+          "plantuml": "PlantUML",
+          "plantumlcollapse": "Click to hide source",
+          "plantumlexpand": "Click to edit source"
         },
         "RichMarkdownDocLinkMenu": {
           "e17b987473": "↑↓ 导航↵ 选择 esc 关闭",
@@ -11973,6 +11985,10 @@
         },
         "richMarkdownSourceOwningCutFeedback": {
           "selectLessContent": "请选择较少的内容，或使用代码模式剪切保留的 HTML 引用。"
+        },
+        "PlantUmlBlock": {
+          "notconfigured": "PlantUML rendering is off. Set a plantuml.jar path in Settings → Editor.",
+          "error": "Diagram error:"
         }
       },
       "diff": {

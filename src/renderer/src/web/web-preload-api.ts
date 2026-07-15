@@ -600,6 +600,15 @@ function createWebPreloadApi(): Partial<PreloadApi> {
     } satisfies Partial<WebSettingsApi> as unknown as WebSettingsApi,
     keybindings: createWebKeybindingsApi(),
     ui: createWebUiApi(),
+    plantuml: {
+      render: () =>
+        Promise.resolve({
+          error: translate(
+            'auto.web.web.preload.api.plantumlunavailable',
+            'PlantUML rendering is only available in the desktop app.'
+          )
+        })
+    },
     crashReports: {
       getLatestPending: () => Promise.resolve(null),
       getLatestReport: () => Promise.resolve(null),
@@ -2719,6 +2728,7 @@ function createShellApi(): NonNullable<Partial<PreloadApi>['shell']> {
     },
     pickAttachment: () => Promise.resolve(null),
     pickImage: () => Promise.resolve(null),
+    pickJarFile: () => Promise.resolve(null),
     pickRepoIconImage: () => Promise.resolve(null),
     pickAudio: () => Promise.resolve(null),
     pickDirectory: () => Promise.resolve(null),
