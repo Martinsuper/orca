@@ -1,0 +1,148 @@
+name: Build Release Installers
+
+# Why: this fork wants an installer for every push to main. It intentionally
+# builds an UNSIGNED, non-official dev artifact — ORCA_MAC_RELEASE,
+# ORCA_BUILD_IDENTITY and ORCA_POSTHOG_WRITE_KEY are left unset so no Apple /
+# SignPath / PostHog secrets are required. The upstream release pipeline
+# (release-cut.yml, release-mac-build.yml) is gated to stablyai/orca and needs
+# those secrets, so it is not reused here.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# Rapid pushes supersede in-flight builds so the release always reflects the
+# newest commit and runner minutes are not spent on stale commits.
+concurrency:
+  group: build-release
+  cancel-in-progress: true
+
+jobs:
+  build:
+    # Why: never run on the upstream repo (where the signed pipeline owns
+    # releases). Runs on this fork and any re-fork.
+    if: github.repository != 'stablyai/orca'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+            eb_args: --linux AppImage deb --x64
+            artifact_glob: |
+              dist/*.AppImage
+              dist/*.deb
+          # Why windows-2022, not windows-latest: the 2025 image ships VS 2026,
+          # which node-gyp cannot detect, breaking native dependency install.
+          - os: windows-2022
+            platform: win
+            eb_args: --win
+            artifact_glob: |
+              dist/*.exe
+              dist/*.blockmap
+          - os: macos-latest
+            platform: mac
+            eb_args: --mac
+            artifact_glob: |
+              dist/*.dmg
+              dist/*.zip
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    env:
+      # Why: Vite's web build crossed Node's default old-space ceiling on
+      # release runners, producing incomplete artifacts.
+      NODE_OPTIONS: --max-old-space-size=4096
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      # pnpm must be on PATH before setup-node so setup-node can cache its store.
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: package.json
+          cache: pnpm
+
+      # Why: pnpm's bundled node-gyp ships gyp_main.py without execute
+      # permission, breaking node-pty's native postinstall on Linux runners.
+      - name: Use external node-gyp to avoid pnpm's bundled copy (Linux only)
+        if: runner.os == 'Linux'
+        run: |
+          npm install -g node-gyp@11.5.0
+          echo "npm_config_node_gyp=$(npm root -g)/node-gyp/bin/node-gyp.js" >> "$GITHUB_ENV"
+
+      # Why: `pnpm build:release` verifies the Linux computer-use provider by
+      # importing AT-SPI bindings, which are runtime deps absent on stock
+      # Ubuntu runners. build-essential/python3 back node-gyp native builds.
+      - name: Install Linux build dependencies
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y build-essential python3 python3-gi gir1.2-atspi-2.0 at-spi2-core xclip xdotool
+
+      # Why: Electron's postinstall downloads its binary from GitHub's CDN,
+      # which occasionally 504s. Retry so a transient error is not a failed run.
+      - name: Install dependencies
+        uses: nick-fields/retry@v4
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          retry_wait_seconds: 30
+          command: pnpm install --frozen-lockfile
+
+      # Why: build:release is the exact recipe upstream ships (relay + native
+      # helpers + cli + electron-vite + web). Without ORCA_BUILD_IDENTITY the
+      # telemetry gate marks this a non-official build — correct for a fork.
+      - name: Build app
+        run: pnpm build:release
+
+      # Why: mirror upstream's release_command. --publish never keeps
+      # electron-builder from touching the hardcoded stablyai/orca publish
+      # target; the release job below uploads to this fork instead.
+      - name: Package installers
+        shell: bash
+        run: node config/scripts/ensure-native-runtime.mjs --runtime=electron && pnpm exec electron-builder --config config/electron-builder.config.cjs ${{ matrix.eb_args }} --publish never
+
+      - name: Upload installers
+        uses: actions/upload-artifact@v7
+        with:
+          name: installers-${{ matrix.platform }}
+          path: ${{ matrix.artifact_glob }}
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    needs: build
+    if: github.repository != 'stablyai/orca'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all installers
+        uses: actions/download-artifact@v5
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      # Why: a single rolling prerelease keeps the download links stable across
+      # pushes. Delete + recreate (with --cleanup-tag so the tag re-points to
+      # this commit) guarantees stale assets from prior builds are cleared.
+      - name: Publish rolling prerelease
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          short_sha="${GITHUB_SHA::7}"
+          gh release delete build-main --repo "$GITHUB_REPOSITORY" --yes --cleanup-tag || true
+          gh release create build-main \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --prerelease \
+            --title "Orca main build ($short_sha)" \
+            --notes "Automated unsigned development build from main ($short_sha). macOS/Windows artifacts are not code-signed." \
+            artifacts/*
