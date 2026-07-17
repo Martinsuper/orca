@@ -5463,7 +5463,10 @@
           "31fd7150cf": "업데이트 확인 중...",
           "3394d1f663": "확인 중",
           "d69a09b672": "업데이트는 시작 시 자동으로 확인됩니다.",
-          "7173352632": "idle"
+          "7173352632": "idle",
+          "b5e2a7c1f0": "Automatic update checks are off. Use the button above to check manually.",
+          "a1c0e5d4b2": "Automatically check for updates",
+          "c3f8b7e6a9": "Periodically check for new versions in the background. When off, you can still check manually."
         },
         "GeneralWorkspaceSettingsSection": {
           "3d538a98f7": "워크스페이스의 열기 메뉴에서 사용 가능한 앱을 선택하세요.",

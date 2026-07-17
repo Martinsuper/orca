@@ -195,6 +195,7 @@ export function getDefaultSettings(homedir: string): GlobalSettings {
     localBaseRefSuggestionDismissed: false,
     autoRenameBranchFromWork: true,
     autoRenameBranchFromWorkDefaultedOn: true,
+    autoCheckForUpdates: true,
     branchPrefix: 'git-username',
     branchPrefixCustom: '',
     enableGitHubAttribution: false,

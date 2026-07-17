@@ -188,7 +188,9 @@ export const getGeneralUpdateSearchEntries = createLocalizedCatalog(() => [
         'auto.components.settings.general.search.c9d8c1ce66',
         'release notes'
       ),
-      ...translateSearchKeyword('auto.components.settings.general.search.e49e739a59', 'download')
+      ...translateSearchKeyword('auto.components.settings.general.search.e49e739a59', 'download'),
+      ...translateSearchKeyword('auto.components.settings.general.search.a7d2f1b9e3', 'automatic'),
+      ...translateSearchKeyword('auto.components.settings.general.search.c4e8a06d5b', 'auto update')
     ]
   }
 ])

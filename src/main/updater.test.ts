@@ -1481,6 +1481,42 @@ describe('updater', () => {
     expect(setLastUpdateCheckAt).not.toHaveBeenCalled()
   })
 
+  it('skips the stale startup check when auto-update is disabled', async () => {
+    const mainWindow = { webContents: { send: vi.fn() } }
+
+    const { setupAutoUpdater } = await import('./updater')
+
+    setupAutoUpdater(mainWindow as never, {
+      getLastUpdateCheckAt: () => Date.now() - 25 * 60 * 60 * 1000,
+      getAutoUpdateEnabled: () => false
+    })
+
+    // Give the fire-and-forget startup path a chance to run; it must stay silent.
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(autoUpdaterMock.checkForUpdates).not.toHaveBeenCalled()
+    // Nudge polling must not hit the network either.
+    expect(fetchNudgeMock).not.toHaveBeenCalled()
+  })
+
+  it('still runs a manual check when auto-update is disabled', async () => {
+    autoUpdaterMock.checkForUpdates.mockResolvedValue(undefined)
+    const mainWindow = { webContents: { send: vi.fn() } }
+
+    const { setupAutoUpdater, checkForUpdatesFromMenu } = await import('./updater')
+
+    setupAutoUpdater(mainWindow as never, {
+      getLastUpdateCheckAt: () => Date.now(),
+      getAutoUpdateEnabled: () => false
+    })
+
+    checkForUpdatesFromMenu()
+
+    await vi.waitFor(() => {
+      expect(autoUpdaterMock.checkForUpdates).toHaveBeenCalledTimes(1)
+    })
+  })
+
   it('starts nudge polling only after updater initialization is complete', async () => {
     const mainWindow = { webContents: { send: vi.fn() } }
     fetchNudgeMock.mockResolvedValue({ id: 'campaign-1', minVersion: '1.0.0' })

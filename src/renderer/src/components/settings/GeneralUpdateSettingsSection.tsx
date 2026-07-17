@@ -5,12 +5,15 @@ import { toast } from 'sonner'
 import { useAppStore } from '../../store'
 import { Button } from '../ui/button'
 import { SearchableSetting } from './SearchableSetting'
-import { SettingsSubsectionHeader } from './SettingsFormControls'
+import { SettingsSubsectionHeader, SettingsSwitchRow } from './SettingsFormControls'
 import { translate } from '@/i18n/i18n'
 import { getUpdateCheckClickOptions, getUpdateCheckHint } from '@/lib/update-check-click-options'
 
 export function GeneralUpdateSettingsSection(): React.JSX.Element {
   const updateStatus = useAppStore((s) => s.updateStatus)
+  const settings = useAppStore((s) => s.settings)
+  const updateSettings = useAppStore((s) => s.updateSettings)
+  const autoCheckEnabled = settings?.autoCheckForUpdates !== false
   // Why: the 'error' variant of UpdateStatus does not carry a `version` field.
   // The main process emits `{ state: 'error' }` for both check failures (no
   // version known yet) and download/install failures (version was known from
@@ -72,6 +75,31 @@ export function GeneralUpdateSettingsSection(): React.JSX.Element {
           { value0: appVersion ?? '...' }
         )}
       />
+
+      <SearchableSetting
+        title={translate(
+          'auto.components.settings.GeneralUpdateSettingsSection.a1c0e5d4b2',
+          'Automatically check for updates'
+        )}
+        description={translate(
+          'auto.components.settings.GeneralUpdateSettingsSection.c3f8b7e6a9',
+          'Periodically check for new versions in the background. When off, you can still check manually.'
+        )}
+        keywords={['update', 'automatic', 'auto update', 'background', 'check']}
+      >
+        <SettingsSwitchRow
+          label={translate(
+            'auto.components.settings.GeneralUpdateSettingsSection.a1c0e5d4b2',
+            'Automatically check for updates'
+          )}
+          description={translate(
+            'auto.components.settings.GeneralUpdateSettingsSection.c3f8b7e6a9',
+            'Periodically check for new versions in the background. When off, you can still check manually.'
+          )}
+          checked={autoCheckEnabled}
+          onChange={() => void updateSettings({ autoCheckForUpdates: !autoCheckEnabled })}
+        />
+      </SearchableSetting>
 
       <SearchableSetting
         title={translate(
@@ -147,10 +175,15 @@ export function GeneralUpdateSettingsSection(): React.JSX.Element {
 
         <p className="text-xs text-muted-foreground">
           {updateStatus.state === 'idle' &&
-            translate(
-              'auto.components.settings.GeneralUpdateSettingsSection.d69a09b672',
-              'Updates are checked automatically on launch.'
-            )}
+            (autoCheckEnabled
+              ? translate(
+                  'auto.components.settings.GeneralUpdateSettingsSection.d69a09b672',
+                  'Updates are checked automatically on launch.'
+                )
+              : translate(
+                  'auto.components.settings.GeneralUpdateSettingsSection.b5e2a7c1f0',
+                  'Automatic update checks are off. Use the button above to check manually.'
+                ))}
           {updateStatus.state === 'checking' &&
             translate(
               'auto.components.settings.GeneralUpdateSettingsSection.31fd7150cf',

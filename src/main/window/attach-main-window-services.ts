@@ -150,6 +150,7 @@ export function attachMainWindowServices(
     updaterSetupDone = true
     setupAutoUpdater(mainWindow, {
       getLastUpdateCheckAt: () => store.getUI().lastUpdateCheckAt,
+      getAutoUpdateEnabled: () => store.getSettings().autoCheckForUpdates !== false,
       onBeforeQuit: async () => {
         try {
           await options?.onBeforeUpdateQuit?.()

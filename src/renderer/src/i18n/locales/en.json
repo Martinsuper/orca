@@ -5478,6 +5478,9 @@
           "31fd7150cf": "Checking for updates...",
           "3394d1f663": "checking",
           "d69a09b672": "Updates are checked automatically on launch.",
+          "b5e2a7c1f0": "Automatic update checks are off. Use the button above to check manually.",
+          "a1c0e5d4b2": "Automatically check for updates",
+          "c3f8b7e6a9": "Periodically check for new versions in the background. When off, you can still check manually.",
           "7173352632": "idle"
         },
         "GeneralWorkspaceSettingsSection": {

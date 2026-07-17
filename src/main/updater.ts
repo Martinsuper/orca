@@ -81,6 +81,9 @@ let updateInstallCommitted = false
 let quitAndInstallNativeInvoked = false
 let persistLastUpdateCheckAt: ((timestamp: number) => void) | null = null
 let _getLastUpdateCheckAt: (() => number | null) | null = null
+// Why: gate every automatic check on the user setting. Read via callback so
+// toggling the setting takes effect on the next trigger without re-wiring.
+let _getAutoUpdateEnabled: (() => boolean) | null = null
 let backgroundCheckLaunchPending = false
 // Why: a manually promoted background check can emit an error event before the
 // paired promise catch runs; keep the promotion attached to that launch.
@@ -1101,6 +1104,11 @@ function runBackgroundUpdateCheck(
   if (backgroundCheckLaunchPending || currentStatus.state === 'checking') {
     return
   }
+  // Why: user disabled automatic checks. Return silently (no status change) so
+  // the idle UI is unaffected; manual checkForUpdatesFromMenu bypasses this.
+  if (_getAutoUpdateEnabled?.() === false) {
+    return
+  }
   if (!app.isPackaged || is.dev) {
     sendStatus({ state: 'not-available' })
     return
@@ -1290,6 +1298,11 @@ async function checkForUpdateNudge(): Promise<void> {
   if (!app.isPackaged || is.dev) {
     return
   }
+  // Why: no automatic nudge polling when the user disabled auto-updates —
+  // avoids the remote fetchNudge() request entirely.
+  if (_getAutoUpdateEnabled?.() === false) {
+    return
+  }
   if (nudgeCheckInFlight) {
     return
   }
@@ -1361,12 +1374,14 @@ export function setupAutoUpdater(
     getDismissedUpdateNudgeId?: () => string | null
     setPendingUpdateNudgeId?: (id: string | null) => void
     setDismissedUpdateNudgeId?: (id: string | null) => void
+    getAutoUpdateEnabled?: () => boolean
   }
 ): void {
   mainWindowRef = mainWindow
   onBeforeQuitCleanup = opts?.onBeforeQuit ?? null
   persistLastUpdateCheckAt = opts?.setLastUpdateCheckAt ?? null
   _getLastUpdateCheckAt = opts?.getLastUpdateCheckAt ?? null
+  _getAutoUpdateEnabled = opts?.getAutoUpdateEnabled ?? null
   _getPendingUpdateNudgeId = opts?.getPendingUpdateNudgeId ?? null
   _getDismissedUpdateNudgeId = opts?.getDismissedUpdateNudgeId ?? null
   _setPendingUpdateNudgeId = opts?.setPendingUpdateNudgeId ?? null

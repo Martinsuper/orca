@@ -2530,6 +2530,10 @@ export type GlobalSettings = {
   /** One-shot migration guard for the default-on rollout. Existing profiles
    *  without the guard are flipped on once; later explicit opt-outs stick. */
   autoRenameBranchFromWorkDefaultedOn?: boolean
+  /** Whether Orca checks for new releases automatically in the background.
+   *  When off, background and nudge checks stop; manual "Check for Updates"
+   *  still works. Defaults on. */
+  autoCheckForUpdates: boolean
   branchPrefix: 'git-username' | 'custom' | 'none'
   branchPrefixCustom: string
   enableGitHubAttribution: boolean
