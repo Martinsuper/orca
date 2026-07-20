@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { cancelTrackingResponse } from '../lib/unread-response-body.test-fixtures'
 
 const { gitExecFileAsyncMock } = vi.hoisted(() => ({
   gitExecFileAsyncMock: vi.fn()
@@ -11,6 +12,7 @@ vi.mock('../git/runner', () => ({
 import {
   getGiteaAuthStatus,
   getGiteaPullRequestForBranch,
+  getGiteaPullRequestForBranchOrThrow,
   normalizeGiteaApiBaseUrl
 } from './client'
 import { _resetGiteaRepoRefCache } from './repository-ref'
@@ -171,6 +173,19 @@ describe('Gitea client', () => {
     }
   })
 
+  it('surfaces a lookup failure via getGiteaPullRequestForBranchOrThrow instead of null (finding 4)', async () => {
+    const fetchMock = vi.fn(async () => Response.json({ message: 'unauthorized' }, { status: 403 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    // The swallowing variant returns null — indistinguishable from "no PR".
+    await expect(getGiteaPullRequestForBranch('/repo', 'feature/gitea')).resolves.toBeNull()
+    // The throwing variant makes the failure visible so eligibility records
+    // `unavailable` rather than a false "No pull request found".
+    await expect(getGiteaPullRequestForBranchOrThrow('/repo', 'feature/gitea')).rejects.toThrow(
+      /Gitea request failed/
+    )
+  })
+
   it('expires successful scans and bounds retained repository listings', async () => {
     vi.useFakeTimers()
     try {
@@ -300,5 +315,20 @@ describe('Gitea client', () => {
       tokenConfigured: true
     })
     expect(String(fetchMock.mock.calls[0]?.[0])).toBe('https://git.example.com/api/v1/user')
+  })
+
+  it('cancels unread error-response bodies so bundled undici cannot crash on socket close', async () => {
+    let cancelledBodies = 0
+    const fetchMock = vi.fn(async () =>
+      cancelTrackingResponse(502, () => {
+        cancelledBodies += 1
+      })
+    )
+    vi.stubGlobal('fetch', fetchMock)
+
+    await getGiteaPullRequestForBranch('/repo', 'refs/heads/feature/gitea')
+
+    expect(fetchMock).toHaveBeenCalled()
+    expect(cancelledBodies).toBe(fetchMock.mock.calls.length)
   })
 })

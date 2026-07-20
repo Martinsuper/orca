@@ -51,6 +51,7 @@ import { registerUIHandlers, setTrustedUIRendererWebContentsId } from './ui'
 import { registerEmulatorFrameStreamHandlers } from './emulator-frame-stream'
 import { registerEmulatorVideoStreamHandlers } from './emulator-video-stream'
 import { registerSpeechHandlers } from './speech'
+import { registerTerminalRenderDesyncEvidenceHandler } from './terminal-render-desync-evidence'
 import { registerOrcaProfileHandlers } from './orca-profiles'
 import { registerCodexAccountHandlers } from './codex-accounts'
 import { registerAgentHookHandlers } from './agent-hooks'
@@ -154,6 +155,7 @@ export function registerCoreHandlers(
   // `src/main/observability/`, never from `src/main/telemetry/`. Order is
   // not load-bearing; both register independent ipcMain channels.
   registerDiagnosticsHandlers()
+  registerTerminalRenderDesyncEvidenceHandler()
   registerComputerUsePermissionHandlers()
   registerSettingsHandlers(store, agentAwakeService)
   registerSkillsHandlers(store)
