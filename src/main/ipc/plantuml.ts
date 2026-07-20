@@ -4,6 +4,7 @@ import { constants as fsConstants } from 'node:fs'
 import { ipcMain } from 'electron'
 import { endSubprocessStdin } from '../../shared/subprocess-stdin-write'
 import type { PlantumlRenderArgs, PlantumlRenderResult } from '../../shared/types'
+import { getCachedRender, renderCacheKey, setCachedRender } from './plantuml-render-cache'
 
 // Why: a complex diagram can take a few seconds to lay out under the JVM, but a
 // runaway java process must not hang the render forever — kill and surface a
@@ -26,6 +27,12 @@ async function renderPlantuml(args: PlantumlRenderArgs): Promise<PlantumlRenderR
   const jarPath = args.jarPath.trim()
   if (jarPath === '') {
     return { error: 'PlantUML jar path is not configured.' }
+  }
+
+  const cacheKey = renderCacheKey(jarPath, args.source)
+  const cachedSvg = getCachedRender(cacheKey)
+  if (cachedSvg !== undefined) {
+    return { svg: cachedSvg }
   }
 
   try {
@@ -69,6 +76,7 @@ async function renderPlantuml(args: PlantumlRenderArgs): Promise<PlantumlRenderR
         (error, stdout, stderr) => {
           const svg = String(stdout).trim()
           if (svg.includes('<svg')) {
+            setCachedRender(cacheKey, svg)
             finish({ svg })
             return
           }
