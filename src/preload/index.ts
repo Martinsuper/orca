@@ -687,6 +687,38 @@ const api = {
     }
   } satisfies PreloadApi['sparsePresets'],
 
+  projectLinks: {
+    list: (args) => ipcRenderer.invoke('projectLinks:list', args),
+
+    save: (args) => ipcRenderer.invoke('projectLinks:save', args),
+
+    remove: (args) => ipcRenderer.invoke('projectLinks:remove', args),
+
+    reorder: (args) => ipcRenderer.invoke('projectLinks:reorder', args),
+
+    onChanged: (callback: (data: { repoId: string }) => void): (() => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, data: { repoId: string }) =>
+        callback(data)
+      ipcRenderer.on('projectLinks:changed', listener)
+      return () => ipcRenderer.removeListener('projectLinks:changed', listener)
+    }
+  } satisfies PreloadApi['projectLinks'],
+
+  projectLinkFolders: {
+    list: (args) => ipcRenderer.invoke('projectLinkFolders:list', args),
+
+    add: (args) => ipcRenderer.invoke('projectLinkFolders:add', args),
+
+    remove: (args) => ipcRenderer.invoke('projectLinkFolders:remove', args),
+
+    onChanged: (callback: (data: { repoId: string }) => void): (() => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, data: { repoId: string }) =>
+        callback(data)
+      ipcRenderer.on('projectLinkFolders:changed', listener)
+      return () => ipcRenderer.removeListener('projectLinkFolders:changed', listener)
+    }
+  } satisfies PreloadApi['projectLinkFolders'],
+
   worktrees: {
     list: (args) => ipcRenderer.invoke('worktrees:list', args),
 

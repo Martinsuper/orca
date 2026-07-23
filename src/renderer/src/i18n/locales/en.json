@@ -316,6 +316,20 @@
             "f518e89aa5": "Project already exists in that profile",
             "f03ae7f27b": "Failed to transfer project"
           }
+        },
+        "project": {
+          "links": {
+            "updateFailed": "Failed to update link",
+            "saveFailed": "Failed to save link",
+            "mustLoadFirst": "Links must load before saving.",
+            "updated": "Link updated",
+            "saved": "Link saved",
+            "removed": "Link removed",
+            "removeFailed": "Failed to remove link",
+            "folderAddFailed": "Failed to add folder",
+            "folderRemoveFailed": "Failed to remove folder",
+            "reorderFailed": "Failed to reorder links"
+          }
         }
       }
     },
@@ -10534,6 +10548,52 @@
                 }
               }
             }
+          },
+          "projectLinks": {
+            "uncategorized": "Uncategorized",
+            "manageTitle": "Project Links",
+            "empty": "No links yet. Add one below.",
+            "open": "Open link",
+            "edit": "Edit link",
+            "delete": "Delete link",
+            "editingHeader": "Edit link",
+            "addHeader": "Add link",
+            "cancelEdit": "Cancel edit",
+            "namePlaceholder": "Name",
+            "urlPlaceholder": "https://example.com",
+            "categoryPlaceholder": "Category (e.g. Production, Test, Database)",
+            "save": "Save",
+            "add": "Add",
+            "menuTitle": "Project Links",
+            "noneYet": "No links yet",
+            "manage": "Manage links",
+            "emptyManaged": "No links yet. Add your first one below.",
+            "confirm": "Confirm",
+            "nameLabel": "Name",
+            "namePlaceholderShort": "Prod dashboard",
+            "categoryLabel": "Category",
+            "categoryPlaceholderShort": "Production, Test…",
+            "urlLabel": "URL",
+            "addFirst": "Add a link",
+            "categoryPlaceholderNested": "Production/Database",
+            "categoryHint": "Tip: use “/” in a category to create nested submenus, e.g. Production/Database.",
+            "sectionLabel": "Links",
+            "loading": "Loading links…",
+            "loadFailedTitle": "Could not load links",
+            "emptyTitle": "No links yet",
+            "emptyPanelDescription": "Save quick links to this project — test/prod environments, databases, deploy and config pages.",
+            "tabTitle": "Project Links",
+            "newLink": "New link",
+            "newFolder": "New folder",
+            "newLinkHere": "New link here",
+            "newSubfolder": "New subfolder",
+            "deleteFolder": "Delete folder",
+            "newFolderTitle": "New Folder",
+            "newSubfolderUnder": "New folder under “{{value0}}”",
+            "folderNameLabel": "Folder name",
+            "folderNamePlaceholder": "Production",
+            "cancel": "Cancel",
+            "create": "Create"
           }
         }
       },

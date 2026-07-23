@@ -25,13 +25,19 @@ import type {
   ProjectHostSetupUpdateResult,
   NestedRepoScanResult,
   BaseRefDefaultResult,
-  SparsePreset
+  SparsePreset,
+  ProjectLink
 } from '../../shared/types'
 import type { FolderWorkspacePathStatusRequest } from '../../shared/folder-workspace-path-status'
 import { isFolderRepo } from '../../shared/repo-kind'
 import { DEFAULT_REPO_BADGE_COLOR } from '../../shared/constants'
 import { normalizeRepoBadgeColor } from '../../shared/repo-badge-color'
 import { sanitizeRepoIcon } from '../../shared/repo-icon'
+import {
+  normalizeProjectLinkName,
+  normalizeProjectLinkCategory,
+  normalizeProjectLinkUrl
+} from './project-link-normalization'
 import { normalizeRepoSourceControlAiOverrides } from '../../shared/source-control-ai'
 import {
   isRuntimePathAbsolute,
@@ -1167,6 +1173,13 @@ export function registerRepoHandlers(mainWindow: BrowserWindow, store: Store): v
   ipcMain.removeHandler('sparsePresets:list')
   ipcMain.removeHandler('sparsePresets:save')
   ipcMain.removeHandler('sparsePresets:remove')
+  ipcMain.removeHandler('projectLinks:list')
+  ipcMain.removeHandler('projectLinks:save')
+  ipcMain.removeHandler('projectLinks:remove')
+  ipcMain.removeHandler('projectLinks:reorder')
+  ipcMain.removeHandler('projectLinkFolders:list')
+  ipcMain.removeHandler('projectLinkFolders:add')
+  ipcMain.removeHandler('projectLinkFolders:remove')
 
   ipcMain.handle('repos:list', () => {
     enrichMissingRepoGitRemoteIdentities(store, {
@@ -2190,6 +2203,94 @@ export function registerRepoHandlers(mainWindow: BrowserWindow, store: Store): v
     notifySparsePresetsChanged(mainWindow, args.repoId)
   })
 
+  ipcMain.handle('projectLinks:list', (_event, args: { repoId: string }) => {
+    return store.getProjectLinks(args.repoId)
+  })
+
+  ipcMain.handle(
+    'projectLinks:save',
+    (
+      _event,
+      args: { repoId: string; id?: string; name: string; url: string; category: string }
+    ): ProjectLink => {
+      const repo = store.getRepo(args.repoId)
+      if (!repo) {
+        throw new Error(`Repo "${args.repoId}" not found`)
+      }
+      const name = normalizeProjectLinkName(args.name)
+      const url = normalizeProjectLinkUrl(args.url)
+      const category = normalizeProjectLinkCategory(args.category)
+      const now = Date.now()
+      const existing = args.id
+        ? store.getProjectLinks(args.repoId).find((link) => link.id === args.id)
+        : undefined
+      const link: ProjectLink = {
+        id: existing?.id ?? randomUUID(),
+        repoId: args.repoId,
+        name,
+        url,
+        category,
+        createdAt: existing?.createdAt ?? now,
+        updatedAt: now
+      }
+      const saved = store.saveProjectLink(link)
+      notifyProjectLinksChanged(mainWindow, args.repoId)
+      return saved
+    }
+  )
+
+  ipcMain.handle('projectLinks:remove', (_event, args: { repoId: string; linkId: string }) => {
+    const repo = store.getRepo(args.repoId)
+    if (!repo) {
+      throw new Error(`Repo "${args.repoId}" not found`)
+    }
+    store.removeProjectLink(args.repoId, args.linkId)
+    notifyProjectLinksChanged(mainWindow, args.repoId)
+  })
+
+  ipcMain.handle(
+    'projectLinks:reorder',
+    (
+      _event,
+      args: { repoId: string; updates: { id: string; category: string; order: number }[] }
+    ) => {
+      const repo = store.getRepo(args.repoId)
+      if (!repo) {
+        throw new Error(`Repo "${args.repoId}" not found`)
+      }
+      const updates = args.updates.map((u) => ({
+        id: u.id,
+        category: normalizeProjectLinkReorderCategory(u.category),
+        order: u.order
+      }))
+      store.reorderProjectLinks(args.repoId, updates)
+      notifyProjectLinksChanged(mainWindow, args.repoId)
+    }
+  )
+
+  ipcMain.handle('projectLinkFolders:list', (_event, args: { repoId: string }) => {
+    return store.getProjectLinkFolders(args.repoId)
+  })
+
+  ipcMain.handle('projectLinkFolders:add', (_event, args: { repoId: string; path: string }) => {
+    const repo = store.getRepo(args.repoId)
+    if (!repo) {
+      throw new Error(`Repo "${args.repoId}" not found`)
+    }
+    const path = normalizeProjectLinkFolderPath(args.path)
+    store.addProjectLinkFolder(args.repoId, path)
+    notifyProjectLinkFoldersChanged(mainWindow, args.repoId)
+  })
+
+  ipcMain.handle('projectLinkFolders:remove', (_event, args: { repoId: string; path: string }) => {
+    const repo = store.getRepo(args.repoId)
+    if (!repo) {
+      throw new Error(`Repo "${args.repoId}" not found`)
+    }
+    store.removeProjectLinkFolder(args.repoId, args.path)
+    notifyProjectLinkFoldersChanged(mainWindow, args.repoId)
+  })
+
   ipcMain.handle('repos:pickFolder', async () => {
     const result = await dialog.showOpenDialog(mainWindow, {
       properties: ['openDirectory']
@@ -2672,6 +2773,43 @@ function notifySparsePresetsChanged(mainWindow: BrowserWindow, repoId: string): 
   if (!mainWindow.isDestroyed()) {
     mainWindow.webContents.send('sparsePresets:changed', { repoId })
   }
+}
+
+function notifyProjectLinksChanged(mainWindow: BrowserWindow, repoId: string): void {
+  if (!mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('projectLinks:changed', { repoId })
+  }
+}
+
+function notifyProjectLinkFoldersChanged(mainWindow: BrowserWindow, repoId: string): void {
+  if (!mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('projectLinkFolders:changed', { repoId })
+  }
+}
+
+// Why: mirror the renderer's category parsing (MAX_CATEGORY_DEPTH=5) so a folder
+// path stored here segments the same way link categories do in the tree.
+function normalizeProjectLinkFolderPath(rawPath: string): string {
+  const segments = rawPath
+    .split('/')
+    .map((segment) => segment.trim())
+    .filter(Boolean)
+    .slice(0, 5)
+  if (segments.length === 0) {
+    throw new Error('Folder name is required.')
+  }
+  return segments.join('/')
+}
+
+// Why: a reordered link's category may be empty (dropped at top level) — unlike
+// a new folder, empty is valid here and means "uncategorized".
+function normalizeProjectLinkReorderCategory(rawCategory: string): string {
+  const segments = rawCategory
+    .split('/')
+    .map((segment) => segment.trim())
+    .filter(Boolean)
+    .slice(0, 5)
+  return segments.join('/')
 }
 
 function normalizeSparsePresetName(name: string): string {

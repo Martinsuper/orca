@@ -10266,3 +10266,117 @@ describe('Store native-chat tab viewMode persistence', () => {
     expect(legacyTab?.viewMode).toBeUndefined()
   })
 })
+
+describe('Store project links', () => {
+  it('saves, updates, sorts by name, and removes project links', async () => {
+    const store = await createStore()
+
+    store.saveProjectLink({
+      id: 'l-zed',
+      repoId: 'r1',
+      name: 'Zed',
+      url: 'https://zed.example.com',
+      category: 'Production',
+      createdAt: 1,
+      updatedAt: 1
+    })
+    store.saveProjectLink({
+      id: 'l-api',
+      repoId: 'r1',
+      name: 'Api',
+      url: 'https://api.example.com',
+      category: 'Production',
+      createdAt: 1,
+      updatedAt: 1
+    })
+
+    // getProjectLinks sorts by name.
+    expect(store.getProjectLinks('r1').map((link) => link.name)).toEqual(['Api', 'Zed'])
+
+    // Same id updates in place rather than appending.
+    store.saveProjectLink({
+      id: 'l-api',
+      repoId: 'r1',
+      name: 'Api v2',
+      url: 'https://api.example.com',
+      category: 'Production',
+      createdAt: 1,
+      updatedAt: 2
+    })
+    expect(store.getProjectLinks('r1').map((link) => link.name)).toEqual(['Api v2', 'Zed'])
+
+    store.removeProjectLink('r1', 'l-zed')
+    expect(store.getProjectLinks('r1').map((link) => link.name)).toEqual(['Api v2'])
+  })
+
+  it('keeps project links scoped per repo', async () => {
+    const store = await createStore()
+    store.saveProjectLink({
+      id: 'a',
+      repoId: 'repo-a',
+      name: 'A',
+      url: 'https://a.example.com',
+      category: '',
+      createdAt: 1,
+      updatedAt: 1
+    })
+    store.saveProjectLink({
+      id: 'b',
+      repoId: 'repo-b',
+      name: 'B',
+      url: 'https://b.example.com',
+      category: '',
+      createdAt: 1,
+      updatedAt: 1
+    })
+
+    expect(store.getProjectLinks('repo-a').map((link) => link.id)).toEqual(['a'])
+    expect(store.getProjectLinks('repo-b').map((link) => link.id)).toEqual(['b'])
+  })
+
+  it('drops project links when the repo/project is removed', async () => {
+    const store = await createStore()
+    store.addRepo(makeRepo({ id: 'r1', path: '/repo' }))
+    store.saveProjectLink({
+      id: 'l1',
+      repoId: 'r1',
+      name: 'Docs',
+      url: 'https://docs.example.com',
+      category: 'Production',
+      createdAt: 1,
+      updatedAt: 1
+    })
+    expect(store.getProjectLinks('r1')).toHaveLength(1)
+
+    store.removeProject('r1')
+
+    expect(store.getProjectLinks('r1')).toEqual([])
+  })
+
+  it('sorts links by manual order, missing order last by name', () => {
+    const base = { repoId: 'r1', url: 'https://e.com', category: 'P', createdAt: 1, updatedAt: 1 }
+    // Persisted store — bypass constructor by saving out of order.
+    return createStore().then((store) => {
+      store.saveProjectLink({ id: 'z', name: 'Zed', order: 1, ...base })
+      store.saveProjectLink({ id: 'a', name: 'Api', order: 0, ...base })
+      store.saveProjectLink({ id: 'n', name: 'NoOrder', ...base }) // no order → last
+      expect(store.getProjectLinks('r1').map((l) => l.id)).toEqual(['a', 'z', 'n'])
+    })
+  })
+
+  it('reorderProjectLinks updates category and order', async () => {
+    const store = await createStore()
+    const base = { repoId: 'r1', url: 'https://e.com', createdAt: 1, updatedAt: 1 }
+    store.saveProjectLink({ id: 'a', name: 'A', category: '生产', order: 0, ...base })
+    store.saveProjectLink({ id: 'b', name: 'B', category: '生产', order: 1, ...base })
+
+    store.reorderProjectLinks('r1', [
+      { id: 'b', category: '测试', order: 0 },
+      { id: 'a', category: '生产', order: 0 }
+    ])
+
+    const links = store.getProjectLinks('r1')
+    expect(links.find((l) => l.id === 'b')).toMatchObject({ category: '测试', order: 0 })
+    expect(links.find((l) => l.id === 'a')).toMatchObject({ category: '生产', order: 0 })
+  })
+})

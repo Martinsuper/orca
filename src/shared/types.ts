@@ -2145,6 +2145,20 @@ export type SparsePreset = {
   updatedAt: number
 }
 
+/** Per-repo quick-access URL (test/prod env, database, deploy, config, …).
+ *  `category` is a free-text label used only to group links in the menu. */
+export type ProjectLink = {
+  id: string
+  repoId: string
+  name: string
+  url: string
+  category: string
+  /** Manual sort order within a category (ascending). Missing sorts last, by name. */
+  order?: number
+  createdAt: number
+  updatedAt: number
+}
+
 export type CreateWorktreeArgs = {
   repoId: string
   name: string
@@ -3331,6 +3345,7 @@ export type RightSidebarTab =
   | 'source-control'
   | 'checks'
   | 'ports'
+  | 'links'
 export type ActiveRightSidebarTab = Exclude<RightSidebarTab, 'search'>
 export type RightSidebarExplorerView = 'files' | 'search'
 
@@ -3691,6 +3706,12 @@ export type PersistedState = {
   /** Sparse-checkout presets keyed by repoId. Empty record on first launch;
    *  presets are managed from the new-workspace composer and repo settings. */
   sparsePresetsByRepo: Record<string, SparsePreset[]>
+  /** Quick-access project links keyed by repoId. Empty record on first launch;
+   *  managed from the right-sidebar links menu. */
+  projectLinksByRepo: Record<string, ProjectLink[]>
+  /** Declared (possibly empty) project-link folder paths keyed by repoId, so a
+   *  category with no links yet still shows in the tree. Paths are "/"-joined. */
+  projectLinkFoldersByRepo: Record<string, string[]>
   worktreeMeta: Record<string, WorktreeMeta>
   worktreeLineageById: Record<string, WorktreeLineage>
   workspaceLineageByChildKey: Record<WorkspaceKey, WorkspaceLineage>

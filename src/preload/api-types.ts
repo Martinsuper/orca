@@ -204,6 +204,7 @@ import type {
   ProjectGroupImportMode,
   ShellHydrationFailureReason,
   SparsePreset,
+  ProjectLink,
   SearchOptions,
   NestedRepoScanResult,
   SearchResult,
@@ -1191,6 +1192,28 @@ export type PreloadApi = {
       directories: string[]
     }) => Promise<SparsePreset>
     remove: (args: { repoId: string; presetId: string }) => Promise<void>
+    onChanged: (callback: (data: { repoId: string }) => void) => () => void
+  }
+  projectLinks: {
+    list: (args: { repoId: string }) => Promise<ProjectLink[]>
+    save: (args: {
+      repoId: string
+      id?: string
+      name: string
+      url: string
+      category: string
+    }) => Promise<ProjectLink>
+    remove: (args: { repoId: string; linkId: string }) => Promise<void>
+    reorder: (args: {
+      repoId: string
+      updates: { id: string; category: string; order: number }[]
+    }) => Promise<void>
+    onChanged: (callback: (data: { repoId: string }) => void) => () => void
+  }
+  projectLinkFolders: {
+    list: (args: { repoId: string }) => Promise<string[]>
+    add: (args: { repoId: string; path: string }) => Promise<void>
+    remove: (args: { repoId: string; path: string }) => Promise<void>
     onChanged: (callback: (data: { repoId: string }) => void) => () => void
   }
   worktrees: {

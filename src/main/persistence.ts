@@ -50,6 +50,7 @@ import type {
   ProjectGroup,
   FolderWorkspace,
   SparsePreset,
+  ProjectLink,
   WorktreeMeta,
   WorktreeLineage,
   WorkspaceLineage,
@@ -4345,6 +4346,8 @@ export class Store {
     // Why: presets are repo-scoped, so removing the repo means the presets
     // can never be referenced again — drop them with the parent.
     delete this.state.sparsePresetsByRepo[id]
+    delete this.state.projectLinksByRepo[id]
+    delete this.state.projectLinkFoldersByRepo[id]
     this.pruneWorktreeStateForRepo(id, null)
     this.scheduleSave()
   }
@@ -4362,6 +4365,8 @@ export class Store {
     // last host's copy of this repo is gone, or a surviving host loses its presets.
     if (!idStillPresent) {
       delete this.state.sparsePresetsByRepo[id]
+      delete this.state.projectLinksByRepo[id]
+      delete this.state.projectLinkFoldersByRepo[id]
     }
     this.syncProjectHostSetupCompatibilityState()
     // Why: if the id survives on another host, prune only this host's worktree
@@ -4689,6 +4694,69 @@ export class Store {
   removeSparsePreset(repoId: string, presetId: string): void {
     const existing = this.state.sparsePresetsByRepo[repoId] ?? []
     this.state.sparsePresetsByRepo[repoId] = existing.filter((entry) => entry.id !== presetId)
+    this.scheduleSave()
+  }
+
+  // ── Project Links ──────────────────────────────────────────────────
+
+  getProjectLinks(repoId: string): ProjectLink[] {
+    return [...(this.state.projectLinksByRepo[repoId] ?? [])].sort((left, right) => {
+      // Why: manual order wins within a category; links without an order (e.g.
+      // legacy or freshly added) sort last, then alphabetically as a stable tiebreak.
+      const leftOrder = left.order ?? Number.POSITIVE_INFINITY
+      const rightOrder = right.order ?? Number.POSITIVE_INFINITY
+      if (leftOrder !== rightOrder) {
+        return leftOrder - rightOrder
+      }
+      return left.name.localeCompare(right.name)
+    })
+  }
+
+  saveProjectLink(link: ProjectLink): ProjectLink {
+    const existing = this.state.projectLinksByRepo[link.repoId] ?? []
+    const index = existing.findIndex((entry) => entry.id === link.id)
+    this.state.projectLinksByRepo[link.repoId] =
+      index === -1 ? [...existing, link] : existing.map((entry, i) => (i === index ? link : entry))
+    this.scheduleSave()
+    return link
+  }
+
+  removeProjectLink(repoId: string, linkId: string): void {
+    const existing = this.state.projectLinksByRepo[repoId] ?? []
+    this.state.projectLinksByRepo[repoId] = existing.filter((entry) => entry.id !== linkId)
+    this.scheduleSave()
+  }
+
+  reorderProjectLinks(
+    repoId: string,
+    updates: { id: string; category: string; order: number }[]
+  ): void {
+    const byId = new Map(updates.map((u) => [u.id, u]))
+    const existing = this.state.projectLinksByRepo[repoId] ?? []
+    this.state.projectLinksByRepo[repoId] = existing.map((link) => {
+      const update = byId.get(link.id)
+      return update ? { ...link, category: update.category, order: update.order } : link
+    })
+    this.scheduleSave()
+  }
+
+  getProjectLinkFolders(repoId: string): string[] {
+    return [...(this.state.projectLinkFoldersByRepo[repoId] ?? [])].sort((left, right) =>
+      left.localeCompare(right)
+    )
+  }
+
+  addProjectLinkFolder(repoId: string, path: string): void {
+    const existing = this.state.projectLinkFoldersByRepo[repoId] ?? []
+    if (!existing.includes(path)) {
+      this.state.projectLinkFoldersByRepo[repoId] = [...existing, path]
+      this.scheduleSave()
+    }
+  }
+
+  removeProjectLinkFolder(repoId: string, path: string): void {
+    const existing = this.state.projectLinkFoldersByRepo[repoId] ?? []
+    this.state.projectLinkFoldersByRepo[repoId] = existing.filter((entry) => entry !== path)
     this.scheduleSave()
   }
 
