@@ -1032,6 +1032,14 @@ describe('createUISlice hydratePersistedUI', () => {
     expect(store.getState().settingsProjectHostSelection).toEqual({
       'git:acme/app': 'runtime:home-mac'
     })
+    expect(store.getState().settingsProjectSetupSelection).toEqual({})
+
+    store
+      .getState()
+      .setSettingsProjectHostSelection('git:acme/app', 'runtime:home-mac', 'jump-setup')
+    expect(store.getState().settingsProjectSetupSelection).toEqual({
+      'git:acme/app': 'jump-setup'
+    })
     // Ephemeral: never written through the UI persistence pipeline.
     expect(setUI).not.toHaveBeenCalled()
   })
@@ -1450,6 +1458,34 @@ describe('createUISlice hydratePersistedUI', () => {
     )
 
     expect(store.getState().usagePercentageDisplay).toBe('used')
+  })
+
+  it('persists and hydrates the status bar usage mode', () => {
+    const setUI = vi.fn().mockResolvedValue(undefined)
+    vi.stubGlobal('window', { api: { ui: { set: setUI } } })
+    const store = createUIStore()
+
+    expect(store.getState().statusBarUsageMode).toBe('verbose')
+
+    store.getState().setStatusBarUsageMode('compact')
+
+    expect(store.getState().statusBarUsageMode).toBe('compact')
+    expect(setUI).toHaveBeenCalledWith({ statusBarUsageMode: 'compact' })
+
+    store.getState().hydratePersistedUI(makePersistedUI({ statusBarUsageMode: 'verbose' }))
+    expect(store.getState().statusBarUsageMode).toBe('verbose')
+  })
+
+  it('defaults invalid status bar usage modes to verbose', () => {
+    const store = createUIStore()
+
+    store.getState().hydratePersistedUI(
+      makePersistedUI({
+        statusBarUsageMode: 'expanded' as PersistedUIState['statusBarUsageMode']
+      })
+    )
+
+    expect(store.getState().statusBarUsageMode).toBe('verbose')
   })
 
   it('clamps persisted workspace board column width', () => {

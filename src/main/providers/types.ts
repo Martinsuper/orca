@@ -18,28 +18,28 @@ import type {
   SearchResult
 } from '../../shared/types'
 import type { GitHistoryOptions, GitHistoryResult } from '../../shared/git-history'
+import type { PtyStartupIngressIntent } from '../../shared/pty-startup-ingress'
 import type { CommitMessageDraftContext } from '../../shared/commit-message-generation'
 import type { WorkspaceSpaceDirectoryScanResult } from '../../shared/workspace-space-types'
 import type { StartupCommandDelivery } from '../../shared/codex-startup-delivery'
 import type { TerminalOscLinkRange } from '../../shared/terminal-osc-link-ranges'
-import type { TerminalGitHubPRLink } from '../../shared/terminal-github-pr-link-detector'
 import type { GitProviderStatusOptions } from './git-provider-status-options'
+import type { PtyBackgroundStreamEvent, PtyDataEvent } from './pty-provider-events'
 import type { PtySpawnResult } from './pty-spawn-result'
+import type { PtyIncarnationId } from '../../shared/pty-incarnation'
+import type {
+  AgentSessionExecutionClaim,
+  AgentSessionOwnerBinding,
+  AgentSessionSurfaceBinding
+} from '../../shared/agent-session-host-authority'
+
+export type {
+  PtyBackgroundStreamEvent,
+  PtyDataEvent,
+  PtyTransientFact
+} from './pty-provider-events'
 
 // ─── PTY Provider ───────────────────────────────────────────────────
-
-/** Notification-bearing fact a thinning transport detected while it held
- *  scan authority for a backgrounded PTY (see onBackgroundStreamEvent). */
-export type PtyTransientFact =
-  | { kind: 'bell' }
-  | { kind: 'command-finished'; exitCode: number | null }
-  | { kind: 'pr-link'; link: TerminalGitHubPRLink }
-  | { kind: '2031-subscribe' }
-
-export type PtyBackgroundStreamEvent =
-  | { id: string; kind: 'backgroundMarker'; background: boolean; scanSeedAnsi?: string }
-  | { id: string; kind: 'dataGap'; droppedChars: number; sequenceChars?: number }
-  | { id: string; kind: 'transientFact'; fact: PtyTransientFact }
 
 export type PtyProviderBufferSnapshot = {
   data: string
@@ -62,6 +62,8 @@ export type PtySpawnOptions = {
   cwd?: string
   env?: Record<string, string>
   envToDelete?: string[]
+  /** Main-validated home provenance for an automatic Codex session resume. */
+  codexHomePathOverride?: { value: string | null }
   command?: string
   commandDelivery?: 'renderer' | 'provider'
   startupCommandDelivery?: StartupCommandDelivery
@@ -98,24 +100,46 @@ export type PtySpawnOptions = {
    *  through spawn options keeps local PTY and daemon PTY semantics aligned
    *  without promoting pwsh into a separate shell family. */
   terminalWindowsPowerShellImplementation?: 'auto' | 'powershell.exe' | 'pwsh.exe'
+  /** Fresh-spawn-only source authority installed before any PTY output is released. */
+  startupIngress?: PtyStartupIngressIntent
+  agentSessionEnsure?: {
+    claim: AgentSessionExecutionClaim
+    surface: AgentSessionSurfaceBinding
+  }
+  /** Host-scoped structured-create identity used only for lower-owner replay. */
+  agentSessionCreateOperationId?: string
+  /** Signals that the native process exists even if later publication fails. */
+  onPtySpawnCommitted?: () => void
+  /** Cancels only before physical dispatch; operation identity fences later ambiguity. */
+  signal?: AbortSignal
 }
 
 export type { PtySpawnResult }
 
 export type PtyProcessInfo = {
   id: string
+  incarnationId?: PtyIncarnationId
   cwd: string
   title: string
   /** Owning worktree when the provider can report it authoritatively. */
   worktreeId?: string
   /** Trusted ORCA_TERMINAL_HANDLE exported into this PTY, when known. */
   terminalHandle?: string
+  agentSessionOwners?: AgentSessionOwnerBinding[]
 }
+
+type PtyProbeOptions = { signal?: AbortSignal }
 
 export type IPtyProvider = {
   spawn(opts: PtySpawnOptions): Promise<PtySpawnResult>
   /** Whether this spawn target can append the Git guard after its final env merge. */
   supportsGitCredentialGuardHost?: (sessionId?: string) => boolean
+  /** Explicit false selects pre-claim legacy spawn for a preserved old daemon. */
+  supportsAgentSessionClaims?: (options?: PtyProbeOptions) => boolean | Promise<boolean>
+  /** Whether missing claim metadata in this PTY's process listing proves absence. */
+  providesAgentSessionOwnerListings?: (ptyId: string) => boolean
+  /** Whether fresh structured creates can replay one spawn across a lost relay response. */
+  supportsAgentSessionCreateOperations?: (options?: PtyProbeOptions) => boolean | Promise<boolean>
   attach(id: string): Promise<void>
   hasPty?: (id: string) => boolean
   write(id: string, data: string): void
@@ -165,11 +189,19 @@ export type IPtyProvider = {
    */
   getAppliedSize?: (id: string) => Promise<{ cols: number; rows: number } | null>
 
-  shutdown(id: string, opts: { immediate?: boolean; keepHistory?: boolean }): Promise<void>
+  // Why: deadlineMs (absolute epoch ms) bounds the underlying RPCs so destructive
+  // teardown fails fast inside its sweep budget instead of tripping the outer sweep
+  // deadline; each RPC leaf converts to a relative timeout when it actually issues.
+  shutdown(
+    id: string,
+    opts: { immediate?: boolean; keepHistory?: boolean; deadlineMs?: number }
+  ): Promise<void>
   sendSignal(id: string, signal: string): Promise<void>
   getCwd(id: string): Promise<string>
   getInitialCwd(id: string): Promise<string>
   clearBuffer(id: string): Promise<void>
+  /** Ordered handoff from startup source authority to the live/hidden view authority. */
+  closeStartupQueryAuthority?: (id: string) => Promise<number> | number
   acknowledgeDataEvent(id: string, charCount: number): void
   hasChildProcesses(id: string): Promise<boolean>
   getForegroundProcess(id: string): Promise<string | null>
@@ -177,14 +209,15 @@ export type IPtyProvider = {
   confirmForegroundProcess?: (id: string) => Promise<string | null>
   serialize(ids: string[]): Promise<string>
   revive(state: string): Promise<void>
-  listProcesses(): Promise<PtyProcessInfo[]>
+  // Why: deadlineMs bounds the underlying RPC exactly like shutdown's deadlineMs.
+  listProcesses(opts?: { deadlineMs?: number }): Promise<PtyProcessInfo[]>
   getDefaultShell(): Promise<string>
   getProfiles(): Promise<{ name: string; path: string }[]>
-  onData(
-    callback: (payload: { id: string; data: string; sequenceChars?: number }) => void
-  ): () => void
+  onData(callback: (payload: PtyDataEvent) => void): () => void
   onReplay(callback: (payload: { id: string; data: string }) => void): () => void
-  onExit(callback: (payload: { id: string; code: number }) => void): () => void
+  onExit(
+    callback: (payload: { id: string; code: number; incarnationId?: PtyIncarnationId }) => void
+  ): () => void
 }
 
 // ─── Filesystem Provider ────────────────────────────────────────────

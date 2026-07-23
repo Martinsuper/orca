@@ -194,7 +194,7 @@ export function GeneralUpdateSettingsSection(): React.JSX.Element {
               {translate(
                 'auto.components.settings.GeneralUpdateSettingsSection.a6b37929dc',
                 'Version'
-              )}
+              )}{' '}
               {updateStatus.version}{' '}
               {translate(
                 'auto.components.settings.GeneralUpdateSettingsSection.8311da27ba',
@@ -232,7 +232,7 @@ export function GeneralUpdateSettingsSection(): React.JSX.Element {
               {translate(
                 'auto.components.settings.GeneralUpdateSettingsSection.a6b37929dc',
                 'Version'
-              )}
+              )}{' '}
               {updateStatus.version}{' '}
               {translate(
                 'auto.components.settings.GeneralUpdateSettingsSection.d89806cc89',

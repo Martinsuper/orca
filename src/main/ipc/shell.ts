@@ -1,15 +1,21 @@
 import { ipcMain, shell, dialog } from 'electron'
-import { spawn } from 'node:child_process'
 import { constants, copyFile, readFile, stat } from 'node:fs/promises'
 import { basename, extname, isAbsolute, normalize } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import type { ShellOpenLocalPathResult } from '../../shared/shell-open-types'
+import type {
+  ShellOpenExternalEditorRequest,
+  ShellOpenExternalEditorResult,
+  ShellOpenLocalPathResult
+} from '../../shared/shell-open-types'
 import { MAX_REPO_ICON_UPLOAD_BYTES } from '../../shared/repo-icon'
-import { getSpawnArgsForWindows } from '../win32-utils'
+import type { Store } from '../persistence'
+import { EXTERNAL_EDITOR_CLI_COMMAND } from '../external-editor-launch'
 import {
-  EXTERNAL_EDITOR_CLI_COMMAND,
-  resolveExternalEditorLaunchSpec
-} from '../external-editor-launch'
+  hasActiveRuntime,
+  pathExistsAsync,
+  validateLocalPathTarget
+} from './shell-local-path-guard'
+import { openInExternalEditor } from './shell-external-editor'
 
 export { EXTERNAL_EDITOR_CLI_COMMAND }
 
@@ -17,29 +23,13 @@ const REPO_ICON_IMAGE_MIME_TYPES: Record<string, string> = {
   '.png': 'image/png'
 }
 
-async function pathExists(pathValue: string): Promise<boolean> {
-  try {
-    await stat(pathValue)
-    return true
-  } catch {
-    return false
-  }
-}
-
-async function validateLocalPathTarget(
+async function openInFileManager(
+  store: Store,
   pathValue: string
-): Promise<{ ok: true; path: string } | { ok: false; reason: 'not-absolute' | 'not-found' }> {
-  const normalizedPath = normalize(pathValue)
-  if (!isAbsolute(normalizedPath)) {
-    return { ok: false, reason: 'not-absolute' }
+): Promise<ShellOpenLocalPathResult> {
+  if (hasActiveRuntime(store)) {
+    return { ok: false, reason: 'remote-runtime-unsupported' }
   }
-  if (!(await pathExists(normalizedPath))) {
-    return { ok: false, reason: 'not-found' }
-  }
-  return { ok: true, path: normalizedPath }
-}
-
-async function openInFileManager(pathValue: string): Promise<ShellOpenLocalPathResult> {
   const target = await validateLocalPathTarget(pathValue)
   if (!target.ok) {
     return target
@@ -48,66 +38,6 @@ async function openInFileManager(pathValue: string): Promise<ShellOpenLocalPathR
     // Why: the file-manager action uses reveal semantics, matching the
     // previous sidebar behavior while still validating the path per click.
     shell.showItemInFolder(target.path)
-    return { ok: true }
-  } catch {
-    return { ok: false, reason: 'launch-failed' }
-  }
-}
-
-async function launchExternalEditor(pathValue: string, command?: string): Promise<void> {
-  const launchSpec = resolveExternalEditorLaunchSpec(command, pathValue)
-  const { spawnCmd, spawnArgs } =
-    launchSpec.kind === 'executable'
-      ? getSpawnArgsForWindows(launchSpec.spawnCmd, launchSpec.spawnArgs)
-      : { spawnCmd: launchSpec.spawnCmd, spawnArgs: launchSpec.spawnArgs }
-
-  await new Promise<void>((resolvePromise, rejectPromise) => {
-    const child = spawn(spawnCmd, spawnArgs, {
-      detached: true,
-      stdio: 'ignore',
-      // Why: terminal editors such as nvim need a visible console on Windows;
-      // GUI editor launches stay hidden to avoid command-shim flashes.
-      windowsHide: launchSpec.hideWindowsConsole
-    })
-    let settled = false
-
-    function cleanup(): void {
-      child.off('error', onError)
-      child.off('spawn', onSpawn)
-    }
-
-    function settle(callback: () => void): void {
-      if (settled) {
-        return
-      }
-      settled = true
-      cleanup()
-      callback()
-    }
-
-    function onError(error: Error): void {
-      settle(() => rejectPromise(error))
-    }
-
-    function onSpawn(): void {
-      child.unref()
-      settle(resolvePromise)
-    }
-    child.once('error', onError)
-    child.once('spawn', onSpawn)
-  })
-}
-
-async function openInExternalEditor(
-  pathValue: string,
-  command?: string
-): Promise<ShellOpenLocalPathResult> {
-  const target = await validateLocalPathTarget(pathValue)
-  if (!target.ok) {
-    return target
-  }
-  try {
-    await launchExternalEditor(target.path, command)
     return { ok: true }
   } catch {
     return { ok: false, reason: 'launch-failed' }
@@ -127,22 +57,22 @@ async function openWithSystemDefault(pathValue: string): Promise<boolean> {
   }
 }
 
-export function registerShellHandlers(): void {
+export function registerShellHandlers(store: Store): void {
   ipcMain.handle('shell:openPath', async (_event, path: string): Promise<void> => {
     // Why: keep the legacy fire-and-forget renderer contract while reusing the
     // same absolute/existing path validation as the explicit file-manager API.
-    void (await openInFileManager(path))
+    void (await openInFileManager(store, path))
   })
 
   ipcMain.handle(
     'shell:openInFileManager',
-    (_event, path: string): Promise<ShellOpenLocalPathResult> => openInFileManager(path)
+    (_event, path: string): Promise<ShellOpenLocalPathResult> => openInFileManager(store, path)
   )
 
   ipcMain.handle(
     'shell:openInExternalEditor',
-    (_event, path: string, command?: string): Promise<ShellOpenLocalPathResult> =>
-      openInExternalEditor(path, command)
+    (_event, request: ShellOpenExternalEditorRequest): Promise<ShellOpenExternalEditorResult> =>
+      openInExternalEditor(store, request)
   )
 
   ipcMain.handle('shell:openUrl', (_event, rawUrl: string) => {
@@ -197,7 +127,7 @@ export function registerShellHandlers(): void {
   })
 
   ipcMain.handle('shell:pathExists', async (_event, filePath: string): Promise<boolean> => {
-    return pathExists(filePath)
+    return pathExistsAsync(filePath)
   })
 
   ipcMain.handle(

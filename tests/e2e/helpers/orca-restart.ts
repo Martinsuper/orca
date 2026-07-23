@@ -17,11 +17,17 @@ import {
 } from '@stablyai/playwright-test'
 import { execSync } from 'node:child_process'
 import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { createServer } from 'node:net'
 import os from 'node:os'
 import path from 'node:path'
 import { getE2ECompletedOnboardingProfile } from './e2e-completed-onboarding-profile'
 import { getOrcaElectronLaunchArgs } from './electron-launch-args'
 import { cleanupE2EDaemons, closeElectronAppForE2E } from './electron-process-shutdown'
+import {
+  assertElectronResolvedIsolatedHome,
+  createElectronHomeIsolation,
+  type ElectronHomeIsolation
+} from './electron-home-isolation'
 
 type LaunchedOrca = {
   app: ElectronApplication
@@ -41,6 +47,22 @@ async function delay(ms: number): Promise<void> {
   return new Promise((resolve) => {
     const timeout = setTimeout(resolve, ms)
     timeout.unref?.()
+  })
+}
+
+async function reserveRestartRuntimeWsPort(): Promise<number> {
+  const server = createServer()
+  return new Promise<number>((resolve, reject) => {
+    server.once('error', reject)
+    server.listen(0, '127.0.0.1', () => {
+      const address = server.address()
+      if (!address || typeof address === 'string') {
+        server.close()
+        reject(new Error('Restart fixture could not reserve a runtime WebSocket port'))
+        return
+      }
+      server.close((error) => (error ? reject(error) : resolve(address.port)))
+    })
   })
 }
 
@@ -64,15 +86,30 @@ function shouldLaunchHeadful(testInfo: TestInfo): boolean {
   return testInfo.project.metadata.orcaHeadful === true
 }
 
-function launchEnv(userDataDir: string, headful: boolean): NodeJS.ProcessEnv {
+function createRestartLaunchIsolation(
+  userDataDir: string,
+  headful: boolean,
+  extraEnv: Record<string, string>
+): ElectronHomeIsolation {
   const { ELECTRON_RUN_AS_NODE: _unused, ...cleanEnv } = process.env
   void _unused
-  return {
-    ...cleanEnv,
-    NODE_ENV: 'development',
-    ORCA_E2E_USER_DATA_DIR: userDataDir,
-    ...(headful ? { ORCA_E2E_HEADFUL: '1' } : { ORCA_E2E_HEADLESS: '1' })
-  }
+  return createElectronHomeIsolation({
+    inheritedEnv: cleanEnv,
+    launchEnv: {
+      NODE_ENV: 'development',
+      ...((process.env.ORCA_E2E_SSH_LOCALHOST === '1' ||
+        process.env.ORCA_E2E_SSH_DOCKER === '1' ||
+        process.env.ORCA_E2E_NESTED_RUNTIME_SSH === '1') &&
+      !cleanEnv.ORCA_RELAY_PATH
+        ? { ORCA_RELAY_PATH: path.join(process.cwd(), 'out', 'relay') }
+        : {}),
+      ...extraEnv,
+      ...(headful ? { ORCA_E2E_HEADFUL: '1' } : { ORCA_E2E_HEADLESS: '1' })
+    },
+    extraEnv: {},
+    userDataDir,
+    codexRealHomeEnabled: false
+  })
 }
 
 /**
@@ -82,10 +119,15 @@ function launchEnv(userDataDir: string, headful: boolean): NodeJS.ProcessEnv {
  * env stripping, headful toggle) so behavior differences between fixtures
  * don't leak in as false positives for persistence bugs.
  */
-export function createRestartSession(testInfo: TestInfo): RestartSession {
+export function createRestartSession(
+  testInfo: TestInfo,
+  extraEnv: Record<string, string> = {}
+): RestartSession {
   const mainPath = path.join(process.cwd(), 'out', 'main', 'index.js')
   const userDataDir = mkdtempSync(path.join(os.tmpdir(), 'orca-e2e-restart-'))
   const headful = shouldLaunchHeadful(testInfo)
+  const homeIsolation = createRestartLaunchIsolation(userDataDir, headful, extraEnv)
+  let runtimeWsPort: number | null = null
 
   // Why: this helper bypasses the shared `electronApp` fixture, so it must
   // seed the same completed onboarding profile or first-run overlays cover
@@ -96,10 +138,21 @@ export function createRestartSession(testInfo: TestInfo): RestartSession {
   )
 
   const launch = async (): Promise<LaunchedOrca> => {
+    runtimeWsPort ??= await reserveRestartRuntimeWsPort()
     const app = await electron.launch({
       args: getOrcaElectronLaunchArgs(mainPath, headful),
-      env: launchEnv(userDataDir, headful)
+      env: {
+        ...homeIsolation.env,
+        ORCA_E2E_RUNTIME_WS_PORT: String(runtimeWsPort)
+      }
     })
+    try {
+      const resolvedHome = await app.evaluate(({ app }) => app.getPath('home'))
+      assertElectronResolvedIsolatedHome(resolvedHome, homeIsolation)
+    } catch (error) {
+      await closeElectronAppForE2E(app)
+      throw error
+    }
     const page = await app.firstWindow({ timeout: 120_000 })
     await page.waitForLoadState('domcontentloaded')
     await page.waitForFunction(() => Boolean(window.__store), null, { timeout: 30_000 })
@@ -112,6 +165,10 @@ export function createRestartSession(testInfo: TestInfo): RestartSession {
 
   const dispose = async (): Promise<void> => {
     await cleanupE2EDaemons(userDataDir)
+    if (process.env.ORCA_E2E_PRESERVE_RESTART_PROFILE === '1') {
+      console.log(`[e2e] Preserved restart profile at ${userDataDir}`)
+      return
+    }
     if (existsSync(userDataDir)) {
       await removeProfileDir(userDataDir)
     }
