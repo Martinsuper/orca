@@ -1,5 +1,7 @@
 import type { DaemonPtyAdapter } from './daemon-pty-adapter'
+import { combineUnsubscribes } from './combine-unsubscribes'
 import { shutdownDegradedFallbackSessions } from './degraded-daemon-fallback-shutdown'
+import { inspectPtyProviderProcess } from '../providers/pty-process-inspection'
 import type {
   IPtyProvider,
   PtyBackgroundStreamEvent,
@@ -158,7 +160,11 @@ export class DegradedDaemonPtyProvider implements IPtyProvider {
   async getForegroundProcess(id: string): Promise<string | null> {
     return this.providerFor(id).getForegroundProcess(id)
   }
-
+  inspectProcess(id: string) {
+    return this.hasPty(id)
+      ? inspectPtyProviderProcess(this.providerFor(id), id)
+      : Promise.reject(new Error('terminal_gone'))
+  }
   async confirmForegroundProcess(id: string): Promise<string | null> {
     return this.providerFor(id).confirmForegroundProcess?.(id) ?? null
   }
@@ -197,14 +203,18 @@ export class DegradedDaemonPtyProvider implements IPtyProvider {
   }
 
   onBackgroundStreamEvent(callback: (payload: PtyBackgroundStreamEvent) => void): () => void {
-    const unsubscribes = this.allProviders().flatMap(
-      (provider) => provider.onBackgroundStreamEvent?.(callback) ?? []
+    return combineUnsubscribes(
+      this.allProviders().flatMap((provider) => provider.onBackgroundStreamEvent?.(callback) ?? [])
     )
-    return () => {
-      for (const unsubscribe of unsubscribes) {
-        unsubscribe()
-      }
-    }
+  }
+
+  // Why: main subscribes on the routed provider, so without this the dead-endpoint
+  // fan-out reaches no listener and only the written pane recovers (STA-2373). Daemon
+  // adapters only — the local fallback has no dead-socket problem.
+  onWriteUnavailable(callback: (payload: { id: string }) => void): () => void {
+    return combineUnsubscribes(
+      this.allDaemonAdapters().map((adapter) => adapter.onWriteUnavailable(callback))
+    )
   }
 
   onReplay(callback: (payload: { id: string; data: string }) => void): () => void {
@@ -219,9 +229,7 @@ export class DegradedDaemonPtyProvider implements IPtyProvider {
       if (idx !== -1) {
         this.unsubscribers.splice(idx, 1)
       }
-      for (const unsubscribe of unsubscribes) {
-        unsubscribe()
-      }
+      combineUnsubscribes(unsubscribes)()
     }
     this.unsubscribers.push(trackedUnsubscribe)
     return trackedUnsubscribe
@@ -273,9 +281,7 @@ export class DegradedDaemonPtyProvider implements IPtyProvider {
   }
 
   disposeProviderOnly(): void {
-    for (const unsubscribe of this.unsubscribers.splice(0)) {
-      unsubscribe()
-    }
+    combineUnsubscribes(this.unsubscribers.splice(0))()
   }
 
   async shutdownFallbackSessions(): Promise<number> {

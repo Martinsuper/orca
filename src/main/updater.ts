@@ -2,6 +2,11 @@
 import { app, BrowserWindow, powerMonitor } from 'electron'
 import { is } from '@electron-toolkit/utils'
 import type { UpdateCheckOptions, UpdateStatus } from '../shared/types'
+import type {
+  RemoteServerUpdateInstallResult,
+  RemoteServerUpdaterSnapshot,
+  RemoteServerUpdateSupport
+} from '../shared/remote-server-update'
 import { isWindowsSignatureCheckUnavailableFailure } from '../shared/updater-windows-signature-check'
 import { killAllPty } from './ipc/pty'
 import { withUpdaterSpan } from './observability/instrumentation'
@@ -25,7 +30,6 @@ import {
   isBenignCheckFailure,
   isMissingUpdateManifestFailure,
   isPrereleaseVersion,
-  isReleaseAssetsPublishingFailure,
   statusesEqual
 } from './updater-fallback'
 import {
@@ -39,11 +43,24 @@ import {
   hasServeUpdateSupervisor,
   requestServeUpdateHandoff
 } from './serve-update-handoff'
+import type { LocalBuildFeed } from './local-builds/local-build-feed-server'
 
 type CheckFailureSource = 'event' | 'promise' | 'fallback-promise'
 type MissingManifestPrereleaseFallbackResult = { userInitiated: boolean }
 type PrimaryEventSuppression = { failureKey: string; error: unknown }
 type UpdateCheckVariant = 'default' | 'prerelease' | 'perf'
+type ReleaseFeedPreflightFailure = 'manifest-unavailable' | 'release-not-ready'
+// Why: expected preflight outcomes need typed context so UI routing never depends on matching error text.
+class ReleaseFeedPreflightError extends Error {
+  constructor(
+    readonly reason: ReleaseFeedPreflightFailure,
+    readonly releaseChannel: UpdateCheckVariant,
+    message: string
+  ) {
+    super(message)
+    this.name = 'ReleaseFeedPreflightError'
+  }
+}
 type ReleaseFeedPreflightResult = 'ready' | 'not-available'
 export type UpdateInstallMode =
   | 'interactive'
@@ -126,6 +143,9 @@ let downloadInFlight = false
 /** Guards the macOS `activate` handler from reopening the old version while ShipIt replaces the .app bundle. */
 let quittingForUpdate = false
 let autoUpdater: ElectronAutoUpdater | null = null
+let activeUpdateSource: 'release' | 'local' = 'release'
+let activeLocalBuildFeed: LocalBuildFeed | null = null
+let localBuildSelectionInProgress = false
 
 function getAutoUpdater(): ElectronAutoUpdater {
   if (!autoUpdater) {
@@ -137,6 +157,36 @@ function getAutoUpdater(): ElectronAutoUpdater {
 function clearAvailableUpdateContext(): void {
   availableVersion = null
   availableReleaseUrl = null
+}
+
+function closeLocalBuildFeed(): void {
+  const feed = activeLocalBuildFeed
+  activeLocalBuildFeed = null
+  if (feed) {
+    void feed.close()
+  }
+}
+
+function restoreReleaseUpdateSource(): void {
+  closeLocalBuildFeed()
+  activeUpdateSource = 'release'
+  if (autoUpdater) {
+    autoUpdater.allowDowngrade = false
+    autoUpdater.disableDifferentialDownload = false
+  }
+}
+
+function sendLocalBuildErrorAndRestore(message: string, userInitiated?: boolean): void {
+  clearAvailableUpdateContext()
+  if (
+    currentStatus.state !== 'error' ||
+    currentStatus.message !== message ||
+    currentStatus.userInitiated !== userInitiated ||
+    currentStatus.source !== 'local'
+  ) {
+    sendStatus({ state: 'error', message, userInitiated, source: 'local' })
+  }
+  restoreReleaseUpdateSource()
 }
 
 function clearPrereleaseFallbackContext(): void {
@@ -217,7 +267,9 @@ function sendStatus(status: UpdateStatus): void {
     }
   }
 
-  const decoratedStatus = decorateStatusWithActiveNudge(status)
+  const sourcedStatus: UpdateStatus =
+    activeUpdateSource === 'local' ? { ...status, source: 'local' } : status
+  const decoratedStatus = decorateStatusWithActiveNudge(sourcedStatus)
 
   if (isUpdateCheckResultState(status.state)) {
     finishActiveUpdateCheckAttempt()
@@ -521,8 +573,11 @@ function getKnownReleaseUrl(): string | undefined {
   return availableReleaseUrl ?? undefined
 }
 
-function hasNewerDownloadedVersion(): boolean {
-  return availableVersion !== null && compareVersions(availableVersion, app.getVersion()) > 0
+function hasInstallableDownloadedVersion(): boolean {
+  return (
+    availableVersion !== null &&
+    (activeUpdateSource === 'local' || compareVersions(availableVersion, app.getVersion()) > 0)
+  )
 }
 
 function getPendingInstallVersion(): string {
@@ -767,6 +822,10 @@ async function sendCheckFailureStatus(
   source: CheckFailureSource = 'promise',
   sourceError?: unknown
 ): Promise<void> {
+  if (activeUpdateSource === 'local') {
+    sendLocalBuildErrorAndRestore(message, userInitiated)
+    return
+  }
   const failureKey = getCheckFailureKey(message, userInitiated)
   if (
     source === 'promise' &&
@@ -802,17 +861,22 @@ async function sendCheckFailureStatus(
   }
 
   const handleFailure = async (): Promise<void> => {
-    if (isBenignCheckFailure(message)) {
-      // Why: benign failures (publishing latest.yml, network blips) are transient — retry, and skip persisting the timestamp (would suppress the next startup check).
+    if (isBenignCheckFailure(message) || isRetryableReleaseFeedPreflightFailure(sourceError)) {
+      // Why: benign failures (incomplete latest.yml, network blips) are transient — retry, and skip persisting the timestamp (would suppress the next startup check).
       console.warn('[updater] benign check failure:', message)
       clearAvailableUpdateContext()
       scheduleAutomaticUpdateCheck(AUTO_UPDATE_RETRY_INTERVAL_MS)
       if (userInitiated) {
-        // Why: a user click needs visible feedback (idle looks broken); the UI already prefixes context, so this carries only the actionable cause.
-        sendErrorStatus("Couldn't reach the update server. Try again in a few minutes.", true)
+        // Why: a user click needs visible feedback (idle looks broken); distinguish incomplete releases from transport failures.
+        sendErrorStatus(
+          isStableReleaseNotReadyFailure(sourceError)
+            ? "A newer release isn't available for this device yet. Check again later."
+            : "Couldn't reach the update server. Try again in a few minutes.",
+          true
+        )
       } else {
-        if (isReleaseAssetsPublishingFailure(message)) {
-          // Why: a nudge check can land while GitHub exposes a release before its assets; keep the campaign pending so the short retry can show it.
+        if (isRetryableReleaseFeedPreflightFailure(sourceError)) {
+          // Why: release probes can fail transiently; keep the campaign pending so the short retry can still show it.
           deferPendingUpdateNudgeUntilRetry()
         }
         sendStatus({ state: 'idle' })
@@ -838,8 +902,97 @@ async function sendCheckFailureStatus(
   return pendingCheckFailurePromise
 }
 
+function isRetryableReleaseFeedPreflightFailure(sourceError: unknown): boolean {
+  return (
+    sourceError instanceof ReleaseFeedPreflightError &&
+    (sourceError.reason === 'release-not-ready' || sourceError.reason === 'manifest-unavailable')
+  )
+}
+
+function isStableReleaseNotReadyFailure(sourceError: unknown): boolean {
+  return (
+    sourceError instanceof ReleaseFeedPreflightError &&
+    sourceError.reason === 'release-not-ready' &&
+    sourceError.releaseChannel === 'default'
+  )
+}
+
 export function getUpdateStatus(): UpdateStatus {
   return currentStatus
+}
+
+export function getRemoteServerUpdateSupport(): RemoteServerUpdateSupport {
+  if (!app.isPackaged || is.dev) {
+    return {
+      installMode: updateInstallMode,
+      automatic: false,
+      reason: 'unpackaged-build'
+    }
+  }
+  if (!autoUpdaterInitialized) {
+    return {
+      installMode: updateInstallMode,
+      automatic: false,
+      reason: 'updater-unavailable'
+    }
+  }
+  if (updateInstallMode === 'unsupported-headless-serve') {
+    return {
+      installMode: updateInstallMode,
+      automatic: false,
+      reason: 'manual-service-update-required'
+    }
+  }
+  return { installMode: updateInstallMode, automatic: true, reason: 'available' }
+}
+
+export function getRemoteServerUpdaterSnapshot(runtimeId: string): RemoteServerUpdaterSnapshot {
+  return {
+    appVersion: app.getVersion(),
+    runtimeId,
+    support: getRemoteServerUpdateSupport(),
+    status: getUpdateStatus()
+  }
+}
+
+function assertRemoteServerUpdateAvailable(): void {
+  if (!getRemoteServerUpdateSupport().automatic) {
+    throw new Error('remote_update_manual_required')
+  }
+}
+
+export function checkForRemoteServerUpdate(
+  runtimeId: string,
+  options?: UpdateCheckOptions
+): RemoteServerUpdaterSnapshot {
+  assertRemoteServerUpdateAvailable()
+  checkForUpdatesFromMenu(options)
+  return getRemoteServerUpdaterSnapshot(runtimeId)
+}
+
+export function downloadRemoteServerUpdate(runtimeId: string): RemoteServerUpdaterSnapshot {
+  assertRemoteServerUpdateAvailable()
+  if (currentStatus.state !== 'available') {
+    throw new Error('remote_update_not_available')
+  }
+  downloadUpdate()
+  return getRemoteServerUpdaterSnapshot(runtimeId)
+}
+
+export function installRemoteServerUpdate(runtimeId: string): RemoteServerUpdateInstallResult {
+  assertRemoteServerUpdateAvailable()
+  if (currentStatus.state !== 'downloaded') {
+    throw new Error('remote_update_not_downloaded')
+  }
+  const targetVersion = currentStatus.version
+  const result: RemoteServerUpdateInstallResult = {
+    accepted: true,
+    fromVersion: app.getVersion(),
+    targetVersion,
+    runtimeId
+  }
+  quitAndInstall()
+  return result
 }
 
 let consecutiveAutomaticRetrySchedules = 0
@@ -859,7 +1012,10 @@ function scheduleAutomaticUpdateCheck(delayMs: number): void {
   }
   autoUpdateCheckTimer = setTimeout(() => {
     // Why: Orca runs for days, so keep the next background check scheduled in the main process rather than tying it to relaunches or renderer lifetime.
-    runBackgroundUpdateCheck()
+    if (!runBackgroundUpdateCheck()) {
+      // Why: a deferred check reaches no outcome handler, so re-arm here or one deferral ends automatic checks for the process lifetime.
+      scheduleAutomaticUpdateCheck(AUTO_UPDATE_CHECK_INTERVAL_MS)
+    }
   }, effectiveDelayMs)
 }
 
@@ -1010,9 +1166,25 @@ async function pinDefaultReleaseFeed(
     }
     clearPublishingWindowLastGoodCheck()
     console.info(
-      `[updater] release feed deferred: current=${currentVersion} includePrerelease=${includePrerelease}; newest release assets are still publishing`
+      `[updater] release feed deferred: current=${currentVersion} includePrerelease=${includePrerelease}; newest release assets are not ready`
     )
-    throw new Error('Latest release assets are still publishing')
+    throw new ReleaseFeedPreflightError(
+      'release-not-ready',
+      isPerfCheck ? 'perf' : includePrerelease ? 'prerelease' : 'default',
+      'Latest release artifacts are not ready'
+    )
+  } else if (
+    releaseTagsResult.state === 'unavailable' &&
+    releaseTagsResult.unavailableReason === 'manifest' &&
+    !includePrerelease
+  ) {
+    clearPrereleaseFallbackContext()
+    clearPublishingWindowLastGoodCheck()
+    throw new ReleaseFeedPreflightError(
+      'manifest-unavailable',
+      'default',
+      'Unable to find latest version on GitHub'
+    )
   } else if (isPerfCheck) {
     clearPrereleaseFallbackContext()
     clearPublishingWindowLastGoodCheck()
@@ -1093,11 +1265,15 @@ function retryPrereleaseFallbackAfterMissingManifest(
   return true
 }
 
+/** Returns false when the check was deferred instead of launched, so timer-driven callers can re-arm. */
 function runBackgroundUpdateCheck(
   nudgeId: string | null = getPersistedPendingUpdateNudgeId()
-): void {
+): boolean {
+  if (activeUpdateSource === 'local' || localBuildSelectionInProgress) {
+    return false
+  }
   if (backgroundCheckLaunchPending || currentStatus.state === 'checking') {
-    return
+    return false
   }
   // Why: user disabled automatic checks. Return silently (no status change) so
   // the idle UI is unaffected; manual checkForUpdatesFromMenu bypasses this.
@@ -1106,7 +1282,7 @@ function runBackgroundUpdateCheck(
   }
   if (!app.isPackaged || is.dev) {
     sendStatus({ state: 'not-available' })
-    return
+    return false
   }
   // Why: set the nudge marker before any events arrive so later checks can't inherit a stale campaign id; persisted id keeps a nudge card dismissable after relaunch.
   activeUpdateNudgeId = nudgeId
@@ -1138,6 +1314,7 @@ function runBackgroundUpdateCheck(
       }
       void sendCheckFailureStatus(String(err?.message ?? err), wasUserInitiated, 'promise', err)
     })
+  return true
 }
 
 export function checkForUpdates(): void {
@@ -1167,6 +1344,20 @@ export function checkForUpdatesFromMenu(options?: UpdateCheckOptions): void {
     sendStatus({ state: 'not-available', userInitiated: true })
     return
   }
+  if (options?.localBuild) {
+    void checkForLocalBuildFromMenu()
+    return
+  }
+  if (localBuildSelectionInProgress) {
+    return
+  }
+  if (
+    activeUpdateSource === 'local' &&
+    (currentStatus.state === 'checking' || currentStatus.state === 'downloading')
+  ) {
+    return
+  }
+  restoreReleaseUpdateSource()
 
   const checkVariant = getUpdateCheckVariant(options)
   if (checkVariant === 'prerelease') {
@@ -1232,12 +1423,63 @@ export function checkForUpdatesFromMenu(options?: UpdateCheckOptions): void {
     })
 }
 
+async function checkForLocalBuildFromMenu(): Promise<void> {
+  if (process.platform !== 'darwin') {
+    sendLocalBuildErrorAndRestore(
+      'Local build switching is currently available only on macOS.',
+      true
+    )
+    return
+  }
+  if (currentStatus.state === 'checking' || currentStatus.state === 'downloading') {
+    return
+  }
+  if (localBuildSelectionInProgress) {
+    return
+  }
+  localBuildSelectionInProgress = true
+  try {
+    const [{ chooseLocalBuild }, { startLocalBuildFeed }] = await Promise.all([
+      import('./local-builds/local-build-switch'),
+      import('./local-builds/local-build-feed-server')
+    ])
+    const candidate = await chooseLocalBuild(mainWindowRef)
+    if (!candidate) {
+      return
+    }
+    closeLocalBuildFeed()
+    const feed = await startLocalBuildFeed(candidate)
+    activeLocalBuildFeed = feed
+    activeUpdateSource = 'local'
+    clearPrereleaseFallbackContext()
+    clearPublishingWindowLastGoodCheck()
+    clearAvailableUpdateContext()
+    activeUpdateNudgeId = null
+    userInitiatedCheck = true
+    sendStatus({ state: 'checking', userInitiated: true })
+
+    const updater = getAutoUpdater()
+    updater.allowDowngrade = true
+    updater.disableDifferentialDownload = true
+    updater.setFeedURL({ provider: 'generic', url: feed.url })
+    const attemptId = beginUpdateCheckAttempt()
+    markUpdateCheckLaunched(attemptId)
+    await updater.checkForUpdates()
+    handleSettledUpdateCheckPromise(attemptId)
+  } catch (error) {
+    userInitiatedCheck = false
+    sendLocalBuildErrorAndRestore(String((error as Error)?.message ?? error), true)
+  } finally {
+    localBuildSelectionInProgress = false
+  }
+}
+
 export function isQuittingForUpdate(): boolean {
   return quittingForUpdate
 }
 
 export function quitAndInstall(): void {
-  if (pendingQuitAndInstallTimer || quitAndInstallInProgress) {
+  if (localBuildSelectionInProgress || pendingQuitAndInstallTimer || quitAndInstallInProgress) {
     return
   }
 
@@ -1248,7 +1490,7 @@ export function quitAndInstall(): void {
   if (
     deferMacQuitUntilInstallerReady(
       currentStatus,
-      hasNewerDownloadedVersion(),
+      hasInstallableDownloadedVersion(),
       getPendingInstallVersion,
       sendStatus
     )
@@ -1332,6 +1574,24 @@ export function dismissNudge(): void {
   }
 }
 
+/**
+ * The user closed an offered update without taking it. For a local build that ends the session:
+ * nothing will consume the local feed now, so release checks must stop being deferred.
+ */
+export function dismissAvailableUpdate(): void {
+  if (activeUpdateSource !== 'local' || localBuildSelectionInProgress) {
+    return
+  }
+  // Why: only an un-acted 'available' card is abandoned — 'downloading'/'downloaded' still need the local feed and allowDowngrade.
+  if (currentStatus.state !== 'available') {
+    return
+  }
+  clearAvailableUpdateContext()
+  restoreReleaseUpdateSource()
+  // Why: leaving the card's 'available' status behind would let a retry download the local version off the restored release feed.
+  sendStatus({ state: 'idle' })
+}
+
 export function setupAutoUpdater(
   mainWindow: BrowserWindow,
   opts?: {
@@ -1377,6 +1637,10 @@ export function setupAutoUpdater(
 
   const autoUpdater = getAutoUpdater()
   autoUpdater.autoDownload = false
+  if (activeUpdateSource === 'release') {
+    autoUpdater.allowDowngrade = false
+    autoUpdater.disableDifferentialDownload = false
+  }
   // Why: supervised serve installs require an explicit handoff; ordinary service quits must never install implicitly.
   autoUpdater.autoInstallOnAppQuit = updateInstallMode === 'interactive'
   // Why: MacUpdater ignores quitAndInstall arguments; the surviving CLI supervisor must be the only serve relaunch owner.
@@ -1393,10 +1657,12 @@ export function setupAutoUpdater(
   // Security: never re-add a verifyUpdateCodeSignature override — a no-op disables electron-updater's built-in Authenticode check and accepts any installer.
 
   // Why: generic provider avoids the native GitHub provider's RC-channel filtering; per-check repinning to a concrete /releases/download/<tag>/ URL avoids /latest redirect drift between check and download.
-  autoUpdater.setFeedURL({
-    provider: 'generic',
-    url: 'https://github.com/stablyai/orca/releases/latest/download'
-  })
+  if (activeUpdateSource === 'release') {
+    autoUpdater.setFeedURL({
+      provider: 'generic',
+      url: 'https://github.com/stablyai/orca/releases/latest/download'
+    })
+  }
 
   if (autoUpdaterInitialized) {
     return
@@ -1416,7 +1682,8 @@ export function setupAutoUpdater(
     getUserInitiatedCheck: () => userInitiatedCheck,
     handleQuitAndInstallFailure,
     isQuitAndInstallHandoffActive,
-    hasNewerDownloadedVersion,
+    hasInstallableDownloadedVersion,
+    isLocalBuildCheck: () => activeUpdateSource === 'local',
     shouldHandleUpdaterErrorEvent,
     performQuitAndInstall,
     clearUpdateAvailableEventPending,
@@ -1430,6 +1697,7 @@ export function setupAutoUpdater(
     shouldSuppressMissingManifestPrereleaseFallbackEvent,
     suppressMissingManifestPrereleaseFallbackPromiseFailure,
     recordCompletedUpdateCheck,
+    restoreReleaseUpdateSource,
     sendStatus,
     scheduleAutomaticUpdateCheck,
     clearBackgroundCheckLaunchPending,
@@ -1480,13 +1748,13 @@ export function setupAutoUpdater(
 }
 
 export function downloadUpdate(): void {
-  if (downloadInFlight) {
+  if (localBuildSelectionInProgress || downloadInFlight) {
     return
   }
   // Why: allow retry from 'error' (availableVersion stays cached) so the error card's Retry Download button works.
   const canStart =
     currentStatus.state === 'available' ||
-    (currentStatus.state === 'error' && hasNewerDownloadedVersion())
+    (currentStatus.state === 'error' && hasInstallableDownloadedVersion())
   if (!canStart) {
     return
   }
@@ -1498,6 +1766,7 @@ export function downloadUpdate(): void {
     return
   }
   downloadInFlight = true
+  const localBuildDownload = activeUpdateSource === 'local'
   beginMacUpdateDownload()
   // Why: setup can take seconds before progress emits; surface acceptance now so the action never looks inert.
   sendStatus({ state: 'downloading', percent: 0, version })
@@ -1505,6 +1774,11 @@ export function downloadUpdate(): void {
     .downloadUpdate()
     .catch((err) => {
       downloadInFlight = false
-      sendErrorStatus(String(err?.message ?? err))
+      const message = String(err?.message ?? err)
+      if (localBuildDownload) {
+        sendLocalBuildErrorAndRestore(message)
+      } else {
+        sendErrorStatus(message)
+      }
     })
 }

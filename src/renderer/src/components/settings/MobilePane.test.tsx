@@ -105,8 +105,16 @@ vi.mock('./MobilePairingConnectionOptions', () => ({
   )
 }))
 vi.mock('./MobilePairingQrSection', () => ({
-  MobilePairingQrSection: (props: { qrDataUrl: string | null }) => (
-    <span data-testid="qr">{props.qrDataUrl ?? 'none'}</span>
+  MobilePairingQrSection: (props: {
+    qrDataUrl: string | null
+    pairingUrl: string | null
+    qrError: boolean
+  }) => (
+    <div>
+      <span data-testid="qr">{props.qrDataUrl ?? 'none'}</span>
+      <span data-testid="pairing-url">{props.pairingUrl ?? 'none'}</span>
+      <span data-testid="qr-error">{String(props.qrError)}</span>
+    </div>
   )
 }))
 vi.mock('./MobilePairedDevicesSection', () => ({
@@ -204,11 +212,11 @@ describe('MobilePane pairing connection mode', () => {
     await user.click(screen.getByRole('button', { name: 'Generate' }))
     await waitFor(() =>
       expect(screen.getByTestId('relay-degraded-notice')).toHaveTextContent(
-        'only works on your local network'
+        'only works on your LAN or Tailscale'
       )
     )
 
-    // Switching to Local network clears the mismatch along with the QR.
+    // Switching to LAN clears the mismatch along with the QR.
     await user.click(screen.getByRole('button', { name: 'choose-local' }))
     await waitFor(() =>
       expect(screen.queryByTestId('relay-degraded-notice')).not.toBeInTheDocument()
@@ -222,6 +230,25 @@ describe('MobilePane pairing connection mode', () => {
     await user.click(screen.getByRole('button', { name: 'Generate' }))
     await waitFor(() => expect(screen.getByTestId('qr')).toHaveTextContent('base64,qr'))
     expect(screen.queryByTestId('relay-degraded-notice')).not.toBeInTheDocument()
+  })
+
+  it('keeps the copy fallback when QR encoding fails', async () => {
+    getPairingQR.mockResolvedValue({
+      available: true,
+      qrDataUrl: null,
+      qrError: 'encoding_failed',
+      pairingUrl: 'orca://pair?code=copy-fallback',
+      endpoint: 'wss://host.example/large',
+      connectionMode: 'automatic'
+    })
+    const user = userEvent.setup()
+    render(<MobilePane />)
+
+    await user.click(screen.getByRole('button', { name: 'Generate' }))
+
+    await waitFor(() => expect(screen.getByTestId('qr-error')).toHaveTextContent('true'))
+    expect(screen.getByTestId('qr')).toHaveTextContent('none')
+    expect(screen.getByTestId('pairing-url')).toHaveTextContent('copy-fallback')
   })
 
   it('persists the chosen path when the mode changes', async () => {
@@ -301,7 +328,7 @@ describe('MobilePane pairing connection mode', () => {
     await new Promise((resolve) => setTimeout(resolve, 10))
     expect(screen.getByTestId('loading')).toHaveTextContent('false')
 
-    // Switching to Local network re-enables Generate (no signed-in gate).
+    // Switching to LAN re-enables Generate (no signed-in gate).
     await user.click(screen.getByRole('button', { name: 'choose-local' }))
     expect(screen.getByRole('button', { name: 'Generate' })).toBeEnabled()
   })
@@ -314,7 +341,7 @@ describe('MobilePane pairing connection mode', () => {
     await waitFor(() => expect(getPairingQR).toHaveBeenCalledWith({ connectionMode: 'automatic' }))
     expect(screen.getByTestId('loading')).toHaveTextContent('true')
 
-    // Switch to Local network before the mint resolves; loading must clear so
+    // Switch to LAN before the mint resolves; loading must clear so
     // Generate can be used again for the new path.
     await user.click(screen.getByRole('button', { name: 'choose-local' }))
     await waitFor(() => expect(screen.getByTestId('loading')).toHaveTextContent('false'))
@@ -352,7 +379,7 @@ describe('MobilePane pairing connection mode', () => {
     await user.click(screen.getByRole('button', { name: 'Generate' }))
     await waitFor(() => expect(getPairingQR).toHaveBeenCalledWith({ connectionMode: 'automatic' }))
 
-    // Switch to Local network before the Relay mint resolves.
+    // Switch to LAN before the Relay mint resolves.
     await user.click(screen.getByRole('button', { name: 'choose-local' }))
 
     resolveQr?.({

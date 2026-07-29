@@ -25,6 +25,7 @@ import { buildWindowsPtyCompatibilityOptions } from '@/lib/pane-manager/windows-
 import { buildTerminalKeyboardProtocolOptions } from '@/lib/pane-manager/terminal-keyboard-protocol'
 import { resolvePaneKeyboardProtocolAgent } from './terminal-keyboard-protocol-pane-agent'
 import { useAppStore } from '@/store'
+import type { DirectSshPaneRetryAttemptId } from '@/store/slices/direct-ssh-terminal-recovery'
 import {
   createFilePathLinkProvider,
   getTerminalFileOpenHint,
@@ -65,10 +66,13 @@ import {
 import { resolveTerminalLayoutActiveLeafId } from './terminal-layout-leaf-ids'
 import { makePaneKey } from '../../../../shared/stable-pane-id'
 import { applyExpandedLayoutTo, restoreExpandedLayoutFrom } from './expand-collapse'
-import { applyTerminalAppearance, installMode2031Handlers } from './terminal-appearance'
-import { pushMode2031SeedReply } from './terminal-mode-2031-replies'
-import { handleOsc52ClipboardRequest } from './osc52-clipboard'
-import { showOsc52ClipboardBlockedToast } from './osc52-clipboard-blocked-toast'
+import { applyTerminalAppearance } from './terminal-appearance'
+import { createOsc52OscHandler } from './osc52-clipboard'
+import {
+  showOsc52ClipboardBlockedToast,
+  showOsc52ClipboardFailedToast
+} from './osc52-clipboard-toast'
+import { copyTerminalSelection } from './terminal-selection-copy'
 import { parseOsc7 } from './parse-osc7'
 import { guardParserHandler } from './terminal-parser-handler-guard'
 import { resolveTerminalJisYenInput } from './terminal-jis-yen-input'
@@ -97,7 +101,6 @@ import {
 import type { PaneCwdMap } from './resolve-split-cwd'
 import { installMouseHideWhileTyping } from './mouse-hide-while-typing'
 import type { EffectiveMacOptionAsAlt } from '@/lib/keyboard-layout/detect-option-as-alt'
-import { resolveEffectiveTerminalAppearance } from '@/lib/terminal-theme'
 import { connectPanePty } from './pty-connection'
 import type { PtyTransport } from './pty-transport'
 import type { PtyTransportRecoveryState } from './pty-transport-types'
@@ -109,6 +112,7 @@ import { getRemoteRuntimePtyEnvironmentId } from '@/runtime/runtime-terminal-str
 import { getConnectionId } from '@/lib/connection-context'
 import { getExecutionHostIdForWorktree } from '@/lib/worktree-runtime-owner'
 import { isPaneReplaying, type ReplayingPanesRef } from './replay-guard'
+import { canReleaseReplayedScrollbackFromStore } from './replayed-scrollback-store-release'
 import { fitAndFocusPanes, fitPanes } from './pane-helpers'
 import { markTerminalPinnedViewport } from '@/lib/pane-manager/terminal-scroll-intent'
 import { syncTerminalScrollIntentSoon } from '@/lib/pane-manager/terminal-scroll-intent-settle'
@@ -131,7 +135,10 @@ import {
 import { acquireWebviewsDragPassthrough } from '../browser-pane/webview-registry'
 import { recordCreatedTerminalPaneSplit } from './terminal-pane-split-completion'
 import { closeTerminalTab } from '../terminal/terminal-tab-actions'
-import { seedStartupSessionRestoredBanner } from './session-restored-banner-pane-state'
+import {
+  seedStartupSessionRestoredBanner,
+  type SessionRestoredBannerReason
+} from './session-restored-banner-pane-state'
 import {
   resolveTabTitleAfterPaneClose,
   shouldClearLaunchAgentForClosedPane
@@ -274,14 +281,19 @@ type UseTerminalPaneLifecycleDeps = {
   updateTabTitle: (tabId: string, title: string) => void
   setRuntimePaneTitle: (tabId: string, paneId: number, title: string) => void
   clearRuntimePaneTitle: (tabId: string, paneId: number) => void
-  updateTabPtyId: (tabId: string, ptyId: string, replacedPtyId?: string) => void
+  updateTabPtyId: (
+    tabId: string,
+    ptyId: string,
+    replacedPtyId?: string,
+    directSshRetryAttemptId?: DirectSshPaneRetryAttemptId
+  ) => void
   markWorktreeUnread: (worktreeId: string) => void
   markTerminalTabUnread: (tabId: string) => void
   markTerminalPaneUnread: (paneKey: string) => void
   clearWorktreeUnread: (worktreeId: string) => void
   clearTerminalTabUnread: (tabId: string) => void
   clearTerminalPaneUnread: (paneKey: string) => void
-  onShowSessionRestoredBanner: (paneId: number) => void
+  onShowSessionRestoredBanner: (paneId: number, reason?: SessionRestoredBannerReason) => void
   dispatchNotification: (event: {
     source: 'terminal-bell' | 'agent-task-complete'
     terminalTitle?: string
@@ -571,8 +583,6 @@ export function useTerminalPaneLifecycle({
   // Why: read settingsRef at fire time so toggling "copy on select" applies without recreating panes.
   const selectionDisposablesRef = useRef(new Map<number, IDisposable>())
   const selectionCaptureTimersRef = useRef(new Map<number, number>())
-  const mode2031DisposablesRef = useRef(new Map<number, IDisposable[]>())
-  const mode2031SeedAttemptTokensRef = useRef(new Map<number, symbol>())
   const osc52DisposablesRef = useRef(new Map<number, IDisposable>())
   const osc7DisposablesRef = useRef(new Map<number, IDisposable>())
   const mouseHideDisposablesRef = useRef(new Map<number, IDisposable>())
@@ -596,30 +606,6 @@ export function useTerminalPaneLifecycle({
       paneMode2031Ref.current,
       paneLastThemeModeRef.current
     )
-  }
-
-  const pushMode2031ForPane = (paneId: number): void => {
-    const attemptToken = Symbol()
-    mode2031SeedAttemptTokensRef.current.set(paneId, attemptToken)
-    pushMode2031SeedReply(paneId, {
-      hasPane: (candidateId) =>
-        managerRef.current?.getPanes().some((pane) => pane.id === candidateId) === true,
-      isSubscribed: (candidateId) => paneMode2031Ref.current.get(candidateId) === true,
-      // Why: an older connect retry must not answer a later resubscription.
-      isCurrentAttempt: (candidateId) =>
-        mode2031SeedAttemptTokensRef.current.get(candidateId) === attemptToken,
-      getTransport: (candidateId) => paneTransportsRef.current.get(candidateId),
-      getMode: () => {
-        const currentSettings = settingsRef.current
-        return currentSettings
-          ? resolveEffectiveTerminalAppearance(currentSettings, systemPrefersDarkRef.current).mode
-          : null
-      },
-      recordMode: (candidateId, mode) => paneLastThemeModeRef.current.set(candidateId, mode),
-      schedule: (callback, delayMs) => {
-        window.setTimeout(callback, delayMs)
-      }
-    })
   }
 
   // Initialize PaneManager instance once
@@ -782,35 +768,18 @@ export function useTerminalPaneLifecycle({
     const manager = new PaneManager(container, {
       // `spawnHints.cwd` (from Split actions) lets the new PTY inherit the source pane's cwd — see docs/ssh-split-pane-inherit-cwd.md.
       onPaneCreated: (pane, spawnHints) => {
-        // Install mode 2031 handlers before PTY attach so the child's initial CSI ?2031h is captured.
-        const mode2031Disposables = installMode2031Handlers({
-          paneId: pane.id,
-          parser: pane.terminal.parser,
-          onSubscribe: () => {
-            // Why: for hidden-delivery-gate PTYs, main's '2031-subscribe' fact is the sole responder — don't send a second reply.
-            const binding = panePtyBindings.get(pane.id) as
-              | (IDisposable & { isHiddenDeliveryGateManagedPty?: () => boolean })
-              | undefined
-            if (binding?.isHiddenDeliveryGateManagedPty?.()) {
-              return
-            }
-            pushMode2031ForPane(pane.id)
-          },
-          isReplaying: () => isPaneReplaying(replayingPanesRef, pane.id),
-          paneMode2031: paneMode2031Ref.current,
-          paneLastThemeMode: paneLastThemeModeRef.current
-        })
-        mode2031DisposablesRef.current.set(pane.id, mode2031Disposables)
-
-        // OSC 52 — TUI-initiated clipboard writes (tmux/nvim/fzf/ssh).
+        // OSC 52 — TUI-initiated clipboard writes (Zellij/tmux/nvim/fzf/ssh).
         // Why: read settingsRef at fire time so mid-session gate toggles apply; return true in both paths so xterm doesn't fall through.
         const osc52Disposable = pane.terminal.parser.registerOscHandler(
           52,
-          guardParserHandler('osc-52-clipboard', (data) =>
-            handleOsc52ClipboardRequest(data, {
-              allowClipboardWrite: settingsRef.current?.terminalAllowOsc52Clipboard === true,
-              writeClipboardText: window.api.ui.writeClipboardText,
-              onBlockedWrite: showOsc52ClipboardBlockedToast
+          guardParserHandler(
+            'osc-52-clipboard',
+            createOsc52OscHandler({
+              getSettingEnabled: () => settingsRef.current?.terminalAllowOsc52Clipboard,
+              getReplaying: () => isPaneReplaying(replayingPanesRef, pane.id),
+              writeClipboardText: (text) => window.api.ui.writeTerminalClipboardText(text),
+              showBlockedWriteToast: showOsc52ClipboardBlockedToast,
+              showWriteFailedToast: showOsc52ClipboardFailedToast
             })
           )
         )
@@ -1059,11 +1028,10 @@ export function useTerminalPaneLifecycle({
           if (!shouldWriteClipboard) {
             return
           }
-          const selection = pane.terminal.getSelection()
-          if (!selection) {
-            return
-          }
-          void window.api.ui.writeClipboardText(selection).catch(() => {
+          void copyTerminalSelection({
+            terminal: pane.terminal,
+            writeClipboardText: window.api.ui.writeTerminalClipboardText
+          }).catch(() => {
             /* ignore clipboard write failures */
           })
         })
@@ -1179,15 +1147,7 @@ export function useTerminalPaneLifecycle({
           window.clearTimeout(selectionCaptureTimer)
           selectionCaptureTimersRef.current.delete(paneId)
         }
-        const mode2031Disposables = mode2031DisposablesRef.current.get(paneId)
-        if (mode2031Disposables) {
-          for (const d of mode2031Disposables) {
-            d.dispose()
-          }
-          mode2031DisposablesRef.current.delete(paneId)
-        }
         paneMode2031Ref.current.delete(paneId)
-        mode2031SeedAttemptTokensRef.current.delete(paneId)
         paneKittyKeyboardModesRef.current.delete(paneId)
         paneLastThemeModeRef.current.delete(paneId)
         const osc52Disposable = osc52DisposablesRef.current.get(paneId)
@@ -1423,12 +1383,23 @@ export function useTerminalPaneLifecycle({
       replayingPanesRef,
       restoredViewportBlankingPanesRef
     )
-    if (restoredBuffers && initialLayoutRef.current.scrollbackRefsByLeafId) {
+    const hasScrollbackRefs = Boolean(initialLayoutRef.current.scrollbackRefsByLeafId)
+    if (
+      restoredBuffers &&
+      canReleaseReplayedScrollbackFromStore({
+        hasScrollbackRefs,
+        worktreeId,
+        repos: useAppStore.getState().repos
+      })
+    ) {
       const layoutWithoutRestoredBuffers = { ...initialLayoutRef.current }
       delete layoutWithoutRestoredBuffers.buffersByLeafId
-      initialLayoutRef.current = layoutWithoutRestoredBuffers
+      if (hasScrollbackRefs) {
+        // Why refs-only: without a disk ref this mount is the sole replay source, so a re-run (StrictMode) still needs the bytes.
+        initialLayoutRef.current = layoutWithoutRestoredBuffers
+      }
       if (initialLayoutHadBuffers) {
-        // Why: raw replay bytes belong to this mount only; drop legacy hydrated copies from Zustand so session writes stay ref-only.
+        // Why: xterm owns the replayed bytes now; leaving the park-time copy in Zustand retains up to 512KB/leaf for the app's lifetime.
         useAppStore.getState().setTabLayout(tabId, layoutWithoutRestoredBuffers)
       }
     }

@@ -29,6 +29,13 @@ const AutomationWorkspaceProvenanceRequest = z.object({
   createRequestId: z.string()
 })
 
+// Why no dispatch token (unlike automation provenance): this is a descriptive
+// origin marker for sidebar filtering, not an authority grant. The host stamps
+// createdAt itself so a client clock can't skew sort order.
+const CliWorkspaceProvenanceRequest = z.object({
+  callerTerminalHandle: OptionalString
+})
+
 export const WorktreeListParams = z.object({
   repo: OptionalString,
   limit: OptionalFiniteNumber
@@ -128,8 +135,9 @@ export const WorktreeCreate = z
       )
       .pipe(z.union([z.enum(['run', 'skip', 'inherit']), z.undefined()]))
       .optional(),
-    // Why: mobile clients pass a startup command (e.g. 'claude') so the first
-    // terminal pane launches the selected agent instead of an idle shell.
+    // Why: some clients (e.g. desktop) pass a pre-built launch command so the
+    // first terminal pane launches the selected agent instead of an idle shell.
+    // Clients that can't quote for the host shell send `startupAgent` instead.
     startupCommand: OptionalString,
     startupEnv: z.record(z.string(), z.string()).optional(),
     startupLaunchConfig: sleepingAgentLaunchConfigSchema,
@@ -148,7 +156,8 @@ export const WorktreeCreate = z
     // Why: mobile retries a create interrupted by a connection migration with the
     // same key so the host dedupes instead of spawning a duplicate worktree.
     clientMutationId: z.string().min(1).max(128).optional(),
-    automationProvenanceRequest: AutomationWorkspaceProvenanceRequest.optional()
+    automationProvenanceRequest: AutomationWorkspaceProvenanceRequest.optional(),
+    cliProvenanceRequest: CliWorkspaceProvenanceRequest.optional()
   })
   .superRefine((params, ctx) => {
     if ((params.parentWorkspace || params.parentWorktree) && params.noParent === true) {
@@ -180,7 +189,10 @@ export const WorktreePrefetchCreateBase = z.object({
 })
 
 export const WorktreeSet = WorktreeSelector.extend({
-  displayName: OptionalString,
+  // Why: '' is the blanking contract — "fall back to the branch/folder name".
+  // OptionalString coerced it to undefined, so on remote/SSH hosts clearing the
+  // name was dropped here and the old name came back on the next refresh.
+  displayName: OptionalPlainString,
   // Why: empty comments are meaningful metadata updates, so use the plain
   // string parser instead of OptionalString's empty-as-undefined behavior.
   comment: OptionalPlainString,

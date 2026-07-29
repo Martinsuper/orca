@@ -23,9 +23,9 @@ import type {
   Worktree,
   WorktreeLineage,
   WorkspaceLineage,
-  WorktreeLineageWarning
+  WorktreeLineageWarning,
+  TerminalPaneLayoutNode
 } from './types'
-import type { TerminalPaneLayoutNode } from './types'
 import type {
   RuntimeMarkdownReadTabResult,
   RuntimeMarkdownSaveTabResult
@@ -37,7 +37,10 @@ import type {
   SleepingAgentLaunchConfig
 } from './agent-session-resume'
 import type { StartupCommandDelivery } from './codex-startup-delivery'
+import type { RemoteServerUpdateSupport } from './remote-server-update'
 import type { ExecutionHostId } from './execution-host'
+import type { PtyIncarnationId } from './pty-incarnation'
+import type { RasterImageDimensions } from './raster-image-dimensions'
 
 export type { RuntimeMarkdownReadTabResult, RuntimeMarkdownSaveTabResult }
 
@@ -75,6 +78,9 @@ export type RuntimeStatus = {
   runtimeProtocolVersion?: number
   minCompatibleRuntimeClientVersion?: number
   capabilities?: RuntimeCapability[]
+  // Why: optional fields let updated clients inventory both new and legacy paired servers.
+  appVersion?: string
+  remoteUpdateSupport?: RemoteServerUpdateSupport
   remoteControl?: RemoteRuntimeSharedConnectionDiagnostics | null
   hostPlatform?: NodeJS.Platform
   terminalWindowsShell?: string | null
@@ -107,6 +113,9 @@ export type CliStatusResult = {
     state: CliRuntimeState
     reachable: boolean
     runtimeId: string | null
+    appVersion?: string
+    remoteUpdateSupport?: RemoteServerUpdateSupport
+    capabilities?: RuntimeCapability[]
   }
   graph: {
     state: RuntimeGraphStatus | 'not_running' | 'starting'
@@ -162,6 +171,9 @@ export type RuntimeMobileSessionTerminalTab = {
   /** Per-tab view preference (terminal xterm vs native chat). Host-persisted so
    *  paired clients converge; clients still win during the optimistic echo window. */
   viewMode?: 'terminal' | 'chat'
+  /** Launch context delivered only into the TUI input as an unsent draft; the
+   *  mobile chat composer adopts it so the context isn't invisible in chat. */
+  launchDraft?: string
   isActive: boolean
 }
 
@@ -399,6 +411,7 @@ export type RuntimeFilePreviewResult = {
   isBinary: boolean
   isImage?: boolean
   mimeType?: string
+  imageDimensions?: RasterImageDimensions
 }
 
 export type RuntimeFileReadChunkResult = {
@@ -410,6 +423,8 @@ export type RuntimeFileReadChunkResult = {
 export type RuntimeTerminalSummary = {
   handle: string
   ptyId: string | null
+  incarnationId?: string | null
+  orphaned?: boolean
   worktreeId: string
   worktreePath: string
   branch: string
@@ -473,8 +488,52 @@ export type RuntimeTerminalVisualLayout = {
 export type RuntimeTerminalListResult = {
   terminals: RuntimeTerminalSummary[]
   visualLayouts?: RuntimeTerminalVisualLayout[]
+  topologyRevisions?: Record<string, number>
   totalCount: number
   truncated: boolean
+}
+
+export type RuntimeTerminalOrphanAdoptionClaim = {
+  terminal: string
+  ptyId: string
+  incarnationId: PtyIncarnationId
+  tabId: string
+  leafId: string
+}
+
+export type RuntimeTerminalOrphanTopologyTab = {
+  tabId: string
+  root: TerminalPaneLayoutNode
+  activeLeafId: string
+  expandedLeafId: string | null
+}
+
+export type RuntimeTerminalOrphanTopologyGroup = {
+  id: string
+  activeTabId: string
+  tabOrder: string[]
+  recentTabIds?: string[]
+}
+
+export type RuntimeTerminalOrphanTopology = {
+  tabs: RuntimeTerminalOrphanTopologyTab[]
+  groups: RuntimeTerminalOrphanTopologyGroup[]
+  groupLayout?: TabGroupLayoutNode
+}
+
+export type RuntimeTerminalOrphanAdoptionRequest = {
+  worktree: string
+  expectedTopologyRevision: number
+  claims: RuntimeTerminalOrphanAdoptionClaim[]
+  activeTabId?: string
+  activeGroupId?: string
+  topology?: RuntimeTerminalOrphanTopology
+}
+
+export type RuntimeTerminalOrphanAdoptionResult = {
+  adopted: boolean
+  topologyRevision: number
+  snapshot: RuntimeMobileSessionTabsResult
 }
 
 export type RuntimeWorktreeTerminalSleepFailure =

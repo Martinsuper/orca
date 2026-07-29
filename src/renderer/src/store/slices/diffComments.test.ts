@@ -134,6 +134,7 @@ import { createAgentStatusSlice } from './agent-status'
 import { createPaneForegroundAgentSlice } from './pane-foreground-agent'
 import { createDiffCommentsSlice } from './diffComments'
 import { createDetectedAgentsSlice } from './detected-agents'
+import { createRuntimeDetectedAgentsSlice } from './runtime-detected-agents'
 import { createWorktreeNavHistorySlice } from './worktree-nav-history'
 import { createDictationSlice } from './dictation'
 import { createWorkspaceCleanupSlice } from './workspace-cleanup'
@@ -144,6 +145,7 @@ import { createPinnedTabCloseConfirmSlice } from './pinned-tab-close-confirm'
 import { createRecentlyClosedTabsSlice } from './recently-closed-tabs'
 import { createOrcaProfilesSlice } from './orca-profiles'
 import { createNewIssueDraftSlice } from './new-issue-draft'
+import { createRemoteServerUpdatesSlice } from './remote-server-updates'
 
 function createTestStore() {
   return create<AppState>()((...a) => ({
@@ -176,6 +178,7 @@ function createTestStore() {
     ...createPaneForegroundAgentSlice(...a),
     ...createDiffCommentsSlice(...a),
     ...createDetectedAgentsSlice(...a),
+    ...createRuntimeDetectedAgentsSlice(...a),
     ...createWorktreeNavHistorySlice(...a),
     ...createDictationSlice(...a),
     ...createWorkspaceCleanupSlice(...a),
@@ -185,7 +188,8 @@ function createTestStore() {
     ...createPinnedTabCloseConfirmSlice(...a),
     ...createRecentlyClosedTabsSlice(...a),
     ...createOrcaProfilesSlice(...a),
-    ...createNewIssueDraftSlice(...a)
+    ...createNewIssueDraftSlice(...a),
+    ...createRemoteServerUpdatesSlice(...a)
   }))
 }
 

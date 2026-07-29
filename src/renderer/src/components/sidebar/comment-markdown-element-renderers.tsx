@@ -8,6 +8,7 @@ import {
   isGitHubUserAttachmentUrl,
   isGitHubUserAttachmentVideoLink
 } from './comment-markdown-github-attachment-media'
+import { ExpandableMarkdownImage } from './MarkdownImageLightbox'
 
 export type CommentMarkdownLinkClickHandler = (
   event: React.MouseEvent<HTMLElement>,
@@ -51,7 +52,8 @@ function handleMarkdownImageClick(
 }
 
 export function createCompactCommentMarkdownComponents(
-  onLinkClick?: CommentMarkdownLinkClickHandler
+  onLinkClick?: CommentMarkdownLinkClickHandler,
+  expandImages = false
 ): Components {
   return {
     // Strip <p> wrappers to avoid double margins in the tight card layout.
@@ -156,6 +158,17 @@ export function createCompactCommentMarkdownComponents(
           >
             {alt || src}
           </a>
+        )
+      }
+
+      if (expandImages) {
+        return (
+          <ExpandableMarkdownImage
+            src={src}
+            alt={alt}
+            triggerClassName="my-1"
+            className="max-h-32 max-w-full rounded-sm object-contain outline outline-1 outline-border/70"
+          />
         )
       }
 
@@ -271,20 +284,31 @@ export function createDocumentCommentMarkdownComponents(
         // back to a text link when the image itself can't render.
         return <GitHubUserAttachmentImage src={src} alt={alt} />
       }
-      const imageClassName = [
-        'my-3 max-h-96 max-w-full rounded-md object-contain',
-        'outline outline-1 outline-black/10 dark:outline-white/10',
-        onLinkClick ? 'cursor-pointer' : ''
-      ]
-        .filter(Boolean)
-        .join(' ')
-
+      if (!src) {
+        return alt ? <span>{alt}</span> : null
+      }
+      // Why: Jira/Linear/GitHub document bodies often embed screenshots; open a
+      // viewport-centered lightbox so the preview is not trapped in the drawer.
+      if (onLinkClick) {
+        const imageClassName = [
+          'my-3 max-h-96 max-w-full rounded-md object-contain',
+          'outline outline-1 outline-black/10 dark:outline-white/10',
+          'cursor-pointer'
+        ].join(' ')
+        return (
+          <img
+            src={src}
+            alt={alt ?? ''}
+            className={imageClassName}
+            onClick={(e) => handleMarkdownImageClick(e, src, onLinkClick)}
+          />
+        )
+      }
       return (
-        <img
+        <ExpandableMarkdownImage
           src={src}
-          alt={alt ?? ''}
-          className={imageClassName}
-          onClick={(e) => handleMarkdownImageClick(e, src, onLinkClick)}
+          alt={alt}
+          className="max-h-96 max-w-full rounded-md object-contain outline outline-1 outline-black/10 dark:outline-white/10"
         />
       )
     },

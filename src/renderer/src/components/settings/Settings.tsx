@@ -51,6 +51,7 @@ import { NotificationsPane } from './NotificationsPane'
 import { VoicePane } from './VoicePane'
 import { SshPane } from './SshPane'
 import { ExperimentalPane } from './ExperimentalPane'
+import { PluginsSettingsSection } from './PluginsSettingsSection'
 import { AgentsPane } from './AgentsPane'
 import { OrchestrationPane } from './OrchestrationPane'
 import { LinearAgentSkillPane } from './LinearAgentSkillPane'
@@ -76,9 +77,11 @@ import { isIntentionalAppRestartInProgress } from '@/lib/updater-beforeunload'
 import { registerWindowCloseGuard } from '../window-close-request-coordinator'
 import { checkRuntimeHooks } from '@/runtime/runtime-hooks-client'
 import {
-  getWindowsTerminalCapabilityOwnerKey,
+  isWindowsTerminalCapabilityHost,
+  useLocalWindowsTerminalCapabilities,
   useWindowsTerminalCapabilities
 } from '@/lib/windows-terminal-capabilities'
+import { useWindowsTerminalCapabilityOwnerKey } from '@/hooks/useWindowsTerminalCapabilityOwnerKey'
 import { getActiveRuntimeTarget } from '@/runtime/runtime-rpc-client'
 import { getShortcutPlatform } from '@/lib/shortcut-platform'
 import { keybindingMatchesAction } from '../../../../shared/keybindings'
@@ -280,7 +283,10 @@ function Settings(): React.JSX.Element {
   const settings = useAppStore((s) => s.settings)
   const keybindings = useAppStore((s) => s.keybindings)
   const updateSettings = useAppStore((s) => s.updateSettings)
-  const switchRuntimeEnvironment = useAppStore((s) => s.switchRuntimeEnvironment)
+  const updateSettingsOrThrow = useAppStore((s) => s.updateSettingsOrThrow)
+  const setActiveRuntimeEnvironmentPreference = useAppStore(
+    (s) => s.setActiveRuntimeEnvironmentPreference
+  )
   const fetchSettings = useAppStore((s) => s.fetchSettings)
   const fetchKeybindings = useAppStore((s) => s.fetchKeybindings)
   const closeSettingsPage = useAppStore((s) => s.closeSettingsPage)
@@ -643,7 +649,7 @@ function Settings(): React.JSX.Element {
     }
     pendingNavSectionRef.current = paneSectionId
     pendingScrollTargetRef.current = settingsNavigationTarget.sectionId ?? paneSectionId
-    // Why: force Appearance's collapsed status-bar accordion open before scrolling so the row is visible.
+    // Why: ensure Appearance's nested status-bar section is open before scrolling so the row is visible.
     if (settingsNavigationTarget.pane === 'appearance') {
       const accordion = resolveAppearanceAccordionDeepLink(settingsNavigationTarget.sectionId)
       if (accordion) {
@@ -830,32 +836,59 @@ function Settings(): React.JSX.Element {
       }),
     [activeSectionId, mountedSectionIds, navSections, settingsSearchQuery, visibleSectionIds]
   )
-  const windowsTerminalCapabilityOwnerKey = getWindowsTerminalCapabilityOwnerKey(
+  const windowsTerminalCapabilityOwnerKey = useWindowsTerminalCapabilityOwnerKey(
     settings?.activeRuntimeEnvironmentId
   )
   const runtimeTarget = useMemo(() => getActiveRuntimeTarget(settings), [settings])
+  const capabilityLoadTarget = useMemo(
+    () => (isWebClient ? { kind: 'local' as const } : runtimeTarget),
+    [isWebClient, runtimeTarget]
+  )
   const hasActiveRuntimeEnvironment = Boolean(settings?.activeRuntimeEnvironmentId?.trim())
   const needsRepoWindowsRuntimeCapabilities = [...neededSectionIds].some((sectionId) =>
     sectionId.startsWith('repo-')
   )
+  const needsLocalWindowsRuntimeCapabilities =
+    (isWindows || isWebClient) &&
+    (neededSectionIds.has('agents') || neededSectionIds.has('general'))
   const shouldLoadWindowsTerminalCapabilities =
     hasActiveRuntimeEnvironment ||
     ((isWindows || isWebClient) &&
       (neededSectionIds.has('terminal') ||
-        neededSectionIds.has('general') ||
         neededSectionIds.has('accounts') ||
-        neededSectionIds.has('agents') ||
-        needsRepoWindowsRuntimeCapabilities))
-  // Why: General owns the Orca CLI controls, including WSL skill-location setup.
+        needsRepoWindowsRuntimeCapabilities ||
+        (runtimeTarget.kind === 'local' && needsLocalWindowsRuntimeCapabilities)))
+  // Why: terminal, account, and repository settings describe the active execution host.
   const windowsTerminalCapabilities = useWindowsTerminalCapabilities(
     shouldLoadWindowsTerminalCapabilities,
     true,
     windowsTerminalCapabilityOwnerKey,
-    runtimeTarget
+    capabilityLoadTarget
   )
+  // Why: global agent and project defaults belong to the desktop, not its active remote.
+  const remoteViewLocalWindowsRuntimeCapabilities = useLocalWindowsTerminalCapabilities(
+    needsLocalWindowsRuntimeCapabilities && runtimeTarget.kind === 'environment' && !isWebClient,
+    true,
+    'local'
+  )
+  const localWindowsRuntimeCapabilities =
+    runtimeTarget.kind === 'local' || isWebClient
+      ? windowsTerminalCapabilities
+      : remoteViewLocalWindowsRuntimeCapabilities
   // Why: only supported-but-unavailable WSL (Windows) should render disabled controls, not unsupported WSL (macOS/Linux).
-  const wslSupportedPlatform = isWindows || windowsTerminalCapabilities.hostPlatform === 'win32'
-  const isWindowsTerminalHost = isWindows || windowsTerminalCapabilities.hostPlatform === 'win32'
+  const runtimeWslSupportedPlatform = isWindowsTerminalCapabilityHost({
+    isWindowsRenderer: isWindows,
+    isWebClient,
+    target: runtimeTarget,
+    hostPlatform: windowsTerminalCapabilities.hostPlatform
+  })
+  const localWslSupportedPlatform = isWindowsTerminalCapabilityHost({
+    isWindowsRenderer: isWindows,
+    isWebClient,
+    target: { kind: 'local' },
+    hostPlatform: localWindowsRuntimeCapabilities.hostPlatform
+  })
+  const isWindowsTerminalHost = runtimeWslSupportedPlatform
 
   if ([...neededSectionIds].some((id) => !mountedSectionIds.has(id))) {
     // Why: record newly needed sections during render so panes don't wait for a follow-up Effect.
@@ -972,7 +1005,7 @@ function Settings(): React.JSX.Element {
     const scrollTargetId = pendingScrollTargetRef.current
     const pendingNavSectionId = pendingNavSectionRef.current
 
-    // Why: subsection deep links clear a stale filter that could hide the target row; pane-level links keep it to force-open the matching accordion.
+    // Why: subsection deep links clear a stale filter that could hide the target row; pane-level links keep it to force-open the matching section.
     if (
       scrollTargetId &&
       pendingNavSectionId &&
@@ -1179,10 +1212,10 @@ function Settings(): React.JSX.Element {
                     <AgentsPane
                       settings={settings}
                       updateSettings={updateSettings}
-                      wslSupportedPlatform={wslSupportedPlatform}
-                      wslAvailable={windowsTerminalCapabilities.wslAvailable}
-                      wslDistros={windowsTerminalCapabilities.wslDistros}
-                      wslCapabilitiesLoading={windowsTerminalCapabilities.isLoading}
+                      wslSupportedPlatform={localWslSupportedPlatform}
+                      wslAvailable={localWindowsRuntimeCapabilities.wslAvailable}
+                      wslDistros={localWindowsRuntimeCapabilities.wslDistros}
+                      wslCapabilitiesLoading={localWindowsRuntimeCapabilities.isLoading}
                     />
                   ) : null}
                 </SettingsSection>
@@ -1207,7 +1240,7 @@ function Settings(): React.JSX.Element {
                     <AccountsPane
                       settings={settings}
                       updateSettings={updateSettings}
-                      wslSupportedPlatform={wslSupportedPlatform}
+                      wslSupportedPlatform={runtimeWslSupportedPlatform}
                       wslAvailable={windowsTerminalCapabilities.wslAvailable}
                       wslDistros={windowsTerminalCapabilities.wslDistros}
                       wslCapabilitiesLoading={windowsTerminalCapabilities.isLoading}
@@ -1306,10 +1339,10 @@ function Settings(): React.JSX.Element {
                       updateSettings={updateSettings}
                       fontSuggestions={terminalFontSuggestions}
                       onRequestFontSuggestions={requestFontSuggestions}
-                      wslSupportedPlatform={wslSupportedPlatform}
-                      wslAvailable={windowsTerminalCapabilities.wslAvailable}
-                      wslDistros={windowsTerminalCapabilities.wslDistros}
-                      wslCapabilitiesLoading={windowsTerminalCapabilities.isLoading}
+                      wslSupportedPlatform={localWslSupportedPlatform}
+                      wslAvailable={localWindowsRuntimeCapabilities.wslAvailable}
+                      wslDistros={localWindowsRuntimeCapabilities.wslDistros}
+                      wslCapabilitiesLoading={localWindowsRuntimeCapabilities.isLoading}
                     />
                   ) : null}
                 </SettingsSection>
@@ -1612,7 +1645,7 @@ function Settings(): React.JSX.Element {
                   {isSectionMounted('servers') ? (
                     <RuntimeEnvironmentsPane
                       settings={settings}
-                      switchRuntimeEnvironment={switchRuntimeEnvironment}
+                      setActiveRuntimeEnvironmentPreference={setActiveRuntimeEnvironmentPreference}
                       canGeneratePairingUrl={!isWebClient}
                       allowLocalRuntime={!isWebClient}
                       addServerIntentSignal={remoteServerAddIntentSignal}
@@ -1721,6 +1754,14 @@ function Settings(): React.JSX.Element {
                     />
                   ) : null}
                 </SettingsSection>
+
+                {showDesktopOnlySettings ? (
+                  <PluginsSettingsSection
+                    mounted={isSectionMounted('plugins')}
+                    settings={settings}
+                    updateSettings={updateSettingsOrThrow}
+                  />
+                ) : null}
 
                 {settingsProjectList.map((settingsProject) => {
                   const repoSectionId = `repo-${settingsProject.representativeRepoId}`

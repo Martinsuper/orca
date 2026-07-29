@@ -77,6 +77,10 @@ import {
 } from '../../../shared/tui-agent-launch-defaults'
 import { normalizeAutoRenameBranchFromWorkDefaultOn } from '../../../shared/auto-rename-branch-from-work-settings'
 import { normalizeTerminalCursorStyleDefault } from '../../../shared/terminal-cursor-style-settings'
+import {
+  normalizeOsc52ClipboardDefaultOn,
+  osc52ClipboardDefaultOnOverridesPersistedOff
+} from '../../../shared/osc52-clipboard-settings'
 import { normalizeTerminalCustomThemes } from '../../../shared/terminal-custom-themes'
 import { normalizeUiLanguage } from '../../../shared/ui-language'
 import { normalizeUsagePercentageDisplay } from '../../../shared/usage-percentage-display'
@@ -107,6 +111,7 @@ import {
   type StoredWebRuntimeEnvironment
 } from './web-runtime-environment'
 import { parseWebPairingInput } from './web-pairing'
+import { copyClipboardTextViaExecCommand } from './web-clipboard-copy-fallback'
 import { WebRuntimeClient } from './web-runtime-client'
 import { RuntimeRpcCallQueuePool } from '../../../shared/runtime-rpc-call-queue'
 import {
@@ -484,6 +489,26 @@ export function installWebPreloadApi(): void {
   window.api = withFallback(createWebPreloadApi(), []) as PreloadApi
 }
 
+async function writeWebClipboardText(text: string): Promise<void> {
+  await assertClipboardTextWriteWithinLimitWithYield(text)
+  const clipboard = navigator.clipboard
+  if (typeof clipboard?.writeText === 'function') {
+    try {
+      await clipboard.writeText(text)
+      return
+    } catch (error) {
+      // Preserve the current user-activation turn for the synchronous fallback.
+      if (copyClipboardTextViaExecCommand(text)) {
+        return
+      }
+      throw error
+    }
+  }
+  if (!copyClipboardTextViaExecCommand(text)) {
+    throw new Error('Clipboard write is unavailable in this browser context')
+  }
+}
+
 function createWebPreloadApi(): Partial<PreloadApi> {
   const webOrcaProfileAuthStatus = () =>
     Promise.resolve({
@@ -629,18 +654,27 @@ function createWebPreloadApi(): Partial<PreloadApi> {
       // Why: localStorage-backed settings are synchronous, so the pre-hydration kill-switch read works the same as desktop.
       getSync: () => getStoredSettings(),
       set: async (updates) => {
-        if (updates.activeRuntimeEnvironmentId === null) {
-          disconnectActiveRuntimeEnvironment()
-        }
         const sanitizedUpdates = { ...updates }
+        delete sanitizedUpdates.activeRuntimeEnvironmentId
         if ('autoRenameBranchFromWorkDefaultedOn' in sanitizedUpdates) {
           sanitizedUpdates.autoRenameBranchFromWorkDefaultedOn = true
         }
         const next = mergeSettings(getStoredSettings(), sanitizedUpdates, {
           preserveAutoRenameBranchFromWorkUpdate: 'autoRenameBranchFromWork' in sanitizedUpdates
         })
-        writeJson(SETTINGS_STORAGE_KEY, next)
+        writeStoredSettings(next)
         return syncRuntimeBackedSettings(sanitizedUpdates, next)
+      },
+      setActiveRuntimeEnvironmentPreference: async ({ environmentId }) => {
+        const requestedEnvironmentId = environmentId?.trim() || null
+        const activeRuntimeEnvironmentId = requestedEnvironmentId
+          ? resolveEnvironment(requestedEnvironmentId).id
+          : null
+        const next = mergeSettings(getStoredSettings(), {
+          activeRuntimeEnvironmentId
+        })
+        writeStoredSettings(next, activeRuntimeEnvironmentId)
+        return next
       },
       updatePRBotAuthorOverride: (args) => updateRuntimePRBotAuthorOverride(args),
       listFonts: () => Promise.resolve([]),
@@ -673,7 +707,9 @@ function createWebPreloadApi(): Partial<PreloadApi> {
         Promise.resolve({
           ok: false,
           error: translate('auto.web.web.preload.api.fb290366b2', 'Unavailable on web.')
-        })
+        }),
+      // Why: no Electron process on web; the caller falls back to performance.memory.
+      readHeapStatistics: () => null
     },
     diagnostics: {
       getStatus: () =>
@@ -776,6 +812,13 @@ function createWebPreloadApi(): Partial<PreloadApi> {
     claudeAccounts: createAccountsApi(),
     cli: createCliApi(),
     agentHooks: createAgentHooksApi(),
+    macosTccPrompts: createMacosTccPromptsApi(),
+    // Why: the desktop derives this from the host filesystem, which the web
+    // client has no view of; reporting synced keeps the warning banner silent.
+    codexConfigSync: {
+      status: () =>
+        Promise.resolve({ state: 'synced', reason: null, systemConfigPath: '' } as const)
+    },
     developerPermissions: createDeveloperPermissionsApi(),
     computerUsePermissions: createComputerUsePermissionsApi(),
     updater: createUpdaterApi(),
@@ -1051,7 +1094,7 @@ function writeWebKeybindingAction(
   bindings: string[] | null
 ): KeybindingFileSnapshot {
   if (!isKeybindingActionId(actionId)) {
-    throw new Error(`Unknown keybinding action "${actionId}".`)
+    throw new Error(`Unknown keybinding action "${String(actionId)}".`)
   }
   const normalizedBindings =
     bindings === null ? null : normalizeKeybindingArrayForAction(actionId, bindings)
@@ -2389,6 +2432,7 @@ function createWebUiApi(): NonNullable<Partial<PreloadApi>['ui']> {
         const local = readLocalWebUIState()
         const next = {
           ...mergeWebUIState(local, result.ui),
+          osc52ClipboardDefaultOnNoticePending: mergeOsc52ClipboardNoticePending(local, result.ui),
           featureInteractions: mergeFeatureInteractionState(
             local.featureInteractions,
             result.ui.featureInteractions
@@ -2438,6 +2482,7 @@ function createWebUiApi(): NonNullable<Partial<PreloadApi>['ui']> {
         const local = readLocalWebUIState()
         const next = {
           ...mergeWebUIState(local, result.ui),
+          osc52ClipboardDefaultOnNoticePending: mergeOsc52ClipboardNoticePending(local, result.ui),
           featureInteractions: mergeFeatureInteractionState(
             local.featureInteractions,
             result.ui.featureInteractions
@@ -2474,10 +2519,8 @@ function createWebUiApi(): NonNullable<Partial<PreloadApi>['ui']> {
       }
       return saveClipboardImageAsTempFileInRuntime(contentBase64, args)
     },
-    writeClipboardText: async (text) => {
-      await assertClipboardTextWriteWithinLimitWithYield(text)
-      await (navigator.clipboard?.writeText?.(text) ?? Promise.resolve())
-    },
+    writeClipboardText: writeWebClipboardText,
+    writeTerminalClipboardText: writeWebClipboardText,
     writeSelectionClipboardText: () =>
       Promise.reject(new Error('Selection clipboard is unavailable in the web client')),
     writeClipboardImage: () => Promise.resolve(),
@@ -2532,6 +2575,8 @@ function createWebUiApi(): NonNullable<Partial<PreloadApi>['ui']> {
     onZoomBrowserPage: () => noopUnsubscribe,
     onHardReloadBrowserPage: () => noopUnsubscribe,
     onCloseActiveTab: () => noopUnsubscribe,
+    onCloseFloatingItem: () => noopUnsubscribe,
+    onSelectFloatingIndex: () => noopUnsubscribe,
     onSwitchTab: () => noopUnsubscribe,
     onSwitchTabAcrossAllTypes: () => noopUnsubscribe,
     onSwitchRecentTab: () => noopUnsubscribe,
@@ -2568,7 +2613,7 @@ function createWebUiApi(): NonNullable<Partial<PreloadApi>['ui']> {
     syncTrafficLights: () => {},
     setMarkdownEditorFocused: () => {},
     setTerminalInputFocused: () => {},
-    setFloatingTerminalInputFocused: () => {},
+    setFloatingFocus: () => {},
     setShortcutRecorderFocused: () => {},
     onRichMarkdownContextCommand: () => noopUnsubscribe,
     onFullscreenChanged: () => noopUnsubscribe,
@@ -2578,7 +2623,8 @@ function createWebUiApi(): NonNullable<Partial<PreloadApi>['ui']> {
     requestClose: () => {},
     popupMenu: () => {},
     onWindowCloseRequested: () => noopUnsubscribe,
-    confirmWindowClose: () => {}
+    confirmWindowClose: () => {},
+    notifyWindowRevealed: () => {}
   }
 }
 
@@ -2723,6 +2769,17 @@ function createAgentHooksApi(): NonNullable<Partial<PreloadApi>['agentHooks']> {
   }
 }
 
+function createMacosTccPromptsApi(): NonNullable<Partial<PreloadApi>['macosTccPrompts']> {
+  // Why: TCC is a macOS-desktop concept; the web client has no log stream to watch.
+  return {
+    onThreshold: () => noopUnsubscribe,
+    consumePending: () => Promise.resolve(null),
+    acknowledgePending: () => Promise.resolve(),
+    releasePending: () => Promise.resolve(),
+    dismiss: () => Promise.resolve()
+  }
+}
+
 function createDeveloperPermissionsApi(): NonNullable<Partial<PreloadApi>['developerPermissions']> {
   return {
     getStatus: () => Promise.resolve([]),
@@ -2775,8 +2832,16 @@ function createSkillsApi(): NonNullable<Partial<PreloadApi>['skills']> {
         schemaVersion: 1,
         installations: [],
         eligibleUpdateNames: [],
+        scanIssues: [],
         scannedAt: Date.now()
-      })
+      }),
+    // Why: with no local skill homes there is nothing to update, so the run rail
+    // reports a permanently idle state rather than spawning anything.
+    startUpdateRun: () => Promise.resolve({ started: false as const, reason: 'invalid-names' }),
+    cancelUpdateRun: () => Promise.resolve(),
+    acknowledgeUpdateRun: () => Promise.resolve(),
+    getUpdateRun: () => Promise.resolve({ state: 'idle' as const }),
+    onUpdateRun: () => () => {}
   }
 }
 
@@ -2860,7 +2925,14 @@ function createAccountsApi(): never {
     cancelPendingLogin: () => Promise.resolve(false),
     reauthenticate: () => Promise.resolve(empty),
     remove: () => Promise.resolve(empty),
-    select: () => Promise.resolve(empty)
+    select: () => Promise.resolve(empty),
+    // Why: launch accounts are recorded on the host that owns the PTY, which the
+    // web client never is — report no stale panes rather than reject the sweep.
+    listStalePanes: () => Promise.resolve([]),
+    // Why empty rather than absent: the same host owns both records, so a web
+    // client has no recorded lane to offer and every pane falls to derivation.
+    listRecordedPaneLanes: () => Promise.resolve({}),
+    forgetStalePanes: () => Promise.resolve()
   } as never
 }
 
@@ -2872,6 +2944,7 @@ function createUpdaterApi(): NonNullable<Partial<PreloadApi>['updater']> {
     download: () => Promise.resolve(),
     quitAndInstall: () => Promise.resolve(),
     dismissNudge: () => Promise.resolve(),
+    dismissAvailableUpdate: () => Promise.resolve(),
     onStatus: () => noopUnsubscribe,
     onClearDismissal: () => noopUnsubscribe
   }
@@ -2935,6 +3008,7 @@ function createPtyApi(): NonNullable<Partial<PreloadApi>['pty']> {
     publishTerminalViewAttributes: () => {},
     hasChildProcesses: () => Promise.resolve(false),
     getForegroundProcess: () => Promise.resolve(null),
+    inspectProcess: () => Promise.reject(new Error('terminal_liveness_unavailable')),
     // Why: paired web panes cannot provide a local post-boundary process scan.
     confirmForegroundProcess: () => Promise.resolve(null),
     getCwd: () => Promise.resolve('~'),
@@ -2980,6 +3054,7 @@ function createPtyApi(): NonNullable<Partial<PreloadApi>['pty']> {
     onReplay: () => noopUnsubscribe,
     onModelRestoreNeeded: () => noopUnsubscribe,
     onExit: () => noopUnsubscribe,
+    onSpawned: () => noopUnsubscribe,
     onSerializeBufferRequest: () => noopUnsubscribe,
     onClearBufferRequest: () => noopUnsubscribe,
     sendSerializedBuffer: () => {},
@@ -3059,7 +3134,7 @@ function createSshApi(): NonNullable<Partial<PreloadApi>['ssh']> {
     listDetectedPorts: () => Promise.resolve([]),
     onPortForwardsChanged: () => noopUnsubscribe,
     onDetectedPortsChanged: () => noopUnsubscribe,
-    browseDir: () => Promise.resolve({ entries: [], resolvedPath: '' }),
+    browseDir: () => Promise.resolve({ entries: [], resolvedPath: '', pathFlavor: 'posix' }),
     onCredentialRequest: () => noopUnsubscribe,
     onCredentialResolved: () => noopUnsubscribe,
     submitCredential: () => Promise.resolve()
@@ -3328,7 +3403,7 @@ function updateEnvironmentFromResponse(
 }
 
 function getStoredSettings(): GlobalSettings {
-  const environment = (activeEnvironment = activeEnvironment ?? readStoredWebRuntimeEnvironment())
+  activeEnvironment = activeEnvironment ?? readStoredWebRuntimeEnvironment()
   const defaults = getDefaultSettings('~')
   const rawStoredSettings = window.localStorage.getItem(SETTINGS_STORAGE_KEY)
   const stored = readJson<Partial<GlobalSettings>>(SETTINGS_STORAGE_KEY, {})
@@ -3336,6 +3411,7 @@ function getStoredSettings(): GlobalSettings {
     ...stored,
     ...normalizeAutoRenameBranchFromWorkDefaultOn(stored),
     ...normalizeTerminalCursorStyleDefault(stored),
+    ...normalizeOsc52ClipboardDefaultOn(stored),
     terminalCustomThemes: normalizeTerminalCustomThemes(stored.terminalCustomThemes),
     uiLanguage: normalizeUiLanguage(stored.uiLanguage)
   }
@@ -3347,6 +3423,11 @@ function getStoredSettings(): GlobalSettings {
       stored.terminalCursorStyle !== migratedStored.terminalCursorStyle ||
       stored.terminalCursorStyleDefaultedToBlock !==
         migratedStored.terminalCursorStyleDefaultedToBlock ||
+      // Kept even though the terminalCustomThemes reference compare below already forces
+      // this branch for every stored blob: no migration should rely on that accident.
+      stored.terminalAllowOsc52Clipboard !== migratedStored.terminalAllowOsc52Clipboard ||
+      stored.terminalAllowOsc52ClipboardDefaultedOnForAllUsers !==
+        migratedStored.terminalAllowOsc52ClipboardDefaultedOnForAllUsers ||
       stored.terminalCustomThemes !== migratedStored.terminalCustomThemes ||
       stored.uiLanguage !== migratedStored.uiLanguage)
   ) {
@@ -3354,6 +3435,14 @@ function getStoredSettings(): GlobalSettings {
       const parsed = JSON.parse(rawStoredSettings) as unknown
       if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
         writeJson(SETTINGS_STORAGE_KEY, migratedStored)
+        if (osc52ClipboardDefaultOnOverridesPersistedOff(stored)) {
+          // Why a raw merge, not readLocalWebUIState(): that path calls back into
+          // getStoredSettings(), and writing through it here would recurse.
+          writeJson(UI_STORAGE_KEY, {
+            ...readJson<Partial<PersistedUIState>>(UI_STORAGE_KEY, {}),
+            osc52ClipboardDefaultOnNoticePending: true
+          })
+        }
       }
     } catch {
       // Keep readJson's invalid-JSON fallback non-destructive.
@@ -3364,10 +3453,28 @@ function getStoredSettings(): GlobalSettings {
       ...defaults,
       floatingTerminalEnabled: false,
       rightSidebarOpenByDefault: false,
-      activeRuntimeEnvironmentId: environment?.id ?? null
+      activeRuntimeEnvironmentId: null
     },
     migratedStored
   )
+}
+
+function writeStoredSettings(
+  settings: GlobalSettings,
+  explicitActiveRuntimeEnvironmentId?: string | null
+): void {
+  const durable = { ...settings }
+  if (explicitActiveRuntimeEnvironmentId !== undefined) {
+    durable.activeRuntimeEnvironmentId = explicitActiveRuntimeEnvironmentId
+  } else {
+    const stored = readJson<Partial<GlobalSettings>>(SETTINGS_STORAGE_KEY, {})
+    if (Object.hasOwn(stored, 'activeRuntimeEnvironmentId')) {
+      durable.activeRuntimeEnvironmentId = stored.activeRuntimeEnvironmentId ?? null
+    } else {
+      delete durable.activeRuntimeEnvironmentId
+    }
+  }
+  writeJson(SETTINGS_STORAGE_KEY, durable)
 }
 
 async function getRuntimeBackedStoredSettings(): Promise<GlobalSettings> {
@@ -3401,7 +3508,7 @@ async function getRuntimeBackedStoredSettings(): Promise<GlobalSettings> {
       )
     }
     const next = mergeSettings(local, runtimeSettings)
-    writeJson(SETTINGS_STORAGE_KEY, next)
+    writeStoredSettings(next)
     return next
   } catch {
     // Why: unpaired/offline web clients keep a local settings fallback.
@@ -3443,8 +3550,10 @@ async function syncRuntimeBackedSettings(
       runtimeUpdates,
       15_000
     )
-    const next = mergeSettings(localNext, result.settings)
-    writeJson(SETTINGS_STORAGE_KEY, next)
+    const runtimeSettings = { ...result.settings }
+    delete runtimeSettings.activeRuntimeEnvironmentId
+    const next = mergeSettings(localNext, runtimeSettings)
+    writeStoredSettings(next)
     return next
   } catch {
     // Why: unpaired/offline web clients still need local settings persistence.
@@ -3467,7 +3576,7 @@ async function updateRuntimePRBotAuthorOverride(args: {
     const next = mergeSettings(local, {
       prBotAuthorOverrides: normalizePRBotAuthorOverrides(result.settings.prBotAuthorOverrides)
     })
-    writeJson(SETTINGS_STORAGE_KEY, next)
+    writeStoredSettings(next)
     return next
   }
   const next = mergeSettings(local, {
@@ -3477,7 +3586,7 @@ async function updateRuntimePRBotAuthorOverride(args: {
       args.isBot
     )
   })
-  writeJson(SETTINGS_STORAGE_KEY, next)
+  writeStoredSettings(next)
   return next
 }
 
@@ -3544,8 +3653,11 @@ function closeWebOnboarding(base: OnboardingState): OnboardingState {
 
 function readLocalWebUIState(): PersistedUIState {
   const defaults = getDefaultUIState()
-  const stored = readJson<Partial<PersistedUIState>>(UI_STORAGE_KEY, {})
+  // Why settings first: getStoredSettings() runs the OSC 52 migration, which writes the
+  // notice arm into UI_STORAGE_KEY. Reading before it would snapshot a pre-arm state that
+  // every caller then writes back, erasing the arm the stamp can never raise again.
   const storedSettings = getStoredSettings()
+  const stored = readJson<Partial<PersistedUIState>>(UI_STORAGE_KEY, {})
   const base = {
     ...defaults,
     // Why: mirror the main-process missing-property seed from legacy card layout mode when runtime ui.get is unavailable.
@@ -3629,6 +3741,19 @@ function mergeContextualTourSeenIds(
   return [...merged]
 }
 
+/** Why OR rather than let the host win: the web client migrates its own localStorage
+ *  settings, so an arm raised here has no counterpart on the host, and the plain spread
+ *  would drop it — flipping the opt-out in silence, which is what the notice exists to stop. */
+function mergeOsc52ClipboardNoticePending(
+  current: PersistedUIState,
+  incoming: PersistedUIState
+): boolean {
+  return (
+    current.osc52ClipboardDefaultOnNoticePending === true ||
+    incoming.osc52ClipboardDefaultOnNoticePending === true
+  )
+}
+
 function mergeSettings(
   base: GlobalSettings,
   updates: Partial<GlobalSettings>,
@@ -3657,7 +3782,9 @@ function mergeSettings(
       ...(base.voice ?? defaults.voice),
       ...updates.voice
     } as NonNullable<GlobalSettings['voice']>,
-    activeRuntimeEnvironmentId: activeEnvironment?.id ?? updates.activeRuntimeEnvironmentId ?? null,
+    activeRuntimeEnvironmentId: Object.hasOwn(updates, 'activeRuntimeEnvironmentId')
+      ? (updates.activeRuntimeEnvironmentId ?? null)
+      : (base.activeRuntimeEnvironmentId ?? null),
     terminalCustomThemes: normalizeTerminalCustomThemes(
       updates.terminalCustomThemes ?? base.terminalCustomThemes
     ),
@@ -3882,11 +4009,14 @@ function createEmptyMemorySnapshot(): MemorySnapshot {
     host: {
       totalMemory: 0,
       freeMemory: 0,
+      availableMemory: 0,
+      availableMemorySource: 'free-memory',
       usedMemory: 0,
       memoryUsagePercent: 0,
       cpuCoreCount: navigator.hardwareConcurrency || 1,
       loadAverage1m: 0
     },
+    processMemoryMetric: getBrowserPlatform() === 'win32' ? 'working-set' : 'rss',
     totalCpu: 0,
     totalMemory: 0,
     collectedAt: Date.now()
