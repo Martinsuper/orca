@@ -36,6 +36,16 @@ import {
   normalizeProjectLinkCategory,
   normalizeProjectLinkUrl
 } from './project-link-normalization'
+import {
+  mergeFoldersSkipDuplicates,
+  mergeSkipDuplicates,
+  parseProjectLinksExport
+} from './project-links-import-merge'
+import {
+  PROJECT_LINKS_EXPORT_KIND,
+  PROJECT_LINKS_EXPORT_SCHEMA_VERSION
+} from '../../shared/project-links-export'
+import type { ProjectLinksExportEnvelope } from '../../shared/project-links-export'
 import { normalizeRepoSourceControlAiOverrides } from '../../shared/source-control-ai'
 import {
   isRuntimePathAbsolute,
@@ -48,7 +58,7 @@ import { WorkspaceLinkedItemSchema } from '../../shared/workspace-linked-item-sc
 import { isWorkspaceLinkedItemSourceContextMatch } from '../../shared/workspace-linked-item-source-context'
 import { invalidateAuthorizedRootsCache } from './filesystem-auth'
 import type { ChildProcess } from 'node:child_process'
-import { access, mkdir, readdir, rm } from 'node:fs/promises'
+import { access, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { gitExecFileAsync, gitSpawn, nonInteractiveGitEnv } from '../git/runner'
 import { isAbsolute, join, posix } from 'node:path'
 import {
@@ -1308,9 +1318,18 @@ export function registerRepoHandlers(mainWindow: BrowserWindow, store: Store): v
   ipcMain.removeHandler('projectLinks:save')
   ipcMain.removeHandler('projectLinks:remove')
   ipcMain.removeHandler('projectLinks:reorder')
+  ipcMain.removeHandler('projectLinks:listGlobal')
+  ipcMain.removeHandler('projectLinks:saveGlobal')
+  ipcMain.removeHandler('projectLinks:removeGlobal')
+  ipcMain.removeHandler('projectLinks:reorderGlobal')
+  ipcMain.removeHandler('projectLinks:export')
+  ipcMain.removeHandler('projectLinks:import')
   ipcMain.removeHandler('projectLinkFolders:list')
   ipcMain.removeHandler('projectLinkFolders:add')
   ipcMain.removeHandler('projectLinkFolders:remove')
+  ipcMain.removeHandler('projectLinkFolders:listGlobal')
+  ipcMain.removeHandler('projectLinkFolders:addGlobal')
+  ipcMain.removeHandler('projectLinkFolders:removeGlobal')
 
   ipcMain.handle('repos:list', () => {
     enrichMissingRepoGitRemoteIdentities(store, {
@@ -2380,6 +2399,213 @@ export function registerRepoHandlers(mainWindow: BrowserWindow, store: Store): v
     notifyProjectLinkFoldersChanged(mainWindow, args.repoId)
   })
 
+  // ── Global (cross-repo) project links ─────────────────────────────
+  ipcMain.handle('projectLinks:listGlobal', () => {
+    return store.getGlobalProjectLinks()
+  })
+
+  ipcMain.handle(
+    'projectLinks:saveGlobal',
+    (_event, args: { id?: string; name: string; url: string; category: string }): ProjectLink => {
+      const name = normalizeProjectLinkName(args.name)
+      const url = normalizeProjectLinkUrl(args.url)
+      const category = normalizeProjectLinkCategory(args.category)
+      const now = Date.now()
+      const existing = args.id
+        ? store.getGlobalProjectLinks().find((link) => link.id === args.id)
+        : undefined
+      const link: ProjectLink = {
+        id: existing?.id ?? randomUUID(),
+        // Why: `repoId` is required by ProjectLink; store empty string so the
+        // shape stays valid without inventing a sentinel repo. Renderer keys
+        // off the global slice, not this field.
+        repoId: '',
+        name,
+        url,
+        category,
+        createdAt: existing?.createdAt ?? now,
+        updatedAt: now
+      }
+      const saved = store.saveGlobalProjectLink(link)
+      notifyGlobalProjectLinksChanged(mainWindow)
+      return saved
+    }
+  )
+
+  ipcMain.handle('projectLinks:removeGlobal', (_event, args: { linkId: string }) => {
+    store.removeGlobalProjectLink(args.linkId)
+    notifyGlobalProjectLinksChanged(mainWindow)
+  })
+
+  ipcMain.handle(
+    'projectLinks:reorderGlobal',
+    (_event, args: { updates: { id: string; category: string; order: number }[] }) => {
+      const updates = args.updates.map((u) => ({
+        id: u.id,
+        category: normalizeProjectLinkReorderCategory(u.category),
+        order: u.order
+      }))
+      store.reorderGlobalProjectLinks(updates)
+      notifyGlobalProjectLinksChanged(mainWindow)
+    }
+  )
+
+  ipcMain.handle('projectLinkFolders:listGlobal', () => {
+    return store.getGlobalProjectLinkFolders()
+  })
+
+  ipcMain.handle('projectLinkFolders:addGlobal', (_event, args: { path: string }) => {
+    const path = normalizeProjectLinkFolderPath(args.path)
+    store.addGlobalProjectLinkFolder(path)
+    notifyGlobalProjectLinkFoldersChanged(mainWindow)
+  })
+
+  ipcMain.handle('projectLinkFolders:removeGlobal', (_event, args: { path: string }) => {
+    store.removeGlobalProjectLinkFolder(args.path)
+    notifyGlobalProjectLinkFoldersChanged(mainWindow)
+  })
+
+  // ── Export / Import (per-repo links + folders as JSON) ────────────
+  ipcMain.handle(
+    'projectLinks:export',
+    async (
+      _event,
+      args: { repoId: string }
+    ): Promise<
+      | { ok: true; filePath: string; linkCount: number; folderCount: number }
+      | { ok: false; cancelled?: boolean; error?: string }
+    > => {
+      const repo = store.getRepo(args.repoId)
+      if (!repo) {
+        return { ok: false, error: `Repo "${args.repoId}" not found` }
+      }
+      try {
+        const links = store.getProjectLinks(args.repoId)
+        const folders = store.getProjectLinkFolders(args.repoId)
+        const displayName = repo.displayName || repo.id
+        // Why: sanitize like export.ts:30 — the same platform filename rules apply.
+        const sanitized = displayName.replace(/[/\\:*?"<>|]/g, '_').slice(0, 100) || 'project'
+        const defaultPath = `${sanitized}.orca-links.json`
+        const dialogResult = await dialog.showSaveDialog(mainWindow, {
+          defaultPath,
+          filters: [
+            { name: 'Orca Project Links', extensions: ['orca-links.json', 'json'] },
+            { name: 'All Files', extensions: ['*'] }
+          ]
+        })
+        if (dialogResult.canceled || !dialogResult.filePath) {
+          return { ok: false, cancelled: true }
+        }
+        const envelope: ProjectLinksExportEnvelope = {
+          kind: PROJECT_LINKS_EXPORT_KIND,
+          schemaVersion: PROJECT_LINKS_EXPORT_SCHEMA_VERSION,
+          exportedAt: Date.now(),
+          links: links.map((link) => ({
+            name: link.name,
+            url: link.url,
+            category: link.category,
+            ...(link.order !== undefined ? { order: link.order } : {})
+          })),
+          folders
+        }
+        await writeFile(dialogResult.filePath, JSON.stringify(envelope, null, 2), 'utf8')
+        return {
+          ok: true,
+          filePath: dialogResult.filePath,
+          linkCount: links.length,
+          folderCount: folders.length
+        }
+      } catch (error) {
+        return {
+          ok: false,
+          error: error instanceof Error ? error.message : 'Failed to export links'
+        }
+      }
+    }
+  )
+
+  ipcMain.handle(
+    'projectLinks:import',
+    async (
+      _event,
+      args: { repoId: string }
+    ): Promise<
+      | {
+          ok: true
+          importedLinks: number
+          skippedLinks: number
+          duplicatesInFile: number
+          importedFolders: number
+          skippedFolders: number
+        }
+      | { ok: false; cancelled?: boolean; error?: string }
+    > => {
+      const repo = store.getRepo(args.repoId)
+      if (!repo) {
+        return { ok: false, error: `Repo "${args.repoId}" not found` }
+      }
+      try {
+        const dialogResult = await dialog.showOpenDialog(mainWindow, {
+          filters: [
+            { name: 'Orca Project Links', extensions: ['orca-links.json', 'json'] },
+            { name: 'All Files', extensions: ['*'] }
+          ],
+          properties: ['openFile']
+        })
+        if (dialogResult.canceled || dialogResult.filePaths.length === 0) {
+          return { ok: false, cancelled: true }
+        }
+        const raw = await readFile(dialogResult.filePaths[0], 'utf8')
+        let parsedJson: unknown
+        try {
+          parsedJson = JSON.parse(raw)
+        } catch {
+          return { ok: false, error: 'File is not valid JSON.' }
+        }
+        const parsed = parseProjectLinksExport(parsedJson)
+        const existing = store.getProjectLinks(args.repoId)
+        const merge = mergeSkipDuplicates(existing, parsed.links)
+        const now = Date.now()
+        for (const entry of merge.toInsert) {
+          store.saveProjectLink({
+            id: randomUUID(),
+            repoId: args.repoId,
+            name: entry.name,
+            url: entry.url,
+            category: entry.category,
+            createdAt: now,
+            updatedAt: now,
+            ...(entry.order !== undefined ? { order: entry.order } : {})
+          })
+        }
+        const existingFolders = store.getProjectLinkFolders(args.repoId)
+        const folderMerge = mergeFoldersSkipDuplicates(existingFolders, parsed.folders)
+        for (const path of folderMerge.toInsert) {
+          store.addProjectLinkFolder(args.repoId, path)
+        }
+        if (merge.toInsert.length > 0) {
+          notifyProjectLinksChanged(mainWindow, args.repoId)
+        }
+        if (folderMerge.toInsert.length > 0) {
+          notifyProjectLinkFoldersChanged(mainWindow, args.repoId)
+        }
+        return {
+          ok: true,
+          importedLinks: merge.toInsert.length,
+          skippedLinks: merge.skipped,
+          duplicatesInFile: merge.duplicatesInFile,
+          importedFolders: folderMerge.toInsert.length,
+          skippedFolders: folderMerge.skipped
+        }
+      } catch (error) {
+        return {
+          ok: false,
+          error: error instanceof Error ? error.message : 'Failed to import links'
+        }
+      }
+    }
+  )
+
   ipcMain.handle('repos:pickFolder', async () => {
     const result = await dialog.showOpenDialog(mainWindow, {
       properties: ['openDirectory']
@@ -2820,6 +3046,18 @@ function notifyProjectLinksChanged(mainWindow: BrowserWindow, repoId: string): v
 function notifyProjectLinkFoldersChanged(mainWindow: BrowserWindow, repoId: string): void {
   if (!mainWindow.isDestroyed()) {
     mainWindow.webContents.send('projectLinkFolders:changed', { repoId })
+  }
+}
+
+function notifyGlobalProjectLinksChanged(mainWindow: BrowserWindow): void {
+  if (!mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('projectLinks:globalChanged')
+  }
+}
+
+function notifyGlobalProjectLinkFoldersChanged(mainWindow: BrowserWindow): void {
+  if (!mainWindow.isDestroyed()) {
+    mainWindow.webContents.send('projectLinkFolders:globalChanged')
   }
 }
 

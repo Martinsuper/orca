@@ -3,6 +3,13 @@ import { toast } from 'sonner'
 import type { AppState } from '../types'
 import type { ProjectLink } from '../../../../shared/types'
 import { translate } from '@/i18n/i18n'
+import { createGlobalProjectLinksState, type GlobalProjectLinksState } from './global-project-links'
+import {
+  createProjectLinksTransferActions,
+  type ProjectLinksTransferActions
+} from './project-links-transfer'
+
+export { omitProjectLinksForRepos } from './project-links-repo-pruning'
 
 const ERROR_TOAST_DURATION = 60_000
 
@@ -19,7 +26,7 @@ function compareProjectLinks(left: ProjectLink, right: ProjectLink): number {
 
 export type ProjectLinksLoadStatus = 'idle' | 'loading' | 'loaded' | 'error'
 
-export type ProjectLinksSlice = {
+type RepoProjectLinksState = {
   /** Per-repo link list. Lazily populated by `fetchProjectLinks`; missing
    *  key means "not yet fetched", empty array means "fetched, none exist". */
   projectLinksByRepo: Record<string, ProjectLink[]>
@@ -47,62 +54,9 @@ export type ProjectLinksSlice = {
   removeProjectLinkFolder: (args: { repoId: string; path: string }) => Promise<void>
 }
 
-type ProjectLinksMaps = Pick<
-  AppState,
-  | 'projectLinksByRepo'
-  | 'projectLinksLoadingByRepo'
-  | 'projectLinksLoadStatusByRepo'
-  | 'projectLinksErrorByRepo'
-  | 'projectLinkFoldersByRepo'
->
-
-// Why: four per-repo project-link maps are populated lazily per repo but
-// never pruned when a repo is removed, so orphaned entries would accumulate for
-// the renderer's whole session. Called from repo-removal reducers to drop
-// entries for repos that no longer exist. Returns only the maps that changed so
-// unrelated selectors don't re-run.
-export function omitProjectLinksForRepos(
-  s: ProjectLinksMaps,
-  removedRepoIds: Iterable<string>
-): Partial<AppState> {
-  const removed = removedRepoIds instanceof Set ? removedRepoIds : new Set(removedRepoIds)
-  if (removed.size === 0) {
-    return {}
-  }
-  const omit = <T>(obj: Record<string, T>): Record<string, T> => {
-    let changed = false
-    const out = { ...obj }
-    for (const id of removed) {
-      if (id in out) {
-        delete out[id]
-        changed = true
-      }
-    }
-    return changed ? out : obj
-  }
-  const result: Partial<AppState> = {}
-  const byRepo = omit(s.projectLinksByRepo)
-  if (byRepo !== s.projectLinksByRepo) {
-    result.projectLinksByRepo = byRepo
-  }
-  const loading = omit(s.projectLinksLoadingByRepo)
-  if (loading !== s.projectLinksLoadingByRepo) {
-    result.projectLinksLoadingByRepo = loading
-  }
-  const status = omit(s.projectLinksLoadStatusByRepo)
-  if (status !== s.projectLinksLoadStatusByRepo) {
-    result.projectLinksLoadStatusByRepo = status
-  }
-  const error = omit(s.projectLinksErrorByRepo)
-  if (error !== s.projectLinksErrorByRepo) {
-    result.projectLinksErrorByRepo = error
-  }
-  const folders = omit(s.projectLinkFoldersByRepo)
-  if (folders !== s.projectLinkFoldersByRepo) {
-    result.projectLinkFoldersByRepo = folders
-  }
-  return result
-}
+export type ProjectLinksSlice = RepoProjectLinksState &
+  GlobalProjectLinksState &
+  ProjectLinksTransferActions
 
 export const createProjectLinksSlice: StateCreator<AppState, [], [], ProjectLinksSlice> = (
   set,
@@ -323,5 +277,8 @@ export const createProjectLinksSlice: StateCreator<AppState, [], [], ProjectLink
       )
       throw err
     }
-  }
+  },
+
+  ...createGlobalProjectLinksState(set, get),
+  ...createProjectLinksTransferActions(set, get)
 })

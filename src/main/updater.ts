@@ -1320,7 +1320,7 @@ function runBackgroundUpdateCheck(
   // Why: user disabled automatic checks. Return silently (no status change) so
   // the idle UI is unaffected; manual checkForUpdatesFromMenu bypasses this.
   if (_getAutoUpdateEnabled?.() === false) {
-    return
+    return false
   }
   if (!app.isPackaged || is.dev) {
     sendStatus({ state: 'not-available' })

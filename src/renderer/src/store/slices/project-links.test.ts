@@ -16,12 +16,21 @@ const mockApi = {
     list: vi.fn(),
     save: vi.fn(),
     remove: vi.fn(),
-    reorder: vi.fn()
+    reorder: vi.fn(),
+    listGlobal: vi.fn(),
+    saveGlobal: vi.fn(),
+    removeGlobal: vi.fn(),
+    reorderGlobal: vi.fn(),
+    export: vi.fn(),
+    import: vi.fn()
   },
   projectLinkFolders: {
     list: vi.fn(),
     add: vi.fn(),
-    remove: vi.fn()
+    remove: vi.fn(),
+    listGlobal: vi.fn(),
+    addGlobal: vi.fn(),
+    removeGlobal: vi.fn()
   }
 }
 
@@ -350,5 +359,57 @@ describe('createProjectLinksSlice', () => {
     ).rejects.toThrow('disk failed')
 
     expect(store.getState().projectLinksByRepo['repo-1']).toEqual(original)
+  })
+
+  it('fetchGlobalProjectLinks stores the list once loaded', async () => {
+    const store = createTestStore()
+    const links = [makeLink({ id: 'g1', repoId: '', name: 'G', category: '' })]
+    mockApi.projectLinks.listGlobal.mockResolvedValue(links)
+    await store.getState().fetchGlobalProjectLinks()
+    expect(store.getState().globalProjectLinks).toEqual(links)
+    expect(store.getState().globalProjectLinksLoadStatus).toBe('loaded')
+  })
+
+  it('saveGlobalProjectLink appends the saved entry', async () => {
+    const store = createTestStore()
+    store.setState({ globalProjectLinks: [] } as Partial<AppState>)
+    const saved = makeLink({ id: 'g1', repoId: '', name: 'G', category: 'Shared' })
+    mockApi.projectLinks.saveGlobal.mockResolvedValue(saved)
+    const result = await store
+      .getState()
+      .saveGlobalProjectLink({ name: 'G', url: 'https://g.com', category: 'Shared' })
+    expect(result).toEqual(saved)
+    expect(store.getState().globalProjectLinks).toEqual([saved])
+  })
+
+  it('removeGlobalProjectLink rolls back on failure', async () => {
+    const store = createTestStore()
+    const original = [makeLink({ id: 'g1', repoId: '', name: 'G', category: '' })]
+    store.setState({ globalProjectLinks: original } as Partial<AppState>)
+    mockApi.projectLinks.removeGlobal.mockRejectedValue(new Error('boom'))
+    await expect(store.getState().removeGlobalProjectLink({ linkId: 'g1' })).rejects.toThrow('boom')
+    expect(store.getState().globalProjectLinks).toEqual(original)
+  })
+
+  it('importProjectLinks refetches on success', async () => {
+    const store = createTestStore()
+    mockApi.projectLinks.import.mockResolvedValue({
+      ok: true,
+      importedLinks: 2,
+      skippedLinks: 1,
+      duplicatesInFile: 0,
+      importedFolders: 0,
+      skippedFolders: 0
+    })
+    const fresh = [makeLink({ id: 'a', repoId: 'repo-1', name: 'A', category: '' })]
+    mockApi.projectLinks.list.mockResolvedValue(fresh)
+    mockApi.projectLinkFolders.list.mockResolvedValue([])
+    store.setState({
+      projectLinksByRepo: { 'repo-1': [] },
+      projectLinkFoldersByRepo: { 'repo-1': [] }
+    } as Partial<AppState>)
+
+    await store.getState().importProjectLinks({ repoId: 'repo-1' })
+    expect(store.getState().projectLinksByRepo['repo-1']).toEqual(fresh)
   })
 })

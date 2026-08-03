@@ -3624,6 +3624,12 @@ export type PersistedState = {
   /** Declared (possibly empty) project-link folder paths keyed by repoId, so a
    *  category with no links yet still shows in the tree. Paths are "/"-joined. */
   projectLinkFoldersByRepo: Record<string, string[]>
+  /** Cross-repo "global" project links, shown in every repo's Links panel.
+   *  Each entry's repoId is stored as '' (renderer ignores it). Missing on
+   *  older saves — treat as empty. */
+  globalProjectLinks?: ProjectLink[]
+  /** Declared global folder paths so empty categories still show. */
+  globalProjectLinkFolders?: string[]
   /** Per paired device last tab selection by worktree; keeps mobile navigation across host restarts. */
   mobileClientTabSelectionsByDeviceId?: PersistedMobileClientTabSelections
   worktreeMeta: Record<string, WorktreeMeta>

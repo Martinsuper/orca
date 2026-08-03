@@ -5097,6 +5097,66 @@ export class Store {
     this.scheduleSave()
   }
 
+  // ── Global Project Links ─────────────────────────────────────────
+  // Cross-repo entries; shown in every repo's Links panel. Storage mirrors the
+  // per-repo methods so the renderer keeps a single sort/normalize contract.
+
+  getGlobalProjectLinks(): ProjectLink[] {
+    return [...(this.state.globalProjectLinks ?? [])].sort((left, right) => {
+      const leftOrder = left.order ?? Number.POSITIVE_INFINITY
+      const rightOrder = right.order ?? Number.POSITIVE_INFINITY
+      if (leftOrder !== rightOrder) {
+        return leftOrder - rightOrder
+      }
+      return left.name.localeCompare(right.name)
+    })
+  }
+
+  saveGlobalProjectLink(link: ProjectLink): ProjectLink {
+    const existing = this.state.globalProjectLinks ?? []
+    const index = existing.findIndex((entry) => entry.id === link.id)
+    this.state.globalProjectLinks =
+      index === -1 ? [...existing, link] : existing.map((entry, i) => (i === index ? link : entry))
+    this.scheduleSave()
+    return link
+  }
+
+  removeGlobalProjectLink(linkId: string): void {
+    const existing = this.state.globalProjectLinks ?? []
+    this.state.globalProjectLinks = existing.filter((entry) => entry.id !== linkId)
+    this.scheduleSave()
+  }
+
+  reorderGlobalProjectLinks(updates: { id: string; category: string; order: number }[]): void {
+    const existing = this.state.globalProjectLinks ?? []
+    const byId = new Map(updates.map((u) => [u.id, u]))
+    this.state.globalProjectLinks = existing.map((link) => {
+      const update = byId.get(link.id)
+      return update ? { ...link, category: update.category, order: update.order } : link
+    })
+    this.scheduleSave()
+  }
+
+  getGlobalProjectLinkFolders(): string[] {
+    return [...(this.state.globalProjectLinkFolders ?? [])].sort((left, right) =>
+      left.localeCompare(right)
+    )
+  }
+
+  addGlobalProjectLinkFolder(path: string): void {
+    const existing = this.state.globalProjectLinkFolders ?? []
+    if (!existing.includes(path)) {
+      this.state.globalProjectLinkFolders = [...existing, path]
+      this.scheduleSave()
+    }
+  }
+
+  removeGlobalProjectLinkFolder(path: string): void {
+    const existing = this.state.globalProjectLinkFolders ?? []
+    this.state.globalProjectLinkFolders = existing.filter((entry) => entry !== path)
+    this.scheduleSave()
+  }
+
   // ── Automations ───────────────────────────────────────────────────
 
   listAutomations(): Automation[] {

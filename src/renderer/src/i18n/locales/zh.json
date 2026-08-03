@@ -11397,7 +11397,20 @@
             "folderNameLabel": "Folder name",
             "folderNamePlaceholder": "Production",
             "cancel": "Cancel",
-            "create": "Create"
+            "create": "Create",
+            "export": "导出链接",
+            "import": "导入链接",
+            "exportSuccess": "已导出 {count} 条链接到 {path}",
+            "exportFailed": "导出链接失败",
+            "importSuccess": "已导入 {imported} 条链接,跳过 {skipped} 条",
+            "importFailed": "导入链接失败",
+            "globalTab": "全局",
+            "localTab": "本项目",
+            "globalGroup": "全局(所有项目)",
+            "localGroup": "本项目",
+            "newGlobalLink": "新建全局链接",
+            "newGlobalFolder": "新建全局文件夹",
+            "newGlobalFolderTitle": "新建全局文件夹"
           },
           "PluginPanel": {
             "unavailable": "此插件面板已不可用。",

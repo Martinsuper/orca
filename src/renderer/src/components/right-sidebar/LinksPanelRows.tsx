@@ -14,16 +14,17 @@ import { linkHost, type LinkNode } from './project-links-tree'
 import { translate } from '@/i18n/i18n'
 import type { ProjectLink } from '../../../../shared/types'
 
-export type NewLinkRequest = { category: string }
+export type LinkScope = 'local' | 'global'
+export type NewLinkRequest = { category: string; scope: LinkScope }
 /** dnd-kit data carried by each sortable link row so drop handlers know the
  *  dragged link's category and the drop target's category. */
-export type LinkDragData = { linkId: string; category: string }
+export type LinkDragData = { linkId: string; category: string; scope: LinkScope }
 
 export type TreeNodeHandlers = {
   onNewLink: (req: NewLinkRequest) => void
-  onNewFolder: (parentPath: string) => void
-  onRemoveLink: (linkId: string) => void
-  onRemoveFolder: (path: string) => void
+  onNewFolder: (args: { parentPath: string; scope: LinkScope }) => void
+  onRemoveLink: (args: { linkId: string; scope: LinkScope }) => void
+  onRemoveFolder: (args: { path: string; scope: LinkScope }) => void
 }
 
 export function LinksEmptyState({
@@ -56,12 +57,14 @@ export function LinkTreeNode({
   depth,
   collapsed,
   onToggle,
+  scope,
   ...handlers
 }: {
   node: LinkNode
   depth: number
   collapsed: Set<string>
   onToggle: (path: string) => void
+  scope: LinkScope
 } & TreeNodeHandlers): React.JSX.Element {
   // Why: the top-level uncategorized bucket renders its links inline at depth 0,
   // with no folder header — matching the tree's flatten behavior.
@@ -73,6 +76,7 @@ export function LinkTreeNode({
             key={link.id}
             link={link}
             depth={depth}
+            scope={scope}
             onRemoveLink={handlers.onRemoveLink}
             onNewLink={handlers.onNewLink}
           />
@@ -107,11 +111,11 @@ export function LinkTreeNode({
           </button>
         </ContextMenuTrigger>
         <ContextMenuContent className="w-48">
-          <ContextMenuItem onSelect={() => handlers.onNewLink({ category: node.path })}>
+          <ContextMenuItem onSelect={() => handlers.onNewLink({ category: node.path, scope })}>
             <Plus />
             {translate('auto.components.right.sidebar.projectLinks.newLinkHere', 'New link here')}
           </ContextMenuItem>
-          <ContextMenuItem onSelect={() => handlers.onNewFolder(node.path)}>
+          <ContextMenuItem onSelect={() => handlers.onNewFolder({ parentPath: node.path, scope })}>
             <FolderPlus />
             {translate('auto.components.right.sidebar.projectLinks.newSubfolder', 'New subfolder')}
           </ContextMenuItem>
@@ -120,7 +124,7 @@ export function LinkTreeNode({
               <ContextMenuSeparator />
               <ContextMenuItem
                 variant="destructive"
-                onSelect={() => handlers.onRemoveFolder(node.path)}
+                onSelect={() => handlers.onRemoveFolder({ path: node.path, scope })}
               >
                 <Trash2 />
                 {translate(
@@ -139,6 +143,7 @@ export function LinkTreeNode({
               key={link.id}
               link={link}
               depth={depth + 1}
+              scope={scope}
               onRemoveLink={handlers.onRemoveLink}
               onNewLink={handlers.onNewLink}
             />
@@ -150,6 +155,7 @@ export function LinkTreeNode({
               depth={depth + 1}
               collapsed={collapsed}
               onToggle={onToggle}
+              scope={scope}
               {...handlers}
             />
           ))}
@@ -162,17 +168,19 @@ export function LinkTreeNode({
 function LinkLeafRow({
   link,
   depth,
+  scope,
   onRemoveLink,
   onNewLink
 }: {
   link: ProjectLink
   depth: number
-  onRemoveLink: (linkId: string) => void
+  scope: LinkScope
+  onRemoveLink: (args: { linkId: string; scope: LinkScope }) => void
   onNewLink: (req: NewLinkRequest) => void
 }): React.JSX.Element {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: link.id,
-    data: { linkId: link.id, category: link.category } satisfies LinkDragData
+    data: { linkId: link.id, category: link.category, scope } satisfies LinkDragData
   })
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -208,12 +216,15 @@ function LinkLeafRow({
           <Link2 />
           {translate('auto.components.right.sidebar.projectLinks.open', 'Open link')}
         </ContextMenuItem>
-        <ContextMenuItem onSelect={() => onNewLink({ category: link.category })}>
+        <ContextMenuItem onSelect={() => onNewLink({ category: link.category, scope })}>
           <Plus />
           {translate('auto.components.right.sidebar.projectLinks.newLinkHere', 'New link here')}
         </ContextMenuItem>
         <ContextMenuSeparator />
-        <ContextMenuItem variant="destructive" onSelect={() => onRemoveLink(link.id)}>
+        <ContextMenuItem
+          variant="destructive"
+          onSelect={() => onRemoveLink({ linkId: link.id, scope })}
+        >
           <Trash2 />
           {translate('auto.components.right.sidebar.projectLinks.delete', 'Delete')}
         </ContextMenuItem>

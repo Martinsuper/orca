@@ -7,6 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog'
 import { useAppStore } from '@/store'
 import { useMountedRef } from '@/hooks/useMountedRef'
 import { translate } from '@/i18n/i18n'
+import type { LinkScope } from './LinksPanelRows'
 
 type ProjectLinkFolderDialogProps = {
   open: boolean
@@ -14,16 +15,20 @@ type ProjectLinkFolderDialogProps = {
   repoId: string
   /** Parent folder path the new folder nests under; empty string = top level. */
   parentPath: string
+  /** Which store the folder lives in — 'local' = per-repo, 'global' = cross-repo. */
+  scope: LinkScope
 }
 
 export function ProjectLinkFolderDialog({
   open,
   onOpenChange,
   repoId,
-  parentPath
+  parentPath,
+  scope
 }: ProjectLinkFolderDialogProps): React.JSX.Element {
   const mountedRef = useMountedRef()
   const addProjectLinkFolder = useAppStore((s) => s.addProjectLinkFolder)
+  const addGlobalProjectLinkFolder = useAppStore((s) => s.addGlobalProjectLinkFolder)
   const [name, setName] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
@@ -44,7 +49,9 @@ export function ProjectLinkFolderDialog({
     const path = parentPath ? `${parentPath}/${trimmed}` : trimmed
     setSubmitting(true)
     try {
-      await addProjectLinkFolder({ repoId, path })
+      await (scope === 'global'
+        ? addGlobalProjectLinkFolder({ path })
+        : addProjectLinkFolder({ repoId, path }))
       if (mountedRef.current) {
         close()
       }
@@ -69,7 +76,15 @@ export function ProjectLinkFolderDialog({
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
           <DialogTitle className="text-base">
-            {translate('auto.components.right.sidebar.projectLinks.newFolderTitle', 'New Folder')}
+            {scope === 'global'
+              ? translate(
+                  'auto.components.right.sidebar.projectLinks.newGlobalFolderTitle',
+                  'New Global Folder'
+                )
+              : translate(
+                  'auto.components.right.sidebar.projectLinks.newFolderTitle',
+                  'New Folder'
+                )}
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="flex flex-col gap-3">

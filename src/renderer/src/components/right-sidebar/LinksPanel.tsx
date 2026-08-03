@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { FolderPlus, Link2, Loader2, Plus, Settings2 } from 'lucide-react'
+import { Download, FolderPlus, Globe, Link2, Loader2, Plus, Settings2, Upload } from 'lucide-react'
 import {
   DndContext,
   DragOverlay,
@@ -9,7 +9,6 @@ import {
   type DragEndEvent,
   type DragStartEvent
 } from '@dnd-kit/core'
-import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { useAppStore } from '@/store'
 import { useActiveRepo } from '@/store/selectors'
 import { Button } from '../ui/button'
@@ -21,6 +20,7 @@ import {
 } from '../ui/context-menu'
 import { ProjectLinksManagerDialog } from './ProjectLinksManagerDialog'
 import { ProjectLinkFolderDialog } from './ProjectLinkFolderDialog'
+import { ProjectLinksScopeTrees } from './ProjectLinksScopeTrees'
 import {
   buildLinkTree,
   collectNodePaths,
@@ -28,15 +28,15 @@ import {
   computeLinkReorder
 } from './project-links-tree'
 import {
-  LinkTreeNode,
   LinksEmptyState,
   type LinkDragData,
+  type LinkScope,
   type NewLinkRequest
 } from './LinksPanelRows'
 import { translate } from '@/i18n/i18n'
 import type { ProjectLink } from '../../../../shared/types'
 
-type NewFolderRequest = { parentPath: string }
+type NewFolderRequest = { parentPath: string; scope: LinkScope }
 
 export default function LinksPanel(): React.JSX.Element {
   const repo = useActiveRepo()
@@ -53,15 +53,29 @@ export default function LinksPanel(): React.JSX.Element {
   const removeProjectLinkFolder = useAppStore((s) => s.removeProjectLinkFolder)
   const reorderProjectLinks = useAppStore((s) => s.reorderProjectLinks)
 
+  const globalLinks = useAppStore((s) => s.globalProjectLinks)
+  const globalFolders = useAppStore((s) => s.globalProjectLinkFolders)
+  const globalLoadStatus = useAppStore((s) => s.globalProjectLinksLoadStatus)
+  const globalLoadError = useAppStore((s) => s.globalProjectLinksError)
+  const fetchGlobalProjectLinks = useAppStore((s) => s.fetchGlobalProjectLinks)
+  const fetchGlobalProjectLinkFolders = useAppStore((s) => s.fetchGlobalProjectLinkFolders)
+  const removeGlobalProjectLink = useAppStore((s) => s.removeGlobalProjectLink)
+  const removeGlobalProjectLinkFolder = useAppStore((s) => s.removeGlobalProjectLinkFolder)
+  const reorderGlobalProjectLinks = useAppStore((s) => s.reorderGlobalProjectLinks)
+
+  const exportProjectLinks = useAppStore((s) => s.exportProjectLinks)
+  const importProjectLinks = useAppStore((s) => s.importProjectLinks)
+
   const [managerOpen, setManagerOpen] = useState(false)
   const [managerCategory, setManagerCategory] = useState('')
   const [managerMode, setManagerMode] = useState<'manage' | 'add'>('manage')
+  const [managerScope, setManagerScope] = useState<LinkScope>('local')
   const [folderRequest, setFolderRequest] = useState<NewFolderRequest | null>(null)
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
   const [draggingLink, setDraggingLink] = useState<ProjectLink | null>(null)
 
-  // Why: an 8px activation distance lets a plain click still open the link;
-  // only a deliberate drag past the threshold starts sorting.
+  // Why: 8px activation distance lets a plain click still open the link — only
+  // a deliberate drag past the threshold starts sorting.
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 8 } }))
 
   useEffect(() => {
@@ -76,26 +90,49 @@ export default function LinksPanel(): React.JSX.Element {
     }
   }, [repoId, folders, fetchProjectLinkFolders])
 
+  useEffect(() => {
+    if (globalLinks === undefined) {
+      void fetchGlobalProjectLinks()
+    }
+  }, [globalLinks, fetchGlobalProjectLinks])
+
+  useEffect(() => {
+    if (globalFolders === undefined) {
+      void fetchGlobalProjectLinkFolders()
+    }
+  }, [globalFolders, fetchGlobalProjectLinkFolders])
+
   const uncategorized = translate(
     'auto.components.right.sidebar.projectLinks.uncategorized',
     'Uncategorized'
   )
-  const tree = useMemo(
+  const localTree = useMemo(
     () => buildLinkTree(links ?? [], uncategorized, folders ?? []),
     [links, folders, uncategorized]
   )
-  const sortableIds = useMemo(() => collectVisibleLinkIds(tree, collapsed), [tree, collapsed])
+  const globalTree = useMemo(
+    () => buildLinkTree(globalLinks ?? [], uncategorized, globalFolders ?? []),
+    [globalLinks, globalFolders, uncategorized]
+  )
+  const localSortableIds = useMemo(
+    () => collectVisibleLinkIds(localTree, collapsed),
+    [localTree, collapsed]
+  )
+  const globalSortableIds = useMemo(
+    () => collectVisibleLinkIds(globalTree, collapsed),
+    [globalTree, collapsed]
+  )
 
-  // Why: category nodes default to expanded (link counts are small, so showing
-  // the whole tree up front beats making the user click into every group).
+  // Why: category nodes default to expanded; seed a fresh expanded set whenever
+  // the underlying paths change so a new folder shows without needing a click.
   const [seededPaths, setSeededPaths] = useState('')
   useEffect(() => {
-    const key = collectNodePaths(tree).join(' ')
+    const key = [...collectNodePaths(localTree), ...collectNodePaths(globalTree)].join(' ')
     if (key !== seededPaths) {
       setSeededPaths(key)
       setCollapsed(new Set())
     }
-  }, [tree, seededPaths])
+  }, [localTree, globalTree, seededPaths])
 
   const toggle = (path: string): void => {
     setCollapsed((prev) => {
@@ -112,23 +149,26 @@ export default function LinksPanel(): React.JSX.Element {
   const openNewLink = (req: NewLinkRequest): void => {
     setManagerMode('add')
     setManagerCategory(req.category)
+    setManagerScope(req.scope)
     setManagerOpen(true)
   }
   const openManage = (): void => {
     setManagerMode('manage')
     setManagerCategory('')
+    setManagerScope('local')
     setManagerOpen(true)
   }
 
   const handleDragStart = (event: DragStartEvent): void => {
     const data = event.active.data.current as LinkDragData | undefined
-    setDraggingLink((links ?? []).find((link) => link.id === data?.linkId) ?? null)
+    const source = data?.scope === 'global' ? globalLinks : links
+    setDraggingLink((source ?? []).find((link) => link.id === data?.linkId) ?? null)
   }
 
   const handleDragEnd = (event: DragEndEvent): void => {
     setDraggingLink(null)
     const { active, over } = event
-    if (!repoId || !over || active.id === over.id) {
+    if (!over || active.id === over.id) {
       return
     }
     const activeData = active.data.current as LinkDragData | undefined
@@ -136,18 +176,44 @@ export default function LinksPanel(): React.JSX.Element {
     if (!activeData || !overData) {
       return
     }
-    // Why: drop lands relative to the "over" link — same category means reorder,
-    // different category means move. Index is the over link's slot within its
-    // category; computeLinkReorder clamps and renumbers.
+    // Why: drops that would cross scopes are ignored — Local/Global stay
+    // separate stores, so a drag from one to the other would need copy-move UX
+    // we haven't designed yet.
+    if (activeData.scope !== overData.scope) {
+      return
+    }
+    const scope = activeData.scope
+    const scopeLinks = (scope === 'global' ? globalLinks : links) ?? []
     const targetCategory = overData.category
-    const inTarget = (links ?? [])
+    const inTarget = scopeLinks
       .filter((l) => l.category === targetCategory && l.id !== activeData.linkId)
       .sort((a, b) => (a.order ?? Infinity) - (b.order ?? Infinity) || a.name.localeCompare(b.name))
     const overIndex = inTarget.findIndex((l) => l.id === overData.linkId)
     const targetIndex = overIndex === -1 ? inTarget.length : overIndex
-    const updates = computeLinkReorder(links ?? [], activeData.linkId, targetCategory, targetIndex)
-    if (updates.length > 0) {
+    const updates = computeLinkReorder(scopeLinks, activeData.linkId, targetCategory, targetIndex)
+    if (updates.length === 0) {
+      return
+    }
+    if (scope === 'global') {
+      void reorderGlobalProjectLinks({ updates })
+    } else if (repoId) {
       void reorderProjectLinks({ repoId, updates })
+    }
+  }
+
+  const handleRemoveLink = ({ linkId, scope }: { linkId: string; scope: LinkScope }): void => {
+    if (scope === 'global') {
+      void removeGlobalProjectLink({ linkId })
+    } else if (repoId) {
+      void removeProjectLink({ repoId, linkId })
+    }
+  }
+
+  const handleRemoveFolder = ({ path, scope }: { path: string; scope: LinkScope }): void => {
+    if (scope === 'global') {
+      void removeGlobalProjectLinkFolder({ path })
+    } else if (repoId) {
+      void removeProjectLinkFolder({ repoId, path })
     }
   }
 
@@ -161,7 +227,11 @@ export default function LinksPanel(): React.JSX.Element {
 
   const isLoading = loadStatus === 'loading' && links === undefined
   const isError = loadStatus === 'error'
-  const isEmpty = tree.length === 0
+  const isGlobalLoading = globalLoadStatus === 'loading' && globalLinks === undefined
+  const isGlobalError = globalLoadStatus === 'error'
+  const hasLocal = localTree.length > 0
+  const hasGlobal = globalTree.length > 0
+  const isEmpty = !hasLocal && !hasGlobal && !isGlobalLoading
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -174,7 +244,7 @@ export default function LinksPanel(): React.JSX.Element {
             type="button"
             variant="ghost"
             size="icon-xs"
-            onClick={() => openNewLink({ category: '' })}
+            onClick={() => openNewLink({ category: '', scope: 'local' })}
             aria-label={translate('auto.components.right.sidebar.projectLinks.newLink', 'New link')}
           >
             <Plus className="size-3.5" />
@@ -183,13 +253,37 @@ export default function LinksPanel(): React.JSX.Element {
             type="button"
             variant="ghost"
             size="icon-xs"
-            onClick={() => setFolderRequest({ parentPath: '' })}
+            onClick={() => setFolderRequest({ parentPath: '', scope: 'local' })}
             aria-label={translate(
               'auto.components.right.sidebar.projectLinks.newFolder',
               'New folder'
             )}
           >
             <FolderPlus className="size-3.5" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            onClick={() => void exportProjectLinks({ repoId })}
+            aria-label={translate(
+              'auto.components.right.sidebar.projectLinks.export',
+              'Export links'
+            )}
+          >
+            <Upload className="size-3.5" />
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-xs"
+            onClick={() => void importProjectLinks({ repoId })}
+            aria-label={translate(
+              'auto.components.right.sidebar.projectLinks.import',
+              'Import links'
+            )}
+          >
+            <Download className="size-3.5" />
           </Button>
           <Button
             type="button"
@@ -226,7 +320,7 @@ export default function LinksPanel(): React.JSX.Element {
                 {loadError && <div className="mt-1 text-xs text-muted-foreground">{loadError}</div>}
               </div>
             ) : isEmpty ? (
-              <LinksEmptyState onManage={() => openNewLink({ category: '' })} />
+              <LinksEmptyState onManage={() => openNewLink({ category: '', scope: 'local' })} />
             ) : (
               <DndContext
                 sensors={sensors}
@@ -234,21 +328,23 @@ export default function LinksPanel(): React.JSX.Element {
                 onDragEnd={handleDragEnd}
                 onDragCancel={() => setDraggingLink(null)}
               >
-                <SortableContext items={sortableIds} strategy={verticalListSortingStrategy}>
-                  {tree.map((node) => (
-                    <LinkTreeNode
-                      key={node.path}
-                      node={node}
-                      depth={0}
-                      collapsed={collapsed}
-                      onToggle={toggle}
-                      onNewLink={openNewLink}
-                      onNewFolder={(parentPath) => setFolderRequest({ parentPath })}
-                      onRemoveLink={(linkId) => void removeProjectLink({ repoId, linkId })}
-                      onRemoveFolder={(path) => void removeProjectLinkFolder({ repoId, path })}
-                    />
-                  ))}
-                </SortableContext>
+                <ProjectLinksScopeTrees
+                  collapsed={collapsed}
+                  globalLoadError={globalLoadError}
+                  globalSortableIds={globalSortableIds}
+                  globalTree={globalTree}
+                  isGlobalError={isGlobalError}
+                  localSortableIds={localSortableIds}
+                  localTree={localTree}
+                  onToggle={toggle}
+                  onNewLink={openNewLink}
+                  onNewFolderInScope={(parentPath, scope) =>
+                    setFolderRequest({ parentPath, scope })
+                  }
+                  onNewFolder={({ parentPath, scope }) => setFolderRequest({ parentPath, scope })}
+                  onRemoveLink={handleRemoveLink}
+                  onRemoveFolder={handleRemoveFolder}
+                />
                 <DragOverlay dropAnimation={null}>
                   {draggingLink ? (
                     <div className="flex items-center gap-1 rounded-sm bg-accent px-2 py-1 text-xs shadow-md">
@@ -261,14 +357,28 @@ export default function LinksPanel(): React.JSX.Element {
             )}
           </div>
         </ContextMenuTrigger>
-        <ContextMenuContent className="w-44">
-          <ContextMenuItem onSelect={() => openNewLink({ category: '' })}>
+        <ContextMenuContent className="w-52">
+          <ContextMenuItem onSelect={() => openNewLink({ category: '', scope: 'local' })}>
             <Plus />
             {translate('auto.components.right.sidebar.projectLinks.newLink', 'New link')}
           </ContextMenuItem>
-          <ContextMenuItem onSelect={() => setFolderRequest({ parentPath: '' })}>
+          <ContextMenuItem onSelect={() => setFolderRequest({ parentPath: '', scope: 'local' })}>
             <FolderPlus />
             {translate('auto.components.right.sidebar.projectLinks.newFolder', 'New folder')}
+          </ContextMenuItem>
+          <ContextMenuItem onSelect={() => openNewLink({ category: '', scope: 'global' })}>
+            <Globe />
+            {translate(
+              'auto.components.right.sidebar.projectLinks.newGlobalLink',
+              'New global link'
+            )}
+          </ContextMenuItem>
+          <ContextMenuItem onSelect={() => setFolderRequest({ parentPath: '', scope: 'global' })}>
+            <FolderPlus />
+            {translate(
+              'auto.components.right.sidebar.projectLinks.newGlobalFolder',
+              'New global folder'
+            )}
           </ContextMenuItem>
         </ContextMenuContent>
       </ContextMenu>
@@ -278,6 +388,7 @@ export default function LinksPanel(): React.JSX.Element {
         onOpenChange={setManagerOpen}
         repoId={repoId}
         initialCategory={managerCategory}
+        initialScope={managerScope}
         mode={managerMode}
       />
       {folderRequest && (
@@ -290,6 +401,7 @@ export default function LinksPanel(): React.JSX.Element {
           }}
           repoId={repoId}
           parentPath={folderRequest.parentPath}
+          scope={folderRequest.scope}
         />
       )}
     </div>

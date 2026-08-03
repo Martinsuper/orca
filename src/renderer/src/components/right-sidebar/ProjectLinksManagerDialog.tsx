@@ -1,14 +1,17 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Link2, Loader2, Pencil, Trash2, ExternalLink, X } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Globe, Link2, Loader2, X } from 'lucide-react'
 import { Button } from '../ui/button'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../ui/dialog'
+import { Tabs, TabsList, TabsTrigger } from '../ui/tabs'
 import { useAppStore } from '@/store'
 import { useMountedRef } from '@/hooks/useMountedRef'
 import { cn } from '@/lib/utils'
 import { translate } from '@/i18n/i18n'
 import type { ProjectLink } from '../../../../shared/types'
+import type { LinkScope } from './LinksPanelRows'
+import { ProjectLinksManagerList } from './ProjectLinksManagerList'
 
 type ProjectLinksManagerDialogProps = {
   open: boolean
@@ -16,6 +19,8 @@ type ProjectLinksManagerDialogProps = {
   repoId: string
   /** Prefill the "add link" form's category (e.g. the folder a user right-clicked). */
   initialCategory?: string
+  /** Which store the dialog opens on; default 'local'. */
+  initialScope?: LinkScope
   /** 'manage' shows the existing-links list + form; 'add' shows only the form. */
   mode?: 'manage' | 'add'
 }
@@ -25,13 +30,19 @@ export function ProjectLinksManagerDialog({
   onOpenChange,
   repoId,
   initialCategory,
+  initialScope = 'local',
   mode = 'manage'
 }: ProjectLinksManagerDialogProps): React.JSX.Element {
   const mountedRef = useMountedRef()
-  const links = useAppStore((s) => s.projectLinksByRepo[repoId])
+  const localLinks = useAppStore((s) => s.projectLinksByRepo[repoId])
+  const globalLinks = useAppStore((s) => s.globalProjectLinks)
   const saveProjectLink = useAppStore((s) => s.saveProjectLink)
   const removeProjectLink = useAppStore((s) => s.removeProjectLink)
+  const saveGlobalProjectLink = useAppStore((s) => s.saveGlobalProjectLink)
+  const removeGlobalProjectLink = useAppStore((s) => s.removeGlobalProjectLink)
+  const fetchGlobalProjectLinks = useAppStore((s) => s.fetchGlobalProjectLinks)
 
+  const [scope, setScope] = useState<LinkScope>(initialScope)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [name, setName] = useState('')
   const [url, setUrl] = useState('')
@@ -40,6 +51,14 @@ export function ProjectLinksManagerDialog({
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
+  // Why: pull global links lazily so the Global tab renders correctly the first
+  // time it's opened without piggybacking on the panel's own fetch.
+  useEffect(() => {
+    if (open && scope === 'global' && globalLinks === undefined) {
+      void fetchGlobalProjectLinks()
+    }
+  }, [open, scope, globalLinks, fetchGlobalProjectLinks])
+
   // Why: when opened from a folder's right-click "new link", prefill that
   // category so the link lands where the user asked. Only on open, and only
   // when not editing an existing link.
@@ -47,15 +66,12 @@ export function ProjectLinksManagerDialog({
     if (open && !editingId && initialCategory !== undefined) {
       setCategory(initialCategory)
     }
+    if (open) {
+      setScope(initialScope)
+    }
   }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const grouped = useMemo(() => {
-    const uncategorized = translate(
-      'auto.components.right.sidebar.projectLinks.uncategorized',
-      'Uncategorized'
-    )
-    return groupLinksByCategory(links ?? [], uncategorized)
-  }, [links])
+  const links = scope === 'global' ? globalLinks : localLinks
 
   const resetForm = (): void => {
     setEditingId(null)
@@ -79,13 +95,16 @@ export function ProjectLinksManagerDialog({
     }
     setSubmitting(true)
     try {
-      const saved = await saveProjectLink({
-        repoId,
+      const args = {
         ...(editingId ? { id: editingId } : {}),
         name: name.trim(),
         url: url.trim(),
         category: category.trim()
-      })
+      }
+      const saved =
+        scope === 'global'
+          ? await saveGlobalProjectLink(args)
+          : await saveProjectLink({ repoId, ...args })
       if (!mountedRef.current) {
         return
       }
@@ -113,7 +132,9 @@ export function ProjectLinksManagerDialog({
     }
     setDeletingId(link.id)
     try {
-      await removeProjectLink({ repoId, linkId: link.id })
+      await (scope === 'global'
+        ? removeGlobalProjectLink({ linkId: link.id })
+        : removeProjectLink({ repoId, linkId: link.id }))
       if (mountedRef.current) {
         setConfirmingDeleteId(null)
         if (editingId === link.id) {
@@ -151,7 +172,12 @@ export function ProjectLinksManagerDialog({
         <DialogHeader>
           <DialogTitle className="text-base">
             {mode === 'add'
-              ? translate('auto.components.right.sidebar.projectLinks.newLink', 'New link')
+              ? scope === 'global'
+                ? translate(
+                    'auto.components.right.sidebar.projectLinks.newGlobalLink',
+                    'New global link'
+                  )
+                : translate('auto.components.right.sidebar.projectLinks.newLink', 'New link')
               : translate(
                   'auto.components.right.sidebar.projectLinks.manageTitle',
                   'Project Links'
@@ -159,108 +185,40 @@ export function ProjectLinksManagerDialog({
           </DialogTitle>
         </DialogHeader>
 
+        <Tabs
+          value={scope}
+          onValueChange={(next) => {
+            if (next === 'local' || next === 'global') {
+              // Why: switching tabs discards a half-typed row so the form
+              // reflects the tab's list. Editing state is scope-specific too.
+              resetForm()
+              setScope(next)
+            }
+          }}
+        >
+          <TabsList className="mb-2">
+            <TabsTrigger value="local">
+              <Link2 className="size-3.5" />
+              {translate('auto.components.right.sidebar.projectLinks.localTab', 'This project')}
+            </TabsTrigger>
+            <TabsTrigger value="global">
+              <Globe className="size-3.5" />
+              {translate('auto.components.right.sidebar.projectLinks.globalTab', 'Global')}
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+
         {mode !== 'add' && (
           <div className="scrollbar-sleek -mr-2 flex max-h-[42vh] flex-col gap-4 overflow-y-auto pr-2">
-            {grouped.length === 0 ? (
-              <div className="flex flex-col items-center gap-2 py-8 text-center">
-                <Link2 className="size-7 text-muted-foreground/40" />
-                <p className="text-sm text-muted-foreground">
-                  {translate(
-                    'auto.components.right.sidebar.projectLinks.emptyManaged',
-                    'No links yet. Add your first one below.'
-                  )}
-                </p>
-              </div>
-            ) : (
-              grouped.map((group) => (
-                <div key={group.category} className="flex flex-col gap-1">
-                  <div className="border-b border-border/40 pb-1 text-[11px] font-semibold uppercase tracking-[0.05em] text-muted-foreground">
-                    {group.category.split('/').join(' / ')}
-                  </div>
-                  {group.links.map((link) => {
-                    const confirming = confirmingDeleteId === link.id
-                    const isDeleting = deletingId === link.id
-                    return (
-                      <div
-                        key={link.id}
-                        className={cn(
-                          'group flex items-center gap-3 rounded-lg border border-transparent px-2.5 py-2 transition-colors hover:border-border/50 hover:bg-accent/40',
-                          editingId === link.id && 'border-border bg-accent'
-                        )}
-                      >
-                        <div className="flex size-8 shrink-0 items-center justify-center rounded-lg border border-border/50 bg-muted/30">
-                          <Link2 className="size-4 text-muted-foreground" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="truncate text-sm font-medium">{link.name}</div>
-                          <div className="truncate text-[11px] text-muted-foreground">
-                            {linkHost(link.url)}
-                          </div>
-                        </div>
-                        <div className="flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon-xs"
-                            onClick={() => void window.api.shell.openUrl(link.url)}
-                            aria-label={translate(
-                              'auto.components.right.sidebar.projectLinks.open',
-                              'Open link'
-                            )}
-                          >
-                            <ExternalLink className="size-3.5" />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon-xs"
-                            onClick={() => beginEdit(link)}
-                            disabled={isDeleting}
-                            aria-label={translate(
-                              'auto.components.right.sidebar.projectLinks.edit',
-                              'Edit link'
-                            )}
-                          >
-                            <Pencil className="size-3.5" />
-                          </Button>
-                          <Button
-                            type="button"
-                            variant={confirming ? 'destructive' : 'ghost'}
-                            size="sm"
-                            onClick={() => void handleDelete(link)}
-                            onBlur={() => setConfirmingDeleteId(null)}
-                            disabled={isDeleting}
-                            className={cn(
-                              'w-[5.5rem] px-2 text-xs',
-                              !confirming && 'text-muted-foreground'
-                            )}
-                            aria-label={translate(
-                              'auto.components.right.sidebar.projectLinks.delete',
-                              'Delete link'
-                            )}
-                          >
-                            {isDeleting ? (
-                              <Loader2 className="size-3.5 animate-spin" />
-                            ) : (
-                              <Trash2 className="size-3.5" />
-                            )}
-                            {confirming
-                              ? translate(
-                                  'auto.components.right.sidebar.projectLinks.confirm',
-                                  'Confirm'
-                                )
-                              : translate(
-                                  'auto.components.right.sidebar.projectLinks.delete',
-                                  'Delete'
-                                )}
-                          </Button>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              ))
-            )}
+            <ProjectLinksManagerList
+              confirmingDeleteId={confirmingDeleteId}
+              deletingId={deletingId}
+              editingId={editingId}
+              links={links ?? []}
+              onDelete={(link) => void handleDelete(link)}
+              onDeleteBlur={() => setConfirmingDeleteId(null)}
+              onEdit={beginEdit}
+            />
           </div>
         )}
 
@@ -368,32 +326,4 @@ export function ProjectLinksManagerDialog({
       </DialogContent>
     </Dialog>
   )
-}
-
-type ProjectLinkGroup = { category: string; links: ProjectLink[] }
-
-function linkHost(rawUrl: string): string {
-  // Why: the host reads cleaner than a full URL in a dense row; fall back to the
-  // raw string when it isn't a parseable absolute URL.
-  try {
-    return new URL(rawUrl).host || rawUrl
-  } catch {
-    return rawUrl
-  }
-}
-
-function groupLinksByCategory(links: ProjectLink[], uncategorized: string): ProjectLinkGroup[] {
-  const byCategory = new Map<string, ProjectLink[]>()
-  for (const link of links) {
-    const key = link.category.trim() || uncategorized
-    const bucket = byCategory.get(key)
-    if (bucket) {
-      bucket.push(link)
-    } else {
-      byCategory.set(key, [link])
-    }
-  }
-  return [...byCategory.entries()]
-    .sort(([left], [right]) => left.localeCompare(right))
-    .map(([category, groupLinks]) => ({ category, links: groupLinks }))
 }

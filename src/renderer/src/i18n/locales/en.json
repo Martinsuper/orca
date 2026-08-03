@@ -335,7 +335,11 @@
             "removeFailed": "Failed to remove link",
             "folderAddFailed": "Failed to add folder",
             "folderRemoveFailed": "Failed to remove folder",
-            "reorderFailed": "Failed to reorder links"
+            "reorderFailed": "Failed to reorder links",
+            "exportSuccess": "Exported {count} link(s) to {path}",
+            "exportFailed": "Failed to export links",
+            "importSuccess": "Imported {imported} link(s), skipped {skipped}",
+            "importFailed": "Failed to import links"
           }
         },
         "runtime": {
@@ -11520,7 +11524,20 @@
             "folderNameLabel": "Folder name",
             "folderNamePlaceholder": "Production",
             "cancel": "Cancel",
-            "create": "Create"
+            "create": "Create",
+            "export": "Export links",
+            "import": "Import links",
+            "exportSuccess": "Exported {count} link(s) to {path}",
+            "exportFailed": "Failed to export links",
+            "importSuccess": "Imported {imported} link(s), skipped {skipped}",
+            "importFailed": "Failed to import links",
+            "globalTab": "Global",
+            "localTab": "This project",
+            "globalGroup": "Global (all projects)",
+            "localGroup": "This project",
+            "newGlobalLink": "New global link",
+            "newGlobalFolder": "New global folder",
+            "newGlobalFolderTitle": "New global folder"
           },
           "PluginPanel": {
             "unavailable": "This plugin panel is no longer available.",

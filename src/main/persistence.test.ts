@@ -12101,3 +12101,99 @@ describe('Store project links', () => {
     expect(links.find((l) => l.id === 'a')).toMatchObject({ category: '生产', order: 0 })
   })
 })
+
+describe('Store global project links', () => {
+  it('saves, updates, sorts, and removes global links independent of repos', async () => {
+    const store = await createStore()
+
+    store.saveGlobalProjectLink({
+      id: 'g-zed',
+      repoId: '',
+      name: 'Zed',
+      url: 'https://zed.example.com',
+      category: 'Shared',
+      createdAt: 1,
+      updatedAt: 1
+    })
+    store.saveGlobalProjectLink({
+      id: 'g-api',
+      repoId: '',
+      name: 'Api',
+      url: 'https://api.example.com',
+      category: 'Shared',
+      createdAt: 1,
+      updatedAt: 1
+    })
+
+    expect(store.getGlobalProjectLinks().map((l) => l.name)).toEqual(['Api', 'Zed'])
+
+    store.saveGlobalProjectLink({
+      id: 'g-api',
+      repoId: '',
+      name: 'Api v2',
+      url: 'https://api.example.com',
+      category: 'Shared',
+      createdAt: 1,
+      updatedAt: 2
+    })
+    expect(store.getGlobalProjectLinks().map((l) => l.name)).toEqual(['Api v2', 'Zed'])
+
+    store.removeGlobalProjectLink('g-zed')
+    expect(store.getGlobalProjectLinks().map((l) => l.name)).toEqual(['Api v2'])
+  })
+
+  it('reorderGlobalProjectLinks updates category and order', async () => {
+    const store = await createStore()
+    const base = { repoId: '', url: 'https://e.com', createdAt: 1, updatedAt: 1 }
+    store.saveGlobalProjectLink({ id: 'a', name: 'A', category: '生产', order: 0, ...base })
+    store.saveGlobalProjectLink({ id: 'b', name: 'B', category: '生产', order: 1, ...base })
+
+    store.reorderGlobalProjectLinks([
+      { id: 'b', category: '测试', order: 0 },
+      { id: 'a', category: '生产', order: 0 }
+    ])
+
+    const links = store.getGlobalProjectLinks()
+    expect(links.find((l) => l.id === 'b')).toMatchObject({ category: '测试', order: 0 })
+    expect(links.find((l) => l.id === 'a')).toMatchObject({ category: '生产', order: 0 })
+  })
+
+  it('is not removed when a project is removed', async () => {
+    const store = await createStore()
+    store.addRepo(makeRepo({ id: 'r1', path: '/repo' }))
+    store.saveGlobalProjectLink({
+      id: 'g1',
+      repoId: '',
+      name: 'Docs',
+      url: 'https://docs.example.com',
+      category: '',
+      createdAt: 1,
+      updatedAt: 1
+    })
+    store.saveProjectLink({
+      id: 'l1',
+      repoId: 'r1',
+      name: 'Docs',
+      url: 'https://docs.example.com',
+      category: '',
+      createdAt: 1,
+      updatedAt: 1
+    })
+
+    store.removeProject('r1')
+
+    // Global entry survives; per-repo one is gone.
+    expect(store.getGlobalProjectLinks().map((l) => l.id)).toEqual(['g1'])
+    expect(store.getProjectLinks('r1')).toEqual([])
+  })
+
+  it('global folders round-trip and dedupe on add', async () => {
+    const store = await createStore()
+    store.addGlobalProjectLinkFolder('shared')
+    store.addGlobalProjectLinkFolder('shared') // idempotent
+    store.addGlobalProjectLinkFolder('other')
+    expect(store.getGlobalProjectLinkFolders()).toEqual(['other', 'shared'])
+    store.removeGlobalProjectLinkFolder('shared')
+    expect(store.getGlobalProjectLinkFolders()).toEqual(['other'])
+  })
+})

@@ -762,7 +762,25 @@ const api = {
         callback(data)
       ipcRenderer.on('projectLinks:changed', listener)
       return () => ipcRenderer.removeListener('projectLinks:changed', listener)
-    }
+    },
+
+    listGlobal: () => ipcRenderer.invoke('projectLinks:listGlobal'),
+
+    saveGlobal: (args) => ipcRenderer.invoke('projectLinks:saveGlobal', args),
+
+    removeGlobal: (args) => ipcRenderer.invoke('projectLinks:removeGlobal', args),
+
+    reorderGlobal: (args) => ipcRenderer.invoke('projectLinks:reorderGlobal', args),
+
+    onGlobalChanged: (callback: () => void): (() => void) => {
+      const listener = (): void => callback()
+      ipcRenderer.on('projectLinks:globalChanged', listener)
+      return () => ipcRenderer.removeListener('projectLinks:globalChanged', listener)
+    },
+
+    export: (args) => ipcRenderer.invoke('projectLinks:export', args),
+
+    import: (args) => ipcRenderer.invoke('projectLinks:import', args)
   } satisfies PreloadApi['projectLinks'],
 
   projectLinkFolders: {
@@ -777,6 +795,18 @@ const api = {
         callback(data)
       ipcRenderer.on('projectLinkFolders:changed', listener)
       return () => ipcRenderer.removeListener('projectLinkFolders:changed', listener)
+    },
+
+    listGlobal: () => ipcRenderer.invoke('projectLinkFolders:listGlobal'),
+
+    addGlobal: (args) => ipcRenderer.invoke('projectLinkFolders:addGlobal', args),
+
+    removeGlobal: (args) => ipcRenderer.invoke('projectLinkFolders:removeGlobal', args),
+
+    onGlobalChanged: (callback: () => void): (() => void) => {
+      const listener = (): void => callback()
+      ipcRenderer.on('projectLinkFolders:globalChanged', listener)
+      return () => ipcRenderer.removeListener('projectLinkFolders:globalChanged', listener)
     }
   } satisfies PreloadApi['projectLinkFolders'],
 
