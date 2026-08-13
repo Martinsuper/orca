@@ -168,7 +168,6 @@ function createSettings(overrides: TestSettingsOverrides = {}): GlobalSettings {
     compactWorktreeCards: false,
     terminalWindowsShell: 'powershell.exe',
     terminalWindowsPowerShellImplementation: 'powershell.exe',
-    enableGitHubAttribution: true,
     ...overrides,
     diffWordWrap: overrides.diffWordWrap ?? false,
     localWindowsRuntimeDefault: overrides.localWindowsRuntimeDefault ?? { kind: 'windows-host' },
