@@ -11,15 +11,19 @@ import {
 import { CLIPBOARD_TEXT_MEASURE_YIELD_CODE_UNITS } from '../../shared/clipboard-text'
 import { redactPtyIdForDiagnostics } from '../../shared/pty-delivery-diagnostics'
 import { FLOATING_TERMINAL_WORKTREE_ID, getDefaultWorkspaceSession } from '../../shared/constants'
-import type { TuiAgent } from '../../shared/types'
+import type { TuiAgent } from '../../shared/tui-agent'
 import type { AgentSessionOwnerBinding } from '../../shared/agent-session-host-authority'
 import { AGENT_SESSION_CLAIM_DIGEST_VERSION } from '../../shared/agent-session-host-authority'
 import { PtyWriteUnavailableError } from '../providers/pty-write-unavailable-error'
 import { TerminalSessionOwnerUnverifiedError } from '../daemon/daemon-errors'
 import type * as Wsl from '../wsl'
+import { getBundledLauncherPath } from '../cli/bundled-cli-launcher-path'
 
 const isWindowsHost = process.platform === 'win32'
 const posixOnlyIt = isWindowsHost ? it.skip : it
+const BUNDLED_RESOURCES_PATH = join('/tmp', 'orca-bundled-resources')
+// Why: this suite forces darwin before every test, including on Linux CI.
+const BUNDLED_CLI_PATH = getBundledLauncherPath('darwin', BUNDLED_RESOURCES_PATH) as string
 // Why: bare shells no longer mkdir ~/.omp; OMP status lives under userData (#10196).
 const expectedOmpStatusExtension = posix.join(
   '/tmp/orca-user-data',
@@ -133,7 +137,8 @@ vi.mock('fs', () => ({
   writeFileSync: writeFileSyncMock,
   chmodSync: chmodSyncMock,
   constants: {
-    X_OK: 1
+    X_OK: 1,
+    R_OK: 4
   }
 }))
 
@@ -248,6 +253,7 @@ import {
   type PrepareCodexSessionResume
 } from './pty'
 import { __resetPersistedWindowsPathCacheForTests } from '../pty/windows-environment-path'
+import { LEGACY_TERMINAL_SHIM_REMOTE_ENV_KEYS } from '../pty/legacy-terminal-shim-dir'
 import { __setWindowsPathRegistryLoaderForTests } from '../pty/windows-path-registry-reader'
 import { resetMacosLoginShellPreflightForTests } from '../providers/macos-tcc-login-shell'
 import {
@@ -1866,6 +1872,7 @@ describe('registerPtyHandlers', () => {
     ) => string | null,
     getSettings?: () => {
       agentStatusHooksEnabled?: boolean
+      disabledTuiAgents?: TuiAgent[]
       httpProxyUrl?: string
       httpProxyBypassRules?: string
     },
@@ -1935,6 +1942,42 @@ describe('registerPtyHandlers', () => {
       string[],
       { cwd: string; env: Record<string, string> }
     ]
+  }
+
+  // Why: the Codex launch preflight now carries the bundled CLI's verified absolute
+  // path, so these cases need a resources root whose launcher passes the exec check.
+  async function withBundledCli<T>(
+    run: () => Promise<T>,
+    options?: { launcherExecutable?: boolean }
+  ): Promise<T> {
+    const launcherExecutable = options?.launcherExecutable ?? true
+    const previousResourcesPath = process.resourcesPath
+    Object.defineProperty(process, 'resourcesPath', {
+      configurable: true,
+      value: BUNDLED_RESOURCES_PATH
+    })
+    // Why: only teach the launcher path to look like an executable file; every other
+    // stat/access keeps the permissive default the rest of the harness relies on.
+    statSyncMock.mockImplementation((target: string) => ({
+      isDirectory: () => target !== BUNDLED_CLI_PATH,
+      isFile: () => target === BUNDLED_CLI_PATH,
+      mode: 0o755
+    }))
+    if (!launcherExecutable) {
+      accessSyncMock.mockImplementation((target: string) => {
+        if (target === BUNDLED_CLI_PATH) {
+          throw new Error(`EACCES: ${target}`)
+        }
+      })
+    }
+    try {
+      return await run()
+    } finally {
+      Object.defineProperty(process, 'resourcesPath', {
+        configurable: true,
+        value: previousResourcesPath
+      })
+    }
   }
 
   describe('spawn environment', () => {
@@ -2131,9 +2174,52 @@ describe('registerPtyHandlers', () => {
     })
 
     it('injects the selected Codex home into Orca terminal PTYs', async () => {
-      const env = await spawnAndGetEnv(undefined, undefined, () => TEST_CODEX_HOME)
+      const env = await withBundledCli(() =>
+        spawnAndGetEnv(undefined, undefined, () => TEST_CODEX_HOME)
+      )
       expect(env.CODEX_HOME).toBe(TEST_CODEX_HOME)
       expect(env.ORCA_CODEX_HOME).toBe(TEST_CODEX_HOME)
+      // Why (STA-4270): a bare name would be resolved by the post-profile PATH the codex()
+      // wrapper inherits, so the preflight must carry the CLI's verified absolute path.
+      expect(env.ORCA_CODEX_LAUNCH_PREFLIGHT).toBe(BUNDLED_CLI_PATH)
+    })
+
+    it('skips the Codex launch preflight when the bundled CLI is not executable', async () => {
+      const env = await withBundledCli(
+        () => spawnAndGetEnv(undefined, undefined, () => TEST_CODEX_HOME),
+        { launcherExecutable: false }
+      )
+
+      expect(env.CODEX_HOME).toBe(TEST_CODEX_HOME)
+      expect(env.ORCA_CODEX_LAUNCH_PREFLIGHT).toBeUndefined()
+    })
+
+    // Why (STA-4270): profile scripts run before the codex() wrapper and routinely prepend
+    // directories to PATH, so a scratch `orca` there must never become the preflight.
+    it('pins the Codex launch preflight to the bundled CLI even when PATH leads elsewhere', async () => {
+      const env = await withBundledCli(() =>
+        spawnAndGetEnv(
+          { PATH: `/tmp/hijack-scratch${delimiter}/usr/bin` },
+          undefined,
+          () => TEST_CODEX_HOME
+        )
+      )
+
+      expect(env.ORCA_CODEX_LAUNCH_PREFLIGHT).toBe(BUNDLED_CLI_PATH)
+      expect(env.ORCA_CODEX_LAUNCH_PREFLIGHT).not.toBe('orca')
+      expect(env.ORCA_CODEX_LAUNCH_PREFLIGHT.startsWith('/tmp/hijack-scratch')).toBe(false)
+    })
+
+    it('does not install the Codex launch preflight when Codex hooks are disabled', async () => {
+      const env = await spawnAndGetEnv(
+        undefined,
+        undefined,
+        () => TEST_CODEX_HOME,
+        () => ({ agentStatusHooksEnabled: true, disabledTuiAgents: ['codex'] })
+      )
+
+      expect(env.CODEX_HOME).toBe(TEST_CODEX_HOME)
+      expect(env.ORCA_CODEX_LAUNCH_PREFLIGHT).toBeUndefined()
     })
 
     it('resumes an automatic Codex session from its prepared originating home', async () => {
@@ -4399,6 +4485,16 @@ describe('registerPtyHandlers', () => {
         expect(spawnOptions.env.ORCA_AGENT_HOOK_TOKEN).toBe('agent-token')
       })
 
+      it('asks surviving pre-upgrade daemons to delete legacy attribution env', async () => {
+        const spawnOptions = await daemonSpawnAndGetOptions({})
+
+        expect(spawnOptions.envToDelete).toEqual(
+          expect.arrayContaining([...LEGACY_TERMINAL_SHIM_REMOTE_ENV_KEYS])
+        )
+        expect(spawnOptions.envToDelete).not.toContain('ORCA_REAL_GIT')
+        expect(spawnOptions.envToDelete).not.toContain('ORCA_REAL_GH')
+      })
+
       it('deletes stale Claude scoped settings env from runtime-created daemon PTYs', async () => {
         type RuntimeSpawnController = {
           spawn(args: {
@@ -4434,6 +4530,38 @@ describe('registerPtyHandlers', () => {
         )
         expect(spawnOptions.env.ORCA_AGENT_HOOK_PORT).toBe('5678')
         expect(spawnOptions.env.ORCA_AGENT_HOOK_TOKEN).toBe('agent-token')
+      })
+
+      it('asks surviving pre-upgrade daemons to delete legacy attribution env for runtime PTYs', async () => {
+        type RuntimeSpawnController = {
+          spawn(args: {
+            cols: number
+            rows: number
+            worktreeId?: string
+            env?: Record<string, string>
+          }): Promise<{ id: string }>
+        }
+        const daemonSpawn = setupDaemonAdapter()
+        const runtime = {
+          setPtyController: vi.fn(),
+          registerPty: vi.fn(),
+          noteTerminalSpawnCommand: vi.fn(),
+          onPtySpawned: vi.fn(),
+          onPtyExit: vi.fn(),
+          onPtyData: vi.fn()
+        }
+        handlers.clear()
+        registerPtyHandlers(mainWindow as never, runtime as never)
+        const controller = runtime.setPtyController.mock.calls[0]?.[0] as RuntimeSpawnController
+
+        await controller.spawn({ cols: 80, rows: 24, worktreeId: 'wt-runtime', env: {} })
+
+        const spawnOptions = daemonSpawn.mock.calls.at(-1)?.[0] as DaemonSpawnCall
+        expect(spawnOptions.envToDelete).toEqual(
+          expect.arrayContaining([...LEGACY_TERMINAL_SHIM_REMOTE_ENV_KEYS])
+        )
+        expect(spawnOptions.envToDelete).not.toContain('ORCA_REAL_GIT')
+        expect(spawnOptions.envToDelete).not.toContain('ORCA_REAL_GH')
       })
 
       it('strips inherited Claude child-session stamps from runtime-created PTYs', async () => {
@@ -6253,7 +6381,7 @@ describe('registerPtyHandlers', () => {
         expect(runtime.onPtyExit).toHaveBeenCalledWith('remote-pty', -1, undefined)
       })
 
-      it('preserves an SSH lease when runtime controller kill shutdown fails transiently', async () => {
+      it('retires a rejected SSH PTY after generic kill shutdown fails transiently', async () => {
         const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
         const store = {
           markSshRemotePtyLease: vi.fn()
@@ -6296,22 +6424,30 @@ describe('registerPtyHandlers', () => {
         )
         const controller = runtime.setPtyController.mock.calls[0]?.[0] as {
           kill: (ptyId: string) => boolean
+          retireRejectedPty: (ptyId: string) => void
         }
 
         try {
           expect(controller.kill('remote-pty')).toBe(true)
           await new Promise((resolve) => setImmediate(resolve))
+          expect(store.markSshRemotePtyLease).not.toHaveBeenCalledWith(
+            'ssh-1',
+            'remote-pty',
+            'terminated'
+          )
+          controller.retireRejectedPty('remote-pty')
         } finally {
           warnSpy.mockRestore()
           deletePtyOwnership('remote-pty')
         }
 
-        expect(store.markSshRemotePtyLease).not.toHaveBeenCalledWith(
+        expect(store.markSshRemotePtyLease).toHaveBeenCalledWith(
           'ssh-1',
           'remote-pty',
           'terminated'
         )
         expect(runtime.onPtyExit).toHaveBeenCalledWith('remote-pty', -1, undefined)
+        expect(runtime.onPtyExit).toHaveBeenCalledWith('remote-pty', 0, undefined)
       })
 
       it('strips ORCA_PANE_KEY/TAB_ID/WORKTREE_ID from SSH spawn env when remote agent hooks are disabled', async () => {

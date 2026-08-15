@@ -80,6 +80,7 @@ describe('Electron runtime package contract', () => {
       'build:linux',
       'test:e2e',
       'test:e2e:terminal-rendering-golden',
+      'test:e2e:posix-profile-index-golden',
       'test:e2e:terminal-rendering-release-evidence',
       'test:e2e:headful'
     ]
@@ -543,6 +544,15 @@ describe('Electron runtime package contract', () => {
     expect(packageScripts['test:e2e:windows-fresh-startup-golden']).toContain(
       '@windows-fresh-startup-golden'
     )
+    expect(packageScripts['test:e2e:posix-profile-index-golden']).toContain(
+      'golden-posix-profile-index-fsync.spec.ts'
+    )
+    expect(packageScripts['test:e2e:posix-profile-index-golden']).toContain(
+      'golden-posix-fresh-startup.spec.ts'
+    )
+    expect(packageScripts['test:e2e:posix-profile-index-golden']).toContain(
+      '@posix-profile-index-golden'
+    )
     expect(packageScripts['test:e2e:terminal-rendering-release-evidence']).toContain(
       'terminal-opencode-emoji-table-rendering.spec.ts'
     )
@@ -557,13 +567,19 @@ describe('Electron runtime package contract', () => {
     expect(goldenRunSteps.get('linux')?.run).toContain(
       'pnpm run test:e2e:terminal-rendering-golden'
     )
+    expect(goldenRunSteps.get('linux')?.run).toContain(
+      'pnpm run --if-present test:e2e:posix-profile-index-golden'
+    )
     expect(goldenRunSteps.get('mac')?.run).toContain('pnpm run test:e2e:terminal-rendering-golden')
+    expect(goldenRunSteps.get('mac')?.run).toContain(
+      'pnpm run --if-present test:e2e:posix-profile-index-golden'
+    )
     expect(goldenRunSteps.get('windows')).toMatchObject({
       if: "runner.os == 'Windows'",
       shell: 'pwsh'
     })
     expect(goldenRunSteps.get('windows').run).toContain(
-      'pnpm run test:e2e:windows-fresh-startup-golden'
+      'pnpm run --if-present test:e2e:windows-fresh-startup-golden'
     )
     expect(goldenWorkflow.on.pull_request).toBeUndefined()
     expect(goldenWorkflow.on.workflow_dispatch).toBeDefined()
@@ -574,8 +590,19 @@ describe('Electron runtime package contract', () => {
     expect(publishReleaseNeeds).not.toContain('terminal-rendering-release-evidence')
     expect(releaseGoldenJob['continue-on-error']).toBeUndefined()
     expect(releaseGoldenMatrix).toEqual(goldenMatrix)
-    expect(releaseGoldenJob.steps.map((step) => step.run ?? '')).toContain(
-      'xvfb-run --auto-servernum env SKIP_BUILD=1 ORCA_E2E_FORWARD_APP_LOGS=1 pnpm run test:e2e:terminal-rendering-golden'
+    const releaseLinuxRunStep = releaseGoldenJob.steps.find(
+      (step) => step.name === 'Run terminal rendering golden on Linux'
+    )
+    expect(releaseLinuxRunStep.run).toContain('pnpm run test:e2e:terminal-rendering-golden')
+    expect(releaseLinuxRunStep.run).toContain(
+      'pnpm run --if-present test:e2e:posix-profile-index-golden'
+    )
+    const releaseMacRunStep = releaseGoldenJob.steps.find(
+      (step) => step.name === 'Run terminal rendering golden on macOS'
+    )
+    expect(releaseMacRunStep.run).toContain('pnpm run test:e2e:terminal-rendering-golden')
+    expect(releaseMacRunStep.run).toContain(
+      'pnpm run --if-present test:e2e:posix-profile-index-golden'
     )
     const releaseWindowsRunStep = releaseGoldenJob.steps.find(
       (step) => step.name === 'Run fresh-startup golden on Windows'
@@ -584,7 +611,9 @@ describe('Electron runtime package contract', () => {
       if: "runner.os == 'Windows'",
       shell: 'pwsh'
     })
-    expect(releaseWindowsRunStep.run).toContain('pnpm run test:e2e:windows-fresh-startup-golden')
+    expect(releaseWindowsRunStep.run).toContain(
+      'pnpm run --if-present test:e2e:windows-fresh-startup-golden'
+    )
     expect(releaseEvidenceJob['continue-on-error']).toBe(true)
     expect(
       releaseEvidenceJob.strategy.matrix.include.map(({ platform }) => platform).sort()

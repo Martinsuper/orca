@@ -1,7 +1,10 @@
 /* eslint-disable max-lines -- Why: splitting spawn() would scatter tightly coupled PTY lifecycle logic (scan → ready → write → exit) with no cleaner ownership seam. */
 import { basename, delimiter, win32 as pathWin32 } from 'node:path'
 import { randomUUID } from 'node:crypto'
-import { resolveWindowsShellLaunchArgs } from './windows-shell-args'
+import {
+  ORCA_CODEX_LAUNCH_PREFLIGHT_CMD_QUOTE_ENV,
+  resolveWindowsShellLaunchArgs
+} from './windows-shell-args'
 import {
   resolveEffectiveWindowsPowerShell,
   shouldProbeWindowsPowerShellAvailability,
@@ -12,7 +15,7 @@ import { resolveProcessCwd } from './process-cwd'
 import { existsSync } from 'node:fs'
 import * as pty from 'node-pty'
 import { getDefaultWslDistro, parseWslPath, isWslAvailableAsync } from '../wsl'
-import { splitWorktreeIdForFilesystem } from '../../shared/worktree-id'
+import { splitWorktreeIdForFilesystem } from '../../shared/worktree/id'
 import { isBracketedPasteSafeShell } from '../../shared/startup-command-submission'
 import {
   injectHistoryEnv,
@@ -36,6 +39,7 @@ import type { ShellReadySignal } from './local-pty-shell-ready'
 import { removeInheritedNoColor } from '../pty/terminal-color-env'
 import { removeAppImageRuntimeEnv } from '../pty/appimage-terminal-env'
 import { stripInheritedBuildModeEnv } from '../pty/build-mode-env'
+import { stripLegacyTerminalShimEnv } from '../pty/legacy-terminal-shim-dir'
 import { SessionNotFoundError } from '../daemon/daemon-errors'
 import { resolvePathEnvKey } from '../pty/windows-environment-path'
 import { isHostCodexHomeForWsl, isWslCodexHomeForHost } from '../pty/codex-home-wsl-env'
@@ -776,6 +780,30 @@ export class LocalPtyProvider implements IPtyProvider {
         delete finalEnv.CODEX_HOME
         delete finalEnv.ORCA_CODEX_HOME
       }
+
+      const shellBasename = pathWin32.basename(shellPath).toLowerCase()
+      const codexLaunchPreflightCommand = finalEnv.ORCA_CODEX_LAUNCH_PREFLIGHT
+      if (
+        codexLaunchPreflightCommand &&
+        (shellBasename === 'cmd.exe' || isWindowsGitBashShellPath(shellPath))
+      ) {
+        if (shellBasename === 'cmd.exe') {
+          // Why: node-pty backslash-escapes argv quotes; expand the quote inside cmd.exe instead.
+          finalEnv[ORCA_CODEX_LAUNCH_PREFLIGHT_CMD_QUOTE_ENV] = '"'
+        }
+        const resolved = resolveWindowsShellLaunchArgs(
+          shellPath,
+          cwd,
+          defaultCwd,
+          launchWslContext,
+          args.command,
+          codexLaunchPreflightCommand
+        )
+        shellArgs = resolved.shellArgs
+        effectiveCwd = resolved.effectiveCwd
+        validationCwd = resolved.validationCwd
+        startupCommandDeliveredInShellArgs = resolved.startupCommandDeliveredInShellArgs === true
+      }
     }
     seedPowerlevel10kWizardEnv(finalEnv, { envToDelete: args.envToDelete })
     if (
@@ -829,6 +857,8 @@ export class LocalPtyProvider implements IPtyProvider {
       finalEnv,
       requestedEnv ? requestedEnv[resolvePathEnvKey(requestedEnv, process.platform)] : undefined
     )
+    // Why: raw requested PATH promotion runs after the host-env scrub.
+    stripLegacyTerminalShimEnv(finalEnv, process.platform)
 
     // Why: worktree-scoped HISTFILE — without it worktrees share one global history (terminal-history-scope-design §7–§10).
     const worktreeId = args.worktreeId

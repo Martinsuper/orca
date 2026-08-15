@@ -1,4 +1,5 @@
 /* eslint-disable max-lines */
+import { toast } from 'sonner'
 import type { RuntimeRpcResponse } from '../../../shared/runtime-rpc-envelope'
 import type {
   BrowserTabCreateResult,
@@ -18,14 +19,18 @@ import type {
   SleepingAgentLaunchConfig,
   AgentProviderSessionMetadata
 } from '../../../shared/agent-session-resume'
-import { AGENT_SESSION_OMP_RESUME_PATH_RUNTIME_CAPABILITY } from '../../../shared/protocol-version'
+import {
+  AGENT_SESSION_OMP_RESUME_PATH_RUNTIME_CAPABILITY,
+  BROWSER_TAB_CREATE_KNOWN_ID_RUNTIME_CAPABILITY
+} from '../../../shared/protocol-version'
 import type {
   AgentLaunchPreferences,
   AgentPromptDelivery,
   RuntimeCreateAgentSessionResult,
   RuntimeEnsureAgentSessionResult
 } from '../../../shared/agent-session-host-authority'
-import type { TerminalPaneLayoutNode, TuiAgent } from '../../../shared/types'
+import type { TerminalPaneLayoutNode } from '../../../shared/terminal-tab-types'
+import type { TuiAgent } from '../../../shared/tui-agent'
 import { createBrowserUuid } from '../lib/browser-uuid'
 import { getRuntimeEnvironmentIdForWorktree } from '../lib/worktree-runtime-owner'
 import { useAppStore } from '../store'
@@ -462,6 +467,8 @@ export async function createWebRuntimeSessionBrowserTab(args: {
   clientTargetGroupId?: string
   clientTargetGroupCreated?: boolean
   focusOnCreate?: boolean
+  /** Wait until a renderer-backed host can publish the new page in its session snapshot. */
+  waitForRegistration?: boolean
   selectWorktree?: boolean
   stagedTitle?: string
   stagedFocusAddressBar?: boolean
@@ -479,6 +486,10 @@ export async function createWebRuntimeSessionBrowserTab(args: {
   const shouldFocusOnCreate = args.focusOnCreate !== false
   const shouldSelectWorktree = args.selectWorktree !== false
   const provisionalPageId = createBrowserUuid()
+  const hostSupportsKnownPageId = useAppStore
+    .getState()
+    .runtimeStatusByEnvironmentId?.get(environmentId)
+    ?.status?.capabilities?.includes(BROWSER_TAB_CREATE_KNOWN_ID_RUNTIME_CAPABILITY)
   let unsubscribeFocusGuard = (): void => {}
   let guardedPageId = provisionalPageId
   let createdPageId: string | null = null
@@ -537,23 +548,44 @@ export async function createWebRuntimeSessionBrowserTab(args: {
       })
     }
     createAttempted = true
+    const navigateAfterCreate =
+      args.waitForRegistration === true && args.url && args.url !== 'about:blank'
     const created = unwrapRuntimeRpcResult(
       (await callEnvironment({
         method: 'browser.tabCreate',
         params: {
           worktree: toRuntimeWorktreeSelector(args.worktreeId),
-          url: args.url,
+          url: navigateAfterCreate ? undefined : args.url,
+          ...(hostSupportsKnownPageId ? { page: provisionalPageId } : {}),
           profileId: args.profileId ?? undefined,
           activate: shouldFocusOnCreate,
           // Why: place the new browser in the clicked split group so the host snapshot is authoritative for it (no left-snap).
           ...(args.targetGroupId ? { targetGroupId: args.targetGroupId } : {}),
           // Why: web clients need the local tab now; waiting for host webview registration makes the workspace appear to close.
-          waitForRegistration: false
+          waitForRegistration: args.waitForRegistration ?? false
         },
         timeoutMs: 15_000
       })) as RuntimeRpcResponse<BrowserTabCreateResult>
     )
     createdPageId = created.browserPageId
+    if (navigateAfterCreate) {
+      void callEnvironment({
+        method: 'browser.goto',
+        params: {
+          worktree: toRuntimeWorktreeSelector(args.worktreeId),
+          page: created.browserPageId,
+          url: args.url
+        },
+        timeoutMs: 15_000
+      })
+        .then((response) => unwrapRuntimeRpcResult(response))
+        .catch((error) => {
+          console.warn(
+            '[web-runtime-session] created browser tab navigation failed:',
+            error instanceof Error ? error.message : String(error)
+          )
+        })
+    }
     await pauseAfterE2eWebRuntimeBrowserCreate(created.browserPageId)
     if (created.browserPageId !== provisionalPageId) {
       moveWebSessionBrowserPlacement({
@@ -632,7 +664,11 @@ export async function createWebRuntimeSessionBrowserTab(args: {
   } catch (error) {
     unsubscribeFocusGuard()
     let recoveryError: unknown = null
-    const createOutcomeUnknown = !createdPageId && !isDefinitiveBrowserCreateFailure(error)
+    const createFailureDefinitive = isDefinitiveBrowserCreateFailure(error)
+    const cleanupPageId =
+      createdPageId ??
+      (!createFailureDefinitive && hostSupportsKnownPageId ? provisionalPageId : null)
+    const createOutcomeUnknown = !cleanupPageId && !createFailureDefinitive
     const ownsClientGroupCleanup = args.clientTargetGroupId
       ? releaseWebSessionBrowserPlacementGroup({
           environmentId,
@@ -649,14 +685,14 @@ export async function createWebRuntimeSessionBrowserTab(args: {
         remotePageId: guardedPageId
       })
     }
-    if (createdPageId) {
+    if (cleanupPageId) {
       try {
         const closeResult = unwrapRuntimeRpcResult(
           (await callEnvironment({
             method: 'browser.tabClose',
             params: {
               worktree: toRuntimeWorktreeSelector(args.worktreeId),
-              page: createdPageId
+              page: cleanupPageId
             },
             timeoutMs: 15_000
           })) as RuntimeRpcResponse<{ closed: boolean }>
@@ -674,17 +710,25 @@ export async function createWebRuntimeSessionBrowserTab(args: {
             useAppStore.getState(),
             environmentId,
             args.worktreeId,
-            createdPageId
+            cleanupPageId
           )
         ) {
           throw new Error('The closed browser tab remained materialized in the client.')
         }
       } catch (cleanupError) {
-        recoveryError = cleanupError
-        console.warn(
-          '[web-runtime-session] failed to clean up unreconciled browser tab:',
-          cleanupError instanceof Error ? cleanupError.message : String(cleanupError)
-        )
+        if (
+          !createdPageId &&
+          hostSupportsKnownPageId &&
+          hasRuntimeRpcErrorCode(cleanupError, 'browser_tab_not_found')
+        ) {
+          recoveryError = null
+        } else {
+          recoveryError = cleanupError
+          console.warn(
+            '[web-runtime-session] failed to clean up unreconciled browser tab:',
+            cleanupError instanceof Error ? cleanupError.message : String(cleanupError)
+          )
+        }
       }
     }
     if (shouldFocusOnCreate) {
@@ -1201,10 +1245,11 @@ export function splitWebRuntimeTerminal(
     })
     .catch((error) => {
       releasePendingMirrorSuppression()
-      console.warn(
-        '[web-runtime-session] failed to split terminal:',
-        error instanceof Error ? error.message : String(error)
-      )
+      const message = error instanceof Error ? error.message : String(error)
+      // Why: a split that fails only in the console leaves the user with a pane that silently
+      // never appears.
+      toast.error(message)
+      console.warn('[web-runtime-session] failed to split terminal:', message)
     })
   return true
 }

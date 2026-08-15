@@ -6,14 +6,14 @@ import { homedir } from 'node:os'
 import { z } from 'zod'
 import type { Store } from '../persistence'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
+import type { FolderWorkspace } from '../../shared/folder-workspace-types'
 import type {
-  BaseRefSearchResult,
-  Project,
-  Repo,
+  NestedRepoScanResult,
   ProjectGroup,
-  FolderWorkspace,
-  ProjectGroupImportResult,
-  ProjectUpdateArgs,
+  ProjectGroupImportResult
+} from '../../shared/project-group-types'
+import type {
+  Project,
   ProjectHostSetupCreateArgs,
   ProjectHostSetupCreateResult,
   ProjectHostSetupDeleteArgs,
@@ -22,11 +22,11 @@ import type {
   ProjectHostSetupResult,
   ProjectHostSetupUpdateArgs,
   ProjectHostSetupUpdateResult,
-  NestedRepoScanResult,
-  BaseRefDefaultResult,
-  SparsePreset,
-  ProjectLink
-} from '../../shared/types'
+  ProjectUpdateArgs
+} from '../../shared/project-types'
+import type { BaseRefDefaultResult, BaseRefSearchResult, Repo } from '../../shared/repo-types'
+import type { SparsePreset } from '../../shared/worktree/create-types'
+import type { ProjectLink } from '../../shared/types'
 import type { FolderWorkspacePathStatusRequest } from '../../shared/folder-workspace-path-status'
 import { isFolderRepo } from '../../shared/repo-kind'
 import { DEFAULT_REPO_BADGE_COLOR } from '../../shared/constants'
@@ -134,6 +134,10 @@ import {
 } from '../project-groups/folder-workspace-path-status'
 import { getGitCloneFailureMessage } from '../../shared/git-clone-failure-message'
 import { prepareLocalWorktreeRootForRepo } from '../worktree-root-preparation'
+import {
+  normalizeCustomWorktreeVisibilitySources,
+  normalizeWorktreeVisibilitySourcePreferences
+} from '../../shared/worktree/visibility-sources'
 import { runWithGitReadCacheInvalidation } from '../git/status'
 import { isAdmissibleDirectSshAuthority } from '../../shared/ssh-retained-payload-admission'
 import { isCurrentSshProviderAuthority } from '../ssh/ssh-provider-authority'
@@ -368,7 +372,6 @@ async function addLocalRepoFromPath(
     kind: repoKind,
     ...(repoKind === 'git'
       ? {
-          externalWorktreeVisibility: 'hide' as const,
           externalWorktreeVisibilityLegacy: false,
           // Why: new Add Project imports are explicit ready host setups; 'legacy-repo' is reserved for older records/projection.
           projectHostSetupMethod: 'imported-existing-folder' as const
@@ -467,7 +470,6 @@ async function addRemoteRepoFromPath(
     connectionId: args.connectionId,
     ...(repoKind === 'git'
       ? {
-          externalWorktreeVisibility: 'hide' as const,
           externalWorktreeVisibilityLegacy: false,
           projectHostSetupMethod: args.setupMethod ?? ('imported-existing-folder' as const)
         }
@@ -1802,7 +1804,6 @@ export function registerRepoHandlers(mainWindow: BrowserWindow, store: Store): v
             addedAt: Date.now(),
             kind: 'git',
             ...(args.connectionId ? { connectionId: args.connectionId } : {}),
-            externalWorktreeVisibility: 'hide',
             externalWorktreeVisibilityLegacy: false,
             projectHostSetupMethod: 'imported-existing-folder',
             ...(group
@@ -2062,7 +2063,6 @@ export function registerRepoHandlers(mainWindow: BrowserWindow, store: Store): v
         kind: repoKind,
         ...(repoKind === 'git'
           ? {
-              externalWorktreeVisibility: 'hide' as const,
               externalWorktreeVisibilityLegacy: false,
               projectHostSetupMethod: 'imported-existing-folder' as const
             }
@@ -2154,15 +2154,17 @@ export function registerRepoHandlers(mainWindow: BrowserWindow, store: Store): v
             | 'symlinkPaths'
             | 'issueSourcePreference'
             | 'forkSyncMode'
-            | 'externalWorktreeVisibility'
             | 'externalWorktreeVisibilityPromptDismissedAt'
             | 'externalWorktreeInboxBaselinePaths'
             | 'importedExternalWorktreePaths'
-            | 'agentWorktreeVisibility'
+            | 'customWorktreeVisibilitySources'
+            | 'worktreeVisibilitySourcePreferences'
             | 'projectGroupId'
             | 'projectGroupOrder'
           >
         > & {
+          externalWorktreeVisibility?: Repo['externalWorktreeVisibility'] | null
+          agentWorktreeVisibility?: Repo['agentWorktreeVisibility'] | null
           sourceControlAi?: Repo['sourceControlAi'] | null
           externalWorktreeDiscoverySuppressedAt?:
             | Repo['externalWorktreeDiscoverySuppressedAt']
@@ -2221,7 +2223,9 @@ export function registerRepoHandlers(mainWindow: BrowserWindow, store: Store): v
           updates.badgeColor = badgeColor
         }
       }
-      if (
+      if ('externalWorktreeVisibility' in updates && updates.externalWorktreeVisibility === null) {
+        updates.externalWorktreeVisibility = undefined
+      } else if (
         'externalWorktreeVisibility' in updates &&
         updates.externalWorktreeVisibility !== undefined &&
         updates.externalWorktreeVisibility !== 'hide' &&
@@ -2231,11 +2235,32 @@ export function registerRepoHandlers(mainWindow: BrowserWindow, store: Store): v
       }
       if (
         'agentWorktreeVisibility' in updates &&
+        updates.agentWorktreeVisibility !== null &&
         updates.agentWorktreeVisibility !== undefined &&
         updates.agentWorktreeVisibility !== 'hide' &&
         updates.agentWorktreeVisibility !== 'show'
       ) {
         delete updates.agentWorktreeVisibility
+      }
+      if ('customWorktreeVisibilitySources' in updates) {
+        const normalized = normalizeCustomWorktreeVisibilitySources(
+          updates.customWorktreeVisibilitySources
+        )
+        if (!normalized) {
+          delete updates.customWorktreeVisibilitySources
+        } else {
+          updates.customWorktreeVisibilitySources = normalized
+        }
+      }
+      if ('worktreeVisibilitySourcePreferences' in updates) {
+        const normalized = normalizeWorktreeVisibilitySourcePreferences(
+          updates.worktreeVisibilitySourcePreferences
+        )
+        if (!normalized) {
+          delete updates.worktreeVisibilitySourcePreferences
+        } else {
+          updates.worktreeVisibilitySourcePreferences = normalized
+        }
       }
       if (
         'externalWorktreeVisibilityPromptDismissedAt' in updates &&
@@ -2852,7 +2877,6 @@ export function registerRepoHandlers(mainWindow: BrowserWindow, store: Store): v
             ...detected,
             addedAt: Date.now(),
             kind: 'git',
-            externalWorktreeVisibility: 'hide',
             externalWorktreeVisibilityLegacy: false,
             projectHostSetupMethod: 'cloned'
           }
