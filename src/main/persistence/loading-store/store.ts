@@ -49,6 +49,7 @@ import type {
   ProjectUpdateArgs
 } from '../../../shared/project-types'
 import type { Repo } from '../../../shared/repo-types'
+import type { ProjectLink } from '../../../shared/types'
 import type { TerminalPaneLayoutNode } from '../../../shared/terminal-tab-types'
 import type {
   WorkspaceSessionPatch,
@@ -3673,6 +3674,129 @@ export class Store {
 
   removeSshRemotePtyLeases(targetId: string): void {
     removeSshRemotePtyLeasesOperation(this.getSshPtyLeaseOperations(), targetId)
+  }
+
+  // ── Project Links ──────────────────────────────────────────────────
+
+  getProjectLinks(repoId: string): ProjectLink[] {
+    return [...(this.state.projectLinksByRepo[repoId] ?? [])].sort((left, right) => {
+      // Why: manual order wins within a category; links without an order (e.g.
+      // legacy or freshly added) sort last, then alphabetically as a stable tiebreak.
+      const leftOrder = left.order ?? Number.POSITIVE_INFINITY
+      const rightOrder = right.order ?? Number.POSITIVE_INFINITY
+      if (leftOrder !== rightOrder) {
+        return leftOrder - rightOrder
+      }
+      return left.name.localeCompare(right.name)
+    })
+  }
+
+  saveProjectLink(link: ProjectLink): ProjectLink {
+    const existing = this.state.projectLinksByRepo[link.repoId] ?? []
+    const index = existing.findIndex((entry) => entry.id === link.id)
+    this.state.projectLinksByRepo[link.repoId] =
+      index === -1 ? [...existing, link] : existing.map((entry, i) => (i === index ? link : entry))
+    this.scheduleSave()
+    return link
+  }
+
+  removeProjectLink(repoId: string, linkId: string): void {
+    const existing = this.state.projectLinksByRepo[repoId] ?? []
+    this.state.projectLinksByRepo[repoId] = existing.filter((entry) => entry.id !== linkId)
+    this.scheduleSave()
+  }
+
+  reorderProjectLinks(
+    repoId: string,
+    updates: { id: string; category: string; order: number }[]
+  ): void {
+    const byId = new Map(updates.map((u) => [u.id, u]))
+    const existing = this.state.projectLinksByRepo[repoId] ?? []
+    this.state.projectLinksByRepo[repoId] = existing.map((link) => {
+      const update = byId.get(link.id)
+      return update ? { ...link, category: update.category, order: update.order } : link
+    })
+    this.scheduleSave()
+  }
+
+  getProjectLinkFolders(repoId: string): string[] {
+    return [...(this.state.projectLinkFoldersByRepo[repoId] ?? [])].sort((left, right) =>
+      left.localeCompare(right)
+    )
+  }
+
+  addProjectLinkFolder(repoId: string, path: string): void {
+    const existing = this.state.projectLinkFoldersByRepo[repoId] ?? []
+    if (!existing.includes(path)) {
+      this.state.projectLinkFoldersByRepo[repoId] = [...existing, path]
+      this.scheduleSave()
+    }
+  }
+
+  removeProjectLinkFolder(repoId: string, path: string): void {
+    const existing = this.state.projectLinkFoldersByRepo[repoId] ?? []
+    this.state.projectLinkFoldersByRepo[repoId] = existing.filter((entry) => entry !== path)
+    this.scheduleSave()
+  }
+
+  // ── Global Project Links ─────────────────────────────────────────
+  // Cross-repo entries; shown in every repo's Links panel. Storage mirrors the
+  // per-repo methods so the renderer keeps a single sort/normalize contract.
+
+  getGlobalProjectLinks(): ProjectLink[] {
+    return [...(this.state.globalProjectLinks ?? [])].sort((left, right) => {
+      const leftOrder = left.order ?? Number.POSITIVE_INFINITY
+      const rightOrder = right.order ?? Number.POSITIVE_INFINITY
+      if (leftOrder !== rightOrder) {
+        return leftOrder - rightOrder
+      }
+      return left.name.localeCompare(right.name)
+    })
+  }
+
+  saveGlobalProjectLink(link: ProjectLink): ProjectLink {
+    const existing = this.state.globalProjectLinks ?? []
+    const index = existing.findIndex((entry) => entry.id === link.id)
+    this.state.globalProjectLinks =
+      index === -1 ? [...existing, link] : existing.map((entry, i) => (i === index ? link : entry))
+    this.scheduleSave()
+    return link
+  }
+
+  removeGlobalProjectLink(linkId: string): void {
+    const existing = this.state.globalProjectLinks ?? []
+    this.state.globalProjectLinks = existing.filter((entry) => entry.id !== linkId)
+    this.scheduleSave()
+  }
+
+  reorderGlobalProjectLinks(updates: { id: string; category: string; order: number }[]): void {
+    const existing = this.state.globalProjectLinks ?? []
+    const byId = new Map(updates.map((u) => [u.id, u]))
+    this.state.globalProjectLinks = existing.map((link) => {
+      const update = byId.get(link.id)
+      return update ? { ...link, category: update.category, order: update.order } : link
+    })
+    this.scheduleSave()
+  }
+
+  getGlobalProjectLinkFolders(): string[] {
+    return [...(this.state.globalProjectLinkFolders ?? [])].sort((left, right) =>
+      left.localeCompare(right)
+    )
+  }
+
+  addGlobalProjectLinkFolder(path: string): void {
+    const existing = this.state.globalProjectLinkFolders ?? []
+    if (!existing.includes(path)) {
+      this.state.globalProjectLinkFolders = [...existing, path]
+      this.scheduleSave()
+    }
+  }
+
+  removeGlobalProjectLinkFolder(path: string): void {
+    const existing = this.state.globalProjectLinkFolders ?? []
+    this.state.globalProjectLinkFolders = existing.filter((entry) => entry !== path)
+    this.scheduleSave()
   }
 
   // ── Flush (for shutdown) ───────────────────────────────────────────
