@@ -58,7 +58,7 @@ import { TaskSourceContextSchema } from '../../shared/task-source-context-schema
 import { WorkspaceLinkedItemSchema } from '../../shared/workspace-linked-item-schema'
 import { isWorkspaceLinkedItemSourceContextMatch } from '../../shared/workspace-linked-item-source-context'
 import { DiffCommentSchema } from '../../shared/diff-comment-schema'
-import { invalidateAuthorizedRootsCache } from './filesystem-auth'
+import { invalidateAuthorizedRootsCache } from './registered-worktree-roots-cache'
 import type { ChildProcess } from 'node:child_process'
 import { access, mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import {
@@ -1359,14 +1359,14 @@ export function registerRepoHandlers(mainWindow: BrowserWindow, store: Store): v
   ipcMain.removeHandler('projectLinkFolders:addGlobal')
   ipcMain.removeHandler('projectLinkFolders:removeGlobal')
 
+  // Why one shared reference: enrichment dedupes coalesced callers by callback identity, so a fresh
+  // closure per list call would stack up (and re-broadcast) for the length of a slow sweep.
+  const broadcastReposChanged = (): void => notifyReposChanged(mainWindow)
+
   ipcMain.handle('repos:list', () => {
-    enrichMissingRepoGitRemoteIdentities(store, {
-      onChanged: () => notifyReposChanged(mainWindow)
-    })
+    enrichMissingRepoGitRemoteIdentities(store, { onChanged: broadcastReposChanged })
     // Why: username resolution spawns git/gh, so keep it off this sync handler (issue #7225); it re-lists when values land.
-    enrichRepoGitUsernames(store, {
-      onChanged: () => notifyReposChanged(mainWindow)
-    })
+    enrichRepoGitUsernames(store, { onChanged: broadcastReposChanged })
     return store.getRepos()
   })
 
@@ -1377,9 +1377,7 @@ export function registerRepoHandlers(mainWindow: BrowserWindow, store: Store): v
   )
 
   ipcMain.handle('projects:list', () => {
-    enrichMissingRepoGitRemoteIdentities(store, {
-      onChanged: () => notifyReposChanged(mainWindow)
-    })
+    enrichMissingRepoGitRemoteIdentities(store, { onChanged: broadcastReposChanged })
     return store.getProjects()
   })
 
@@ -1393,9 +1391,7 @@ export function registerRepoHandlers(mainWindow: BrowserWindow, store: Store): v
   })
 
   ipcMain.handle('projectHostSetups:list', () => {
-    enrichMissingRepoGitRemoteIdentities(store, {
-      onChanged: () => notifyReposChanged(mainWindow)
-    })
+    enrichMissingRepoGitRemoteIdentities(store, { onChanged: broadcastReposChanged })
     return store.getProjectHostSetups()
   })
 
