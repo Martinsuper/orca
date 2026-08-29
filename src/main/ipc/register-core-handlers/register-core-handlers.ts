@@ -16,6 +16,7 @@ import { registerLinearHandlers } from '../linear'
 import { registerJiraHandlers } from '../jira'
 import { registerBitbucketHandlers } from '../bitbucket'
 import { registerFeedbackHandlers } from '../feedback'
+import { registerPlantumlHandlers } from '../plantuml'
 import { registerCrashReportingHandlers } from '../crash-reporting'
 import { registerExportHandlers } from '../export'
 import { registerStatsHandlers } from '../stats'
@@ -156,6 +157,7 @@ export function registerCoreHandlers(
   registerJiraHandlers()
   registerBitbucketHandlers()
   registerFeedbackHandlers()
+  registerPlantumlHandlers()
   if (crashReports) {
     registerCrashReportingHandlers(crashReports)
   }

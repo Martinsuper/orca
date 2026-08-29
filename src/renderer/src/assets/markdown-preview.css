@@ -712,14 +712,13 @@
 }
 
 /* PlantUML diagram container — renders SVG piped from the local plantuml.jar.
-   PlantUmlBlock strips the SVG's inline width/height/preserveAspectRatio, so the
-   viewBox drives intrinsic size and these rules scale it uniformly to fit.
-   Why the fixed light background: PlantUML draws black lines/text on a
-   transparent canvas and, unlike Mermaid, has no dark-theme mode. On a dark UI
-   the strokes vanish, so the container always paints a light backdrop (like
-   GitHub/GitLab diagram embeds) to keep diagrams legible in every theme. */
+   The SVG retains PlantUML's white canvas while this outer surface stays
+   transparent, so narrow diagrams are centered without a full-width white area.
+   Why the fixed light SVG background: PlantUML draws black lines/text and has no
+   dark-theme mode. */
 .plantuml-block--rendered {
-  background: #ffffff;
+  display: flex;
+  justify-content: safe center;
   padding: 12px;
   border-radius: 6px;
   border: 1px solid var(--border, rgba(0, 0, 0, 0.1));
@@ -727,8 +726,12 @@
 }
 .plantuml-block svg {
   display: block;
+  flex: 0 1 auto;
+  width: auto;
   max-width: 100%;
   height: auto;
+  margin-inline: auto;
+  background: #ffffff;
 }
 .plantuml-error {
   color: var(--color-warning, #d29922);
@@ -892,6 +895,7 @@
 
 .markdown-body img {
   max-width: 100%;
+  height: auto;
   border-radius: 6px;
 }
 
