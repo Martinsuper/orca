@@ -17,7 +17,7 @@ import {
 } from './SettingsFormControls'
 import { translate } from '@/i18n/i18n'
 import { RichMarkdownSpellcheckSetting } from './RichMarkdownSpellcheckSetting'
-import { PlantumlJarPathSetting } from './PlantumlJarPathSetting'
+import { DiffShowWhitespaceSetting } from './DiffShowWhitespaceSetting'
 import { EditorWordWrapSetting } from './EditorWordWrapSetting'
 import { EditorFontFamilySetting } from './EditorFontFamilySetting'
 import {
@@ -233,6 +233,8 @@ export function GeneralEditorSettingsSection({
 
       <EditorWordWrapSetting settings={settings} updateSettings={updateSettings} />
 
+      <DiffShowWhitespaceSetting settings={settings} updateSettings={updateSettings} />
+
       <SearchableSetting
         title={translate(
           'auto.components.settings.GeneralEditorSettingsSection.8f1afdfbd8',
@@ -392,8 +394,6 @@ export function GeneralEditorSettingsSection({
           }
         />
       </SearchableSetting>
-
-      <PlantumlJarPathSetting settings={settings} updateSettings={updateSettings} />
     </section>
   )
 }
