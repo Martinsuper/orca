@@ -6,6 +6,7 @@ import type { NodeViewProps } from '@tiptap/react'
 import { Copy, Check } from 'lucide-react'
 import { useAppStore } from '@/store'
 import MermaidBlock from './MermaidBlock'
+import PlantUmlBlock from './PlantUmlBlock'
 import { translate } from '@/i18n/i18n'
 import {
   getCodeBlockLanguageLabel,
@@ -34,6 +35,7 @@ export function RichMarkdownCodeBlock({
     (settings?.theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)
 
   const isMermaid = language === 'mermaid'
+  const isPlantuml = language === 'plantuml'
 
   const clearCopiedResetTimer = useCallback((): void => {
     if (copiedResetTimerRef.current !== null) {
@@ -152,6 +154,11 @@ export function RichMarkdownCodeBlock({
       {isMermaid && node.textContent.trim() && (
         <div contentEditable={false} className="mermaid-preview">
           <MermaidBlock content={node.textContent.trim()} isDark={isDark} htmlLabels={false} />
+        </div>
+      )}
+      {isPlantuml && node.textContent.trim() && (
+        <div contentEditable={false} className="plantuml-preview">
+          <PlantUmlBlock content={node.textContent.trim()} />
         </div>
       )}
     </NodeViewWrapper>
