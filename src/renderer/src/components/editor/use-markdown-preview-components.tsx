@@ -3,6 +3,7 @@ import type { Components } from 'react-markdown'
 import type { MarkdownDocument } from '../../../../shared/filesystem-entry-types'
 import CodeBlockCopyButton from './CodeBlockCopyButton'
 import MermaidBlock from './MermaidBlock'
+import PlantUmlBlock from './PlantUmlBlock'
 import {
   getMarkdownDocLinkAnchor,
   parseMarkdownDocLinkHref,
@@ -159,6 +160,9 @@ export function useMarkdownPreviewComponents({
             <MermaidBlock content={String(children).trimEnd()} isDark={isDark} htmlLabels={false} />
           )
         }
+        if (/language-plantuml/.test(className || '')) {
+          return <PlantUmlBlock content={String(children).trimEnd()} />
+        }
         return (
           <code className={className} {...props}>
             {children}
@@ -167,7 +171,10 @@ export function useMarkdownPreviewComponents({
       },
       pre: ({ node, children, ...props }) => {
         const child = React.Children.toArray(children)[0]
-        if (React.isValidElement(child) && child.type === MermaidBlock) {
+        if (
+          React.isValidElement(child) &&
+          (child.type === MermaidBlock || child.type === PlantUmlBlock)
+        ) {
           return <>{children}</>
         }
         return wrapAnnotatedBlock(
