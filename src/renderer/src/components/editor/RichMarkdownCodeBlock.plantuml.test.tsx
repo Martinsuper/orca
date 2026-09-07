@@ -1,5 +1,4 @@
 // @vitest-environment happy-dom
-import React from 'react'
 import { act } from 'react'
 import { createRoot, type Root } from 'react-dom/client'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -38,11 +37,18 @@ describe('RichMarkdownCodeBlock PlantUML preview', () => {
     act(() => {
       root.render(
         <RichMarkdownCodeBlock
-          node={{ attrs: { language: 'plantuml' }, textContent: '@startuml\nAlice -> Bob\n@enduml' } as never}
+          node={
+            {
+              attrs: { language: 'plantuml' },
+              textContent: '@startuml\nAlice -> Bob\n@enduml'
+            } as never
+          }
           updateAttributes={vi.fn()}
           editor={{} as never}
           getPos={() => 0}
           decorations={[]}
+          innerDecorations={[] as never}
+          HTMLAttributes={{}}
           selected={false}
           extension={{} as never}
           view={{} as never}
