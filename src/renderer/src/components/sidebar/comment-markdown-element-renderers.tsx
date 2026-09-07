@@ -1,5 +1,6 @@
 import React from 'react'
 import type { Components } from 'react-markdown'
+import { NATIVE_CHAT_FILE_HREF_PREFIX } from '../../../../shared/native-chat-href-routing'
 import { isMermaidFence, isMermaidPre, renderMermaidFence } from './comment-mermaid-fence'
 import { isPlantumlFence, isPlantumlPre, renderPlantumlFence } from './comment-plantuml-fence'
 import {
@@ -33,10 +34,24 @@ function handleMarkdownAnchorClick(
   // Why: link clicks should not also trigger an outer row/card click handler;
   // images only claim the click when an image handler is wired below.
   event.stopPropagation()
-  if (href?.trim().toLowerCase().startsWith('file:')) {
+  const trimmedHref = href?.trim()
+  if (
+    trimmedHref?.toLowerCase().startsWith('file:') ||
+    trimmedHref?.startsWith(NATIVE_CHAT_FILE_HREF_PREFIX)
+  ) {
     event.preventDefault()
   }
   onLinkClick?.(event, href)
+}
+
+function handleMarkdownAnchorAuxClick(
+  event: React.MouseEvent<HTMLAnchorElement>,
+  href: string | undefined,
+  onLinkClick: CommentMarkdownLinkClickHandler | undefined
+): void {
+  if (event.button === 1) {
+    handleMarkdownAnchorClick(event, href, onLinkClick)
+  }
 }
 
 function handleMarkdownImageClick(
@@ -66,6 +81,7 @@ export function createCompactCommentMarkdownComponents(
         rel="noreferrer"
         className="underline underline-offset-2 text-foreground/80 hover:text-foreground"
         onClick={(e) => handleMarkdownAnchorClick(e, href, onLinkClick)}
+        onAuxClick={(e) => handleMarkdownAnchorAuxClick(e, href, onLinkClick)}
       >
         {children}
       </a>
@@ -155,6 +171,7 @@ export function createCompactCommentMarkdownComponents(
             rel="noreferrer"
             className="underline underline-offset-2 text-foreground/80 hover:text-foreground"
             onClick={(e) => handleMarkdownAnchorClick(e, src, onLinkClick)}
+            onAuxClick={(e) => handleMarkdownAnchorAuxClick(e, src, onLinkClick)}
           >
             {alt || src}
           </a>
@@ -185,6 +202,7 @@ export function createCompactCommentMarkdownComponents(
           target="_blank"
           rel="noreferrer"
           onClick={(e) => handleMarkdownAnchorClick(e, src, onLinkClick)}
+          onAuxClick={(e) => handleMarkdownAnchorAuxClick(e, src, onLinkClick)}
         >
           {image}
         </a>
@@ -222,6 +240,7 @@ export function createDocumentCommentMarkdownComponents(
           rel="noreferrer"
           className="break-all text-primary underline underline-offset-2 hover:text-primary/80"
           onClick={(e) => handleMarkdownAnchorClick(e, href, onLinkClick)}
+          onAuxClick={(e) => handleMarkdownAnchorAuxClick(e, href, onLinkClick)}
         >
           {children}
         </a>
