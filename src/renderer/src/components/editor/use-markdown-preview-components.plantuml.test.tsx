@@ -18,12 +18,22 @@ function PreviewCodeBlock(): React.JSX.Element {
     annotationRenderers: {} as never,
     filePath: '/repo/diagram.md'
   })
-  const code = components.code?.({
+  if (!components.code || !components.pre) {
+    return <div />
+  }
+  const code = (
+    components.code as (props: { className: string; children: string }) => React.JSX.Element
+  )({
     className: 'language-plantuml',
     children: '@startuml\nAlice -> Bob\n@enduml'
   })
-
-  return <>{components.pre?.({ children: code })}</>
+  return (
+    <>
+      {(components.pre as (props: { children: React.JSX.Element }) => React.JSX.Element)({
+        children: code
+      })}
+    </>
+  )
 }
 
 describe('useMarkdownPreviewComponents PlantUML fences', () => {

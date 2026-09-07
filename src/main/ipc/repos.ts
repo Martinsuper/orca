@@ -9,6 +9,7 @@ import { registerFolderWorkspaceHandlers } from './repos/folder-workspace-handle
 import { registerNestedRepoImportHandler } from './repos/nested-repo-import-handler'
 import { registerRepoUpdateHandler } from './repos/repo-update-handler'
 import { registerSparsePresetHandlers } from './repos/sparse-preset-handlers'
+import { registerProjectLinkHandlers } from './repos/project-link-handlers'
 import { registerRepoFolderPickerHandlers } from './repos/repo-folder-picker-handlers'
 import { registerRepoCloneHandlers } from './repos/repo-clone-lifecycle'
 import { registerRepoGitUsernameHandler } from './repos/repo-git-username-handler'
@@ -76,6 +77,7 @@ export function registerRepoHandlers(
   registerNestedRepoImportHandler(mainWindow, store)
   registerRepoUpdateHandler(mainWindow, store)
   registerSparsePresetHandlers(mainWindow, store)
+  registerProjectLinkHandlers(mainWindow, store)
   registerRepoFolderPickerHandlers(mainWindow)
   registerRepoCloneHandlers(mainWindow, store)
   registerRepoGitUsernameHandler(store)
