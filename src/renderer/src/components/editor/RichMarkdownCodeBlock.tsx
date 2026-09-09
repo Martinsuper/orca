@@ -36,6 +36,8 @@ export function RichMarkdownCodeBlock({
 
   const isMermaid = language === 'mermaid'
   const isPlantuml = language === 'plantuml'
+  const hasPlantumlDiagram = isPlantuml && node.textContent.trim() !== ''
+  const [sourceExpanded, setSourceExpanded] = useState(false)
 
   const clearCopiedResetTimer = useCallback((): void => {
     if (copiedResetTimerRef.current !== null) {
@@ -94,8 +96,45 @@ export function RichMarkdownCodeBlock({
     [clearCopiedResetTimer, node]
   )
 
+  const togglePlantumlSource = useCallback(() => {
+    setSourceExpanded((expanded) => !expanded)
+  }, [])
+
+  const plantumlSourceToggleLabel = sourceExpanded
+    ? translate(
+        'auto.components.editor.RichMarkdownCodeBlock.plantumlcollapse',
+        'Click to hide source'
+      )
+    : translate(
+        'auto.components.editor.RichMarkdownCodeBlock.plantumlexpand',
+        'Click to edit source'
+      )
+
   return (
-    <NodeViewWrapper className="rich-markdown-code-block-wrapper">
+    <NodeViewWrapper
+      className={`rich-markdown-code-block-wrapper${
+        hasPlantumlDiagram && !sourceExpanded ? ' plantuml-source-collapsed' : ''
+      }`}
+    >
+      {hasPlantumlDiagram && (
+        <div
+          contentEditable={false}
+          className="plantuml-preview"
+          role="button"
+          tabIndex={0}
+          aria-label={plantumlSourceToggleLabel}
+          title={plantumlSourceToggleLabel}
+          onClick={togglePlantumlSource}
+          onKeyDown={(event) => {
+            if (event.key === 'Enter' || event.key === ' ') {
+              event.preventDefault()
+              togglePlantumlSource()
+            }
+          }}
+        >
+          <PlantUmlBlock content={node.textContent.trim()} />
+        </div>
+      )}
       <select
         className="rich-markdown-code-block-lang"
         contentEditable={false}
@@ -154,11 +193,6 @@ export function RichMarkdownCodeBlock({
       {isMermaid && node.textContent.trim() && (
         <div contentEditable={false} className="mermaid-preview">
           <MermaidBlock content={node.textContent.trim()} isDark={isDark} htmlLabels={false} />
-        </div>
-      )}
-      {isPlantuml && node.textContent.trim() && (
-        <div contentEditable={false} className="plantuml-preview">
-          <PlantUmlBlock content={node.textContent.trim()} />
         </div>
       )}
     </NodeViewWrapper>
