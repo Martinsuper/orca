@@ -20,6 +20,65 @@ function item(
 }
 
 describe('structured agent session status projection', () => {
+  it('reuses immutable item projections and refreshes revisions and resolved prompts', () => {
+    const original = item('diff', 1, {
+      kind: 'diff',
+      path: 'a.ts',
+      patch: {
+        head: '@@\n+first',
+        digest: 'one',
+        byteLength: 10,
+        truncated: false
+      }
+    })
+    const first = projectStructuredItemToNativeChat(original)
+    expect(projectStructuredItemToNativeChat(original)).toBe(first)
+    const revised = {
+      ...original,
+      revision: 2,
+      observedAt: 2000,
+      body: {
+        kind: 'diff' as const,
+        path: 'a.ts',
+        patch: {
+          head: '@@\n+second',
+          digest: 'two',
+          byteLength: 11,
+          truncated: false
+        }
+      }
+    }
+    const second = projectStructuredItemToNativeChat(revised)
+    expect(second).not.toBe(first)
+    expect(second).toMatchObject({
+      timestamp: 2000,
+      blocks: [{ type: 'tool-call' }, { type: 'tool-result', output: '@@\n+second' }]
+    })
+    const pending = item('approval', 2, {
+      kind: 'approval',
+      title: 'Allow?',
+      detail: null,
+      options: [],
+      resolution: { state: 'pending', selectedOptionId: null, resolvedBy: null, resolvedAt: null }
+    })
+    expect(projectStructuredItemToNativeChat(pending)).toBeNull()
+    if (pending.body.kind !== 'approval') {
+      throw new Error('fixture')
+    }
+    const resolved = {
+      ...pending,
+      revision: 2,
+      body: {
+        ...pending.body,
+        resolution: { ...pending.body.resolution, state: 'resolved' as const }
+      }
+    }
+    expect(projectStructuredItemToNativeChat(resolved)).toMatchObject({
+      id: 'approval',
+      role: 'system'
+    })
+  })
+
   it('projects running, attention, and completed lifecycle states', () => {
     const running = item('running', 1, {
       kind: 'status',
@@ -281,5 +340,68 @@ describe('structured agent session status projection', () => {
     expect(projected?.blocks).toEqual([
       { type: 'tool-call', name: 'shell', input: { command: 'cat package.json' }, state: 'running' }
     ])
+  })
+})
+
+describe('notice projection for desktop and mobile consumers', () => {
+  it.each([
+    { presentation: 'compaction' },
+    { presentation: 'plan-document' },
+    { tone: 'warning' },
+    { tone: 'error' },
+    { tone: 'notice' },
+    { presentation: 'future-presentation', tone: 'future-tone' }
+  ])('preserves readable text alongside optional metadata: %j', (metadata) => {
+    const projected = projectStructuredItemToNativeChat(
+      item('notice', 1, {
+        kind: 'status',
+        text: 'A readable document or notice',
+        ...metadata
+      })
+    )
+    expect(projected).toMatchObject({
+      role: 'system',
+      blocks: [{ type: 'text', text: 'A readable document or notice', ...metadata }]
+    })
+  })
+})
+
+it('preserves optional tool annotations for desktop and mobile projection', () => {
+  const metadata = {
+    exitCode: 127,
+    durationMs: 400,
+    webSearchResults: [{ title: 'Docs', url: 'https://example.com' }]
+  }
+  const projected = projectStructuredItemToNativeChat(
+    item('annotated', 1, {
+      kind: 'tool-call',
+      name: 'shell',
+      input: null,
+      state: 'failed',
+      ...metadata
+    })
+  )
+  expect(projected?.blocks[0]).toEqual({
+    type: 'tool-call',
+    name: 'shell',
+    input: null,
+    state: 'failed',
+    ...metadata
+  })
+})
+
+it('preserves confirmed MCP identity and the raw name through projection', () => {
+  const body = {
+    kind: 'tool-call' as const,
+    name: 'my_server/ns.tool',
+    input: null,
+    state: 'running' as const,
+    mcpIdentity: { server: 'my_server', tool: 'ns.tool' }
+  }
+  const projected = projectStructuredItemToNativeChat(item('mcp', 1, body))
+  expect(projected?.blocks[0]).toMatchObject({
+    name: body.name,
+    mcpIdentity: body.mcpIdentity,
+    type: 'tool-call'
   })
 })

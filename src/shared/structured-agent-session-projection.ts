@@ -47,7 +47,18 @@ function itemBlocks(item: AgentJournalRenderItem): {
     return {
       role: 'assistant',
       blocks: [
-        { type: 'tool-call', name: body.name, input: body.input, state: body.state },
+        {
+          type: 'tool-call',
+          name: body.name,
+          input: body.input,
+          state: body.state,
+          ...(body.mcpIdentity !== undefined ? { mcpIdentity: body.mcpIdentity } : {}),
+          ...(body.exitCode !== undefined ? { exitCode: body.exitCode } : {}),
+          ...(body.durationMs !== undefined ? { durationMs: body.durationMs } : {}),
+          ...(body.webSearchResults !== undefined
+            ? { webSearchResults: body.webSearchResults }
+            : {})
+        },
         ...(body.output
           ? [
               {
@@ -102,35 +113,45 @@ function itemBlocks(item: AgentJournalRenderItem): {
       {
         type: 'text',
         text: body.text,
+        ...(body.presentation !== undefined ? { presentation: body.presentation } : {}),
+        ...(body.tone !== undefined ? { tone: body.tone } : {}),
         ...(body.providerFrame ? { providerFrame: body.providerFrame } : {})
       }
     ]
   }
 }
 
+const projectedItems = new WeakMap<AgentJournalRenderItem, NativeChatMessage | null>()
+
 export function projectStructuredItemsToNativeChat(
   items: readonly AgentJournalRenderItem[]
 ): NativeChatMessage[] {
   return items.flatMap((item) => {
-    const projected = itemBlocks(item)
-    return projected
-      ? [
-          {
-            id: item.itemId,
-            role: projected.role,
-            blocks: projected.blocks,
-            timestamp: item.observedAt,
-            source: 'transcript'
-          }
-        ]
-      : []
+    const projected = projectStructuredItemToNativeChat(item)
+    return projected ? [projected] : []
   })
 }
 
 export function projectStructuredItemToNativeChat(
   item: AgentJournalRenderItem
 ): NativeChatMessage | null {
-  return projectStructuredItemsToNativeChat([item])[0] ?? null
+  const cached = projectedItems.get(item)
+  if (cached !== undefined) {
+    return cached
+  }
+  // Reducer updates replace journal items, so unchanged rows keep their render caches.
+  const projected = itemBlocks(item)
+  const message: NativeChatMessage | null = projected
+    ? {
+        id: item.itemId,
+        role: projected.role,
+        blocks: projected.blocks,
+        timestamp: item.observedAt,
+        source: 'transcript'
+      }
+    : null
+  projectedItems.set(item, message)
+  return message
 }
 
 export function activeStructuredAgentSessionTurnId(
