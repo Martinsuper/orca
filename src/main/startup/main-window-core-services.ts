@@ -126,7 +126,8 @@ export function attachMainWindowCoreServices(
       onBeforeUpdateQuit: () =>
         preserveAgentAuthBeforeRestart({ codexRuntimeHome, claudeRuntimeAuth, store }),
       updateInstallMode: resolveUpdateInstallMode(state.isServeMode),
-      onWorktreeLifecycle: emitPluginWorktreeLifecycle
+      onWorktreeLifecycle: emitPluginWorktreeLifecycle,
+      reminderScheduler: state.todoReminderScheduler ?? undefined
     }
   )
   // Why: attach the durable renderer pull now, but launch the diagnostic process after first paint.

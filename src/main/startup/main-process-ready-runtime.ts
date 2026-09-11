@@ -34,6 +34,8 @@ import { initializeMainProcessPlugins } from './main-process-plugins'
 import { collectWorktreeTrashSweepRoots, sweepStaleWorktreeTrash } from '../worktree-trash'
 import { runAfterFirstWindowShown } from './first-window-deferral'
 import { logStartupMilestone } from './startup-diagnostics'
+import { TodoReminderScheduler } from '../persistence/loading-store/todo-reminder-scheduler'
+import { getActiveNotificationDispatcher } from '../ipc/notifications'
 
 // Headless serve never opens a window, so the sweep still has to run off a timer there.
 const WORKTREE_TRASH_SWEEP_FALLBACK_MS = 15_000
@@ -152,5 +154,15 @@ export async function initializeReadyRuntimeServices(): Promise<void> {
       void handleGpuChildCrash(details.reason, details.exitCode ?? null, crashedAt)
     }
   })
+  state.todoReminderScheduler = new TodoReminderScheduler({
+    store,
+    dispatch: (request) => {
+      const dispatcher = getActiveNotificationDispatcher()
+      if (dispatcher) {
+        void dispatcher(request)
+      }
+    }
+  })
+  state.todoReminderScheduler.hydrate()
   logStartupMilestone('services-initialized')
 }

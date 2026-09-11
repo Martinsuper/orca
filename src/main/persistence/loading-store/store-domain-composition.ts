@@ -54,6 +54,7 @@ import {
   ProjectLinkPersistence,
   installProjectLinkPersistenceContext
 } from './project-link-persistence'
+import { TodoPersistence, installTodoPersistenceContext } from './todo-persistence'
 import {
   PtyBindingPersistenceOperations,
   installPtyBindingPersistenceOperationsContext
@@ -88,6 +89,7 @@ export type StoreDomains = {
   mobileTabSelections: MobileTabSelectionPersistence
   sparsePresets: SparsePresetPersistence
   projectLinks: ProjectLinkPersistence
+  todos: TodoPersistence
   ptyBindings: PtyBindingPersistenceOperations
   sshProfiles: SshProfileOperations
   retiredWorktreeNames: RetiredWorktreeNamePersistence
@@ -102,6 +104,7 @@ export const STORE_DOMAIN_OPERATION_CLASSES = [
   MobileTabSelectionPersistence,
   SparsePresetPersistence,
   ProjectLinkPersistence,
+  TodoPersistence,
   AutomationPersistence,
   MetadataLineageOperations,
   ProfilePreferences,
@@ -122,6 +125,7 @@ export function installStoreDomainContexts(target: object, domains: StoreDomains
   installMobileTabSelectionPersistenceContext(target, domains.mobileTabSelections)
   installSparsePresetPersistenceContext(target, domains.sparsePresets)
   installProjectLinkPersistenceContext(target, domains.projectLinks)
+  installTodoPersistenceContext(target, domains.todos)
   installAutomationPersistenceContext(target, domains.automations)
   installMetadataLineageOperationsContext(target, domains.metadata)
   installProfilePreferencesContext(target, domains.preferences)
@@ -159,6 +163,7 @@ export function createStoreDomains(runtime: StoreRuntimeState): StoreDomains {
   const mobileTabSelections = new MobileTabSelectionPersistence(runtime, scheduling)
   const sparsePresets = new SparsePresetPersistence(runtime, scheduling)
   const projectLinks = new ProjectLinkPersistence(runtime, scheduling)
+  const todos = new TodoPersistence(runtime, scheduling)
   const ptyBindings = new PtyBindingPersistenceOperations(runtime, sessions)
   const sshProfiles = new SshProfileOperations(runtime, scheduling, flushBarriers, repos)
   const retiredWorktreeNames = new RetiredWorktreeNamePersistence(runtime, scheduling)
@@ -188,6 +193,7 @@ export function createStoreDomains(runtime: StoreRuntimeState): StoreDomains {
     mobileTabSelections,
     sparsePresets,
     projectLinks,
+    todos,
     ptyBindings,
     sshProfiles,
     retiredWorktreeNames,

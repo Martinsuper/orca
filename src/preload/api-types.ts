@@ -1,5 +1,12 @@
 import type { ElectronAPI } from '@electron-toolkit/preload'
-import type { PlantumlRenderArgs, PlantumlRenderResult, ProjectLink } from '../shared/types'
+import type {
+  PlantumlRenderArgs,
+  PlantumlRenderResult,
+  ProjectLink,
+  Todo,
+  TodoList,
+  TodoStep
+} from '../shared/types'
 import type {
   ClaudeAccountsApi,
   CodexAccountsApi,
@@ -120,6 +127,48 @@ export type PreloadApi = {
         }
       | { ok: false; cancelled?: boolean; error?: string }
     >
+  }
+  // Fork: todo panel (per-repo + global todos, lists, smart views).
+  todos: {
+    list: (args: { repoId: string }) => Promise<Todo[]>
+    save: (args: {
+      repoId: string
+      id?: string
+      listId?: string
+      title: string
+      note?: string
+      important?: boolean
+      dueDate?: string
+      reminderAt?: number
+      myDayDate?: string
+      steps?: TodoStep[]
+    }) => Promise<Todo>
+    remove: (args: { repoId: string; todoId: string }) => Promise<void>
+    toggle: (args: { repoId: string; todoId: string; done: boolean }) => Promise<Todo>
+    onChanged: (callback: (data: { repoId: string }) => void) => () => void
+    listLists: (args: { repoId: string }) => Promise<TodoList[]>
+    saveList: (args: { repoId: string; id?: string; title: string }) => Promise<TodoList>
+    removeList: (args: { repoId: string; listId: string; confirmed: boolean }) => Promise<void>
+    onListsChanged: (callback: (data: { repoId: string }) => void) => () => void
+    listGlobal: () => Promise<Todo[]>
+    saveGlobal: (args: {
+      id?: string
+      listId?: string
+      title: string
+      note?: string
+      important?: boolean
+      dueDate?: string
+      reminderAt?: number
+      myDayDate?: string
+      steps?: TodoStep[]
+    }) => Promise<Todo>
+    removeGlobal: (args: { todoId: string }) => Promise<void>
+    toggleGlobal: (args: { todoId: string; done: boolean }) => Promise<Todo>
+    onGlobalChanged: (callback: () => void) => () => void
+    listGlobalLists: () => Promise<TodoList[]>
+    saveGlobalList: (args: { id?: string; title: string }) => Promise<TodoList>
+    removeGlobalList: (args: { listId: string; confirmed: boolean }) => Promise<void>
+    onGlobalListsChanged: (callback: () => void) => () => void
   }
   projectLinkFolders: {
     list: (args: { repoId: string }) => Promise<string[]>

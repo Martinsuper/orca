@@ -23,6 +23,7 @@ import type { RepoLifecycleOperations } from './repo-lifecycle-operations'
 import type { MobileTabSelectionPersistence } from './mobile-tab-selection-persistence'
 import type { SparsePresetPersistence } from './sparse-preset-persistence'
 import type { ProjectLinkPersistence } from './project-link-persistence'
+import type { TodoPersistence } from './todo-persistence'
 import type { AutomationPersistence } from './automation-persistence'
 import type { MetadataLineageOperations } from './metadata-lineage-operations'
 import type { ProfilePreferences } from './profile-preferences'
@@ -115,6 +116,7 @@ export interface Store
     MobileTabSelectionPersistence,
     SparsePresetPersistence,
     ProjectLinkPersistence,
+    TodoPersistence,
     AutomationPersistence,
     MetadataLineageOperations,
     ProfilePreferences,

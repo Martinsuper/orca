@@ -71,9 +71,7 @@ export class RepoLifecycleOperations {
       bumpLocalWorktreeScanGeneration(id)
     }
     syncProjectHostSetupCompatibilityState(this)
-    // Why: presets are repo-scoped and unreachable once the repo is gone, so drop them with it.
-    delete this[repoLifecycleOperationsContext].runtime.state.sparsePresetsByRepo[id]
-    delete this[repoLifecycleOperationsContext].runtime.state.retiredWorktreeNamesByRepo?.[id]
+    deleteRepoScopedState(this[repoLifecycleOperationsContext].runtime.state, id)
     pruneWorktreeStateForRepo(this, id, null)
     this[repoLifecycleOperationsContext].runtime.state.workspaceSession =
       removeRepoFromWorkspaceSession(
@@ -103,8 +101,7 @@ export class RepoLifecycleOperations {
     )
     // Why: presets and retirements are repo-id-scoped (not host-scoped); drop them only when the last host's copy is gone.
     if (!idStillPresent) {
-      delete this[repoLifecycleOperationsContext].runtime.state.sparsePresetsByRepo[id]
-      delete this[repoLifecycleOperationsContext].runtime.state.retiredWorktreeNamesByRepo?.[id]
+      deleteRepoScopedState(this[repoLifecycleOperationsContext].runtime.state, id)
     }
     syncProjectHostSetupCompatibilityState(this)
     // Why: prune only this host's worktree metas if the id survives elsewhere; otherwise prune everything (matches removeProject).
@@ -153,6 +150,7 @@ export class RepoLifecycleOperations {
         state.workspaceSessionsByHostId,
         repoId
       )
+      deleteRepoScopedState(state, repoId)
     }
     pruneDeregisteredRepoUiResidue(state.ui, orphanRepoIds)
     return [...orphanRepoIds]
@@ -207,6 +205,13 @@ export function getRepoOrderOperations(
       scheduleSave: () => scheduleSave(owner[repoLifecycleOperationsContext].scheduling)
     })
   return owner[repoLifecycleOperationsContext].runtime.repoOrderOperations
+}
+
+function deleteRepoScopedState(state: PersistedState, repoId: string): void {
+  delete state.sparsePresetsByRepo[repoId]
+  delete state.retiredWorktreeNamesByRepo?.[repoId]
+  delete state.todosByRepo[repoId]
+  delete state.todoListsByRepo?.[repoId]
 }
 
 export function pruneWorktreeStateForRepo(

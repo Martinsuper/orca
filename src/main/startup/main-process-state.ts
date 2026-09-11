@@ -34,6 +34,7 @@ import type { ensureActiveOrcaProfile } from '../orca-profiles/profile-index-sto
 import type { createWindowsShellPathHydration } from './windows-shell-path-hydration'
 import type { ServeOptions } from './main-process-serve'
 import type { HangDetectionMarker } from '../hang-watchdog/hang-detection-marker'
+import type { TodoReminderScheduler } from '../persistence/loading-store/todo-reminder-scheduler'
 import { ServeReadinessPublisher } from '../server/serve-readiness'
 import { SkillShareDeepLinkState } from './skill-share-deep-link-state'
 import { OsOpenedMarkdownFileState } from './os-opened-markdown-files'
@@ -136,7 +137,8 @@ export const mainProcessState = {
   desktopWindow: null as BrowserWindow | null,
   agentBrowserBridge: null as AgentBrowserBridge | null,
   emulatorBridge: null as EmulatorBridge | null,
-  tray: null as Tray | null
+  tray: null as Tray | null,
+  todoReminderScheduler: null as TodoReminderScheduler | null
 }
 
 /** Environment passed to GPU fallback marker helpers. */

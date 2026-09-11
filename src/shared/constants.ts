@@ -1,22 +1,15 @@
 import type { GlobalSettings } from './global-settings-types'
-import type { NotificationSettings } from './notification-settings-types'
-import type { OnboardingChecklistState, OnboardingState } from './onboarding-state-types'
-import type { RepoHookSettings } from './orca-yaml-hook-types'
 import type { PersistedState } from './persisted-state-types'
-import type { PersistedUIState } from './persisted-ui-state-types'
-import type { AgentActivityDisplayMode } from './ui-chrome-types'
-import type { WorkspaceSessionState } from './workspace-session-state-types'
 import { EMPTY_CODEX_RESET_CREDIT_ATTEMPT_LEDGER } from './codex-reset-credit-attempt-ledger'
-import { DEFAULT_STATUS_BAR_ITEMS } from './status-bar-defaults'
-import type { VoiceSettings } from './speech-types'
-import { cloneDefaultWorkspaceStatuses } from './workspace-statuses'
-import { DEFAULT_WORKTREE_CARD_PROPERTIES } from './worktree/card-properties'
-import { DEFAULT_AGENTS_GROUP_BY, DEFAULT_AGENTS_READ_FILTER } from './agents-view-thread-filters'
-import { DEFAULT_USAGE_PERCENTAGE_DISPLAY } from './usage-percentage-display'
-import { DEFAULT_STATUS_BAR_USAGE_MODE } from './status-bar-usage-mode'
 import { buildDefaultSettings } from './default-global-settings'
-import { DEFAULT_SETUP_AGENT_STARTUP_POLICY } from './setup-agent-startup-policy'
-import { DEFAULT_BROWSER_PAGE_ZOOM_LEVEL } from './browser-page-zoom'
+import { DEFAULT_APP_FONT_FAMILY, DEFAULT_TERMINAL_INACTIVE_PANE_OPACITY } from './default-ui-state'
+import { getDefaultOnboardingState } from './default-onboarding-state'
+import {
+  getDefaultNotificationSettings,
+  getDefaultVoiceSettings
+} from './default-notification-voice-hook-settings'
+import { getDefaultUIState } from './default-ui-state'
+import { getDefaultWorkspaceSession } from './default-workspace-session'
 
 export { DEFAULT_STATUS_BAR_ITEMS } from './status-bar-defaults'
 export {
@@ -28,19 +21,25 @@ export {
   isDefaultedCompactWorktreeCardProperties,
   normalizeWorktreeCardProperties
 } from './worktree/card-properties'
+export {
+  DEFAULT_AGENT_ACTIVITY_DISPLAY_MODE,
+  DEFAULT_APP_FONT_FAMILY,
+  DEFAULT_HIDE_SLEEPING_WORKSPACES,
+  DEFAULT_SHOW_SLEEPING_WORKSPACES,
+  DEFAULT_TERMINAL_INACTIVE_PANE_OPACITY,
+  normalizeAgentActivityDisplayMode
+} from './default-ui-state'
+export { getDefaultOnboardingState } from './default-onboarding-state'
+export {
+  getDefaultNotificationSettings,
+  getDefaultRepoHookSettings,
+  getDefaultVoiceSettings
+} from './default-notification-voice-hook-settings'
+export { getDefaultUIState } from './default-ui-state'
+export { getDefaultWorkspaceSession } from './default-workspace-session'
 
 export const SCHEMA_VERSION = 1
-export const DEFAULT_APP_FONT_FAMILY = 'Geist'
-export const DEFAULT_SHOW_SLEEPING_WORKSPACES = true
-export const DEFAULT_HIDE_SLEEPING_WORKSPACES = false
-export const DEFAULT_AGENT_ACTIVITY_DISPLAY_MODE: AgentActivityDisplayMode = 'compact'
-export const DEFAULT_TERMINAL_INACTIVE_PANE_OPACITY = 0.9
 
-export function normalizeAgentActivityDisplayMode(value: unknown): AgentActivityDisplayMode {
-  return value === 'full' || value === 'compact' ? value : DEFAULT_AGENT_ACTIVITY_DISPLAY_MODE
-}
-
-// Why: onboarding wizard's last step index, centralized so backfill, clamps, and UI agree on the bound.
 export const ONBOARDING_FINAL_STEP = 5
 export const ONBOARDING_FLOW_VERSION = 4
 
@@ -73,7 +72,7 @@ function defaultTerminalFontFamily(): string {
   if (platform === 'linux') {
     return 'DejaVu Sans Mono'
   }
-  return 'SF Mono' // macOS default
+  return 'SF Mono'
 }
 
 export const getDefaultPrimarySelectionMiddleClickPaste = (
@@ -118,43 +117,6 @@ export const REPO_COLORS = [
 
 export const DEFAULT_REPO_BADGE_COLOR = REPO_COLORS[0]
 
-export function getDefaultNotificationSettings(): NotificationSettings {
-  return {
-    enabled: true,
-    agentTaskComplete: true,
-    terminalBell: false,
-    suppressWhenFocused: true,
-    customSoundId: 'system',
-    customSoundPath: null,
-    customSoundVolume: 100
-  }
-}
-
-export function getDefaultOnboardingState(): OnboardingState {
-  return {
-    flowVersion: ONBOARDING_FLOW_VERSION,
-    closedAt: null,
-    outcome: null,
-    lastCompletedStep: -1,
-    checklist: {
-      addedRepo: false,
-      choseAgent: false,
-      ranFirstAgent: false,
-      ranSecondAgentOnSameTask: false,
-      triedCmdJ: false,
-      shapedSidebar: false,
-      reviewedDiff: false,
-      openedPr: false,
-      addedFolder: false,
-      openedFile: false,
-      ranAgentOnFile: false,
-      dismissed: false
-    } satisfies OnboardingChecklistState
-  }
-}
-
-/** The stock worktree root. Exported so callers can tell an untouched default apart
- *  from a workspace directory the user actually chose. */
 export function getDefaultWorkspaceDir(homeDir: string): string {
   const separator = homeDir.includes('\\') ? '\\' : '/'
   const trimmedHomeDir = homeDir.replace(/[\\/]+$/, '')
@@ -177,33 +139,6 @@ export function getDefaultSettings(homedir: string): GlobalSettings {
   })
 }
 
-export function getDefaultVoiceSettings(): VoiceSettings {
-  return {
-    enabled: false,
-    sttModel: '',
-    modelsDir: '',
-    language: 'en',
-    dictationMode: 'toggle' as const,
-    terminalConfirmBeforeInsert: false,
-    userModels: [],
-    openAiApiKeyConfigured: false,
-    microphoneDeviceId: null,
-    microphoneDeviceLabel: null
-  }
-}
-
-export function getDefaultRepoHookSettings(): RepoHookSettings {
-  return {
-    mode: 'auto',
-    setupRunPolicy: 'run-by-default',
-    setupAgentStartupPolicy: DEFAULT_SETUP_AGENT_STARTUP_POLICY,
-    scripts: {
-      setup: '',
-      archive: ''
-    }
-  }
-}
-
 export function getDefaultPersistedState(homedir: string): PersistedState {
   return {
     schemaVersion: SCHEMA_VERSION,
@@ -215,6 +150,9 @@ export function getDefaultPersistedState(homedir: string): PersistedState {
     sparsePresetsByRepo: {},
     projectLinksByRepo: {},
     projectLinkFoldersByRepo: {},
+    todosByRepo: {},
+    todoListsByRepo: {},
+    globalTodoLists: [],
     retiredWorktreeNamesByRepo: {},
     retiredWorktreeNamesByNamespace: {},
     worktreeMeta: {},
@@ -238,108 +176,5 @@ export function getDefaultPersistedState(homedir: string): PersistedState {
     onboarding: getDefaultOnboardingState(),
     featureInteractionTelemetryBuckets: {},
     codexResetCreditAttemptLedger: structuredClone(EMPTY_CODEX_RESET_CREDIT_ATTEMPT_LEDGER)
-  }
-}
-
-export function getDefaultUIState(): PersistedUIState {
-  return {
-    lastActiveRepoId: null,
-    lastActiveWorktreeId: null,
-    activeView: 'terminal',
-    sidebarWidth: 280,
-    rightSidebarOpen: true,
-    rightSidebarTab: 'explorer',
-    rightSidebarExplorerView: 'files',
-    rightSidebarWidth: 350,
-    markdownTocPanelWidth: 240,
-    combinedDiffFileTreeWidth: 256,
-    groupBy: 'repo',
-    sortBy: 'recent',
-    projectOrderBy: 'manual',
-    showActiveOnly: false,
-    hideSleepingWorkspaces: DEFAULT_HIDE_SLEEPING_WORKSPACES,
-    workspaceHostScope: 'all',
-    visibleWorkspaceHostIds: null,
-    workspaceHostOrder: [],
-    automationHostFilter: { kind: 'all' },
-    manualRepoOrder: [],
-    showSleepingWorkspaces: DEFAULT_SHOW_SLEEPING_WORKSPACES,
-    hideDefaultBranchWorkspace: false,
-    hideAutomationGeneratedWorkspaces: false,
-    hideCliCreatedWorkspaces: false,
-    hideDetachedHeadWorkspaces: false,
-    hideWorkspacesFromOtherDevices: false,
-    alwaysShowDefaultBranchWorkspace: true,
-    showDotfilesByWorktree: {},
-    filterRepoIds: [],
-    agentsVisibleHostIds: null,
-    agentsFilterRepoIds: [],
-    agentsShowChildAgents: false,
-    agentsCompactMode: true,
-    agentsShowSearch: true,
-    agentsReadFilter: DEFAULT_AGENTS_READ_FILTER,
-    agentsGroupBy: DEFAULT_AGENTS_GROUP_BY,
-    collapsedGroups: [],
-    uiZoomLevel: 0,
-    editorFontZoomLevel: 0,
-    worktreeCardProperties: [...DEFAULT_WORKTREE_CARD_PROPERTIES],
-    _worktreeCardModeDefaulted: true,
-    agentActivityDisplayMode: DEFAULT_AGENT_ACTIVITY_DISPLAY_MODE,
-    workspaceStatuses: cloneDefaultWorkspaceStatuses(),
-    workspaceBoardOpacity: 1,
-    workspaceBoardColumnWidth: 308,
-    syncTaskStatusFromWorkspaceBoard: false,
-    _workspaceStatusesDefaultOrderMigrated: true,
-    _workspaceStatusesReorderedDefaultRepaired: true,
-    _workspaceStatusesDefaultWorkflowMigrated: true,
-    _workspaceStatusesDefaultVisualsMigrated: true,
-    statusBarItems: [...DEFAULT_STATUS_BAR_ITEMS],
-    statusBarVisible: true,
-    usagePercentageDisplay: DEFAULT_USAGE_PERCENTAGE_DISPLAY,
-    statusBarUsageMode: DEFAULT_STATUS_BAR_USAGE_MODE,
-    dismissedUpdateVersion: null,
-    lastUpdateCheckAt: null,
-    trustedOrcaHooks: {},
-    setupScriptPromptDismissedRepoIds: [],
-    acknowledgedAgentsByPaneKey: {},
-    activityClearedAtByPaneKey: {},
-    manuallyUnreadTurnsByPaneKey: {},
-    setupGuideSidebarDismissed: false,
-    setupGuideBrowserMilestoneMigrated: true,
-    setupGuideBrowserMilestoneLegacyComplete: false,
-    browserImportHintHidden: false,
-    trayMinimizeNoticeShown: false,
-    // Why: fresh profiles start on the new default, so nothing was overridden to report.
-    osc52ClipboardDefaultOnNoticePending: false,
-    mobileEmulatorTabIntroDismissed: false,
-    mobileEmulatorAgentSetupDismissed: false,
-    // Why: only upgraded profiles saw the old ordering, so only they get the one-time notice.
-    projectOrderManualDefaultNoticeDismissed: true,
-    // Why: only upgraded profiles saw the old default, so only they get the one-time change notice.
-    usagePercentageDisplayChangeNoticeDismissed: true,
-    workspaceCleanup: { dismissals: {} },
-    featureTipsSeenIds: [],
-    featureInteractions: {},
-    contextualToursSeenIds: [],
-    browserDefaultZoomLevel: DEFAULT_BROWSER_PAGE_ZOOM_LEVEL
-  }
-}
-
-export function getDefaultWorkspaceSession(): WorkspaceSessionState {
-  return {
-    activeRepoId: null,
-    activeWorktreeId: null,
-    activeTabId: null,
-    tabsByWorktree: {},
-    terminalLayoutsByTabId: {},
-    openFilesByWorktree: {},
-    markdownFrontmatterVisible: {},
-    browserTabsByWorktree: {},
-    browserPagesByWorkspace: {},
-    activeBrowserTabIdByWorktree: {},
-    activeFileIdByWorktree: {},
-    activeTabTypeByWorktree: {},
-    browserUrlHistory: [],
-    defaultTerminalTabsAppliedByWorktreeId: {}
   }
 }

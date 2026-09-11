@@ -10,7 +10,7 @@ import type { MigrationUnsupportedPtyEntry } from './agent-status-types'
 import type { FeatureInteractionTelemetryBucketState } from './feature-interactions'
 import type { CodexResetCreditAttemptLedger } from './codex-reset-credit-attempt-ledger'
 import type { DiffComment } from './diff-comment-types'
-import type { ProjectLink } from './types'
+import type { ProjectLink, Todo, TodoList } from './types'
 import type { FolderWorkspace, WorkspaceKey } from './folder-workspace-types'
 import type { GlobalSettings } from './global-settings-types'
 import type { IssueInfo, PRInfo } from './github/pull-request-types'
@@ -77,6 +77,16 @@ export type PersistedState = {
   globalProjectLinks?: ProjectLink[]
   /** Declared global folder paths so empty categories still show. */
   globalProjectLinkFolders?: string[]
+  /** Per-repo todos keyed by repoId. Empty record on first launch. */
+  todosByRepo: Record<string, Todo[]>
+  /** Cross-repo "global" todos. repoId stored as ''. Missing on older saves — treat as empty. */
+  globalTodos?: Todo[]
+  /** Per-repo todo lists keyed by repoId. Each scope auto-creates a default list on first read. */
+  todoListsByRepo?: Record<string, TodoList[]>
+  /** Cross-repo "global" todo lists. repoId stored as ''. */
+  globalTodoLists?: TodoList[]
+  /** Remembered scope selection in the Todos panel: 'project' or 'global'. */
+  todoScope?: 'project' | 'global'
   /** Generated workspace names already issued, keyed by repoId. Suppresses reissuing a name so a
    *  recreated workspace never lands on a prior occupant's path and inherits agent state keyed to
    *  that cwd. Grows monotonically within a repo — entries are never removed on workspace deletion

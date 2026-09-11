@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { Plug, Files, GitBranch, ListChecks, Link2, Workflow } from 'lucide-react'
+import { Plug, Files, GitBranch, ListChecks, Link2, ClipboardList, Workflow } from 'lucide-react'
 import { useAppStore } from '@/store'
 import { useRepoById } from '@/store/selectors'
 import { isFolderRepo } from '../../../../shared/repo-kind'
@@ -115,6 +115,12 @@ export function useRightSidebarActivityItems({
         id: 'links',
         icon: Link2,
         title: translate('auto.components.right.sidebar.projectLinks.tabTitle', 'Project Links'),
+        shortcut: ''
+      },
+      {
+        id: 'todos',
+        icon: ClipboardList,
+        title: translate('auto.components.right.sidebar.todos.tabTitle', 'Todo'),
         shortcut: ''
       },
       // Why: plugin panels append after the built-in tabs so core navigation

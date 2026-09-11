@@ -3,6 +3,7 @@ import type { AppState } from './types'
 import { createRepoSlice } from './slices/repos'
 import { createSparsePresetsSlice } from './slices/sparse-presets'
 import { createProjectLinksSlice } from './slices/project-links'
+import { createTodosSlice } from './slices/todos'
 import { createWorktreeSlice } from './slices/worktrees'
 import { createTerminalSlice } from './slices/terminals'
 import { createTabsSlice } from './slices/tabs'
@@ -78,6 +79,7 @@ export const useAppStore = create<AppState>()(
         ...createRepoSlice(...a),
         ...createSparsePresetsSlice(...a),
         ...createProjectLinksSlice(...a),
+        ...createTodosSlice(...a),
         ...createWorktreeSlice(...a),
         ...createTerminalSlice(...a),
         ...createTabsSlice(...a),

@@ -41,6 +41,7 @@ import { hasStateBackup } from './backup-recovery-rotation'
 import { prepareLoadedTerminalSettings } from './prepare-loaded-terminal-settings'
 import { prepareLoadedProfileSettings } from './prepare-loaded-profile-settings'
 import { normalizeLoadedProfileState } from './normalize-loaded-profile-state'
+import { normalizeTodoState } from './todo-normalization'
 
 type PersistenceStartupDetails = Record<string, unknown> | (() => Record<string, unknown>)
 
@@ -264,6 +265,10 @@ export class LoadedStateParsingOperations {
     }
 
     if (gcStaleWorktreeMeta(result) > 0) {
+      this.runtime.loadNeedsSave = true
+    }
+
+    if (normalizeTodoState(result)) {
       this.runtime.loadNeedsSave = true
     }
 
