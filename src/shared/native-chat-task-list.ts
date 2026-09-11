@@ -1,5 +1,6 @@
 export type NativeChatTaskStatus = 'pending' | 'in_progress' | 'completed'
 export type NativeChatTask = {
+  id?: string
   content: string
   status: NativeChatTaskStatus
   activeForm?: string
@@ -47,6 +48,7 @@ export function normalizeNativeChatTaskList(
     return null
   }
   const tasks: NativeChatTask[] = []
+  const occurrences = new Map<string, number>()
   for (const entry of entries) {
     const item = record(entry)
     const content = nonemptyString(tool === 'todowrite' ? item?.content : item?.step)
@@ -60,7 +62,10 @@ export function normalizeNativeChatTaskList(
           ? 'completed'
           : 'pending'
     const activeForm = tool === 'todowrite' ? nonemptyString(item.activeForm) : undefined
-    tasks.push({ content, status, ...(activeForm ? { activeForm } : {}) })
+    const occurrence = occurrences.get(content) ?? 0
+    occurrences.set(content, occurrence + 1)
+    const id = nonemptyString(item.id) ?? `${tool}:${content}:${occurrence}`
+    tasks.push({ id, content, status, ...(activeForm ? { activeForm } : {}) })
   }
   if (entries.length > 0 && tasks.length === 0) {
     return null
