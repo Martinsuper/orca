@@ -2378,8 +2378,6 @@
         "recentChatsTerminalsHeader": "Recent Chats & Terminals",
         "27f10cca63": "Search chats, terminals, worktrees, settings, and actions...",
         "2770f02910": "Search chats, terminals, worktrees, settings, and actions",
-        "paletteOpenTabBranch": "Branch name",
-        "paletteOpenTabWorkspace": "Workspace name",
         "lastActiveTime": "Last active {{value0}} ago"
       },
       "github": {
@@ -17138,8 +17136,34 @@
         "command": "Background command",
         "monitor": "Background monitor",
         "task": "Background task",
-        "runningList": "Running background tasks",
-        "detailsUnavailable": "Task details are unavailable for this session."
+        "detailsUnavailable": "Task details are unavailable for this session.",
+        "countAgentsOne": "1 agent",
+        "countAgentsMany": "{{value0}} agents",
+        "countShellOne": "1 shell",
+        "countShellMany": "{{value0}} shells",
+        "countShellCommandOne": "1 shell command",
+        "countMonitorsOne": "1 monitor",
+        "countMonitorsMany": "{{value0}} monitors",
+        "countWorkflowsOne": "1 workflow",
+        "countWorkflowsMany": "{{value0}} workflows",
+        "countTasksOne": "1 task",
+        "countTasksMany": "{{value0}} tasks",
+        "headerTotal": "{{value0}} background tasks",
+        "stateWorking": "working",
+        "stateMonitoring": "monitoring",
+        "stateWaiting": "waiting",
+        "stateBlocked": "blocked",
+        "stateDone": "done",
+        "stateIdle": "stopped",
+        "stateUnverifiable": "unverifiable",
+        "reasonWaiting": "needs approval",
+        "reasonUnverifiable": "no contact",
+        "reasonBlocked": "failed",
+        "groupAgents": "Agents",
+        "groupShell": "Shell",
+        "groupMonitors": "Monitors",
+        "groupWorkflows": "Workflows",
+        "groupTasks": "Tasks"
       },
       "jumpToLatest": "Jump to latest",
       "toggle": {
@@ -17789,5 +17813,13 @@
     "title": "Orca keeps failing to load",
     "stalledMessage": "The app window stopped responding while reloading after a crash.",
     "crashLoopMessage": "The app window crashed repeatedly and stopped reloading automatically."
+  },
+  "notifications": {
+    "agentStatus": {
+      "needsInput": "needs input",
+      "working": "working",
+      "stopped": "stopped",
+      "finished": "finished"
+    }
   }
 }
