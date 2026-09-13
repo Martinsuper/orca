@@ -10,6 +10,7 @@ import type { MigrationUnsupportedPtyEntry } from './agent-status-types'
 import type { FeatureInteractionTelemetryBucketState } from './feature-interactions'
 import type { CodexResetCreditAttemptLedger } from './codex-reset-credit-attempt-ledger'
 import type { DiffComment } from './diff-comment-types'
+import type { ProjectLink } from './types'
 import type { FolderWorkspace, WorkspaceKey } from './folder-workspace-types'
 import type { GlobalSettings } from './global-settings-types'
 import type { IssueInfo, PRInfo } from './github/pull-request-types'
@@ -64,6 +65,18 @@ export type PersistedState = {
   folderWorkspaceDiffComments?: Record<string, DiffComment[]>
   /** Sparse-checkout presets keyed by repoId. */
   sparsePresetsByRepo: Record<string, SparsePreset[]>
+  /** Quick-access project links keyed by repoId. Empty record on first launch;
+   *  managed from the right-sidebar links menu. */
+  projectLinksByRepo: Record<string, ProjectLink[]>
+  /** Declared (possibly empty) project-link folder paths keyed by repoId, so a
+   *  category with no links yet still shows in the tree. Paths are "/"-joined. */
+  projectLinkFoldersByRepo: Record<string, string[]>
+  /** Cross-repo "global" project links, shown in every repo's Links panel.
+   *  Each entry's repoId is stored as '' (renderer ignores it). Missing on
+   *  older saves — treat as empty. */
+  globalProjectLinks?: ProjectLink[]
+  /** Declared global folder paths so empty categories still show. */
+  globalProjectLinkFolders?: string[]
   /** Generated workspace names already issued, keyed by repoId. Suppresses reissuing a name so a
    *  recreated workspace never lands on a prior occupant's path and inherits agent state keyed to
    *  that cwd. Grows monotonically within a repo — entries are never removed on workspace deletion

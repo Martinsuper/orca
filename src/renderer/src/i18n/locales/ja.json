@@ -178,7 +178,8 @@
             "36761d9604": "不明なキーバインド 操作「{{value0}}」は無視されました。",
             "d2e43e426a": "{{value0}} はオブジェクトでなければなりません。",
             "fb290366b2": "ウェブでは利用できません。",
-            "76122208ca": "「{{value0}}」のショートカットは無視されました: {{value1}}"
+            "76122208ca": "「{{value0}}」のショートカットは無視されました: {{value1}}",
+            "plantumlunavailable": "PlantUML rendering is only available in the desktop app."
           }
         },
         "runtime": {
@@ -313,6 +314,20 @@
             "7d4bc516ee": "プロファイルの切り替えに失敗しました",
             "f518e89aa5": "プロジェクトはそのプロファイルに既に存在します",
             "f03ae7f27b": "プロジェクトの転送に失敗しました"
+          }
+        },
+        "project": {
+          "links": {
+            "updateFailed": "Failed to update link",
+            "saveFailed": "Failed to save link",
+            "mustLoadFirst": "Links must load before saving.",
+            "updated": "Link updated",
+            "saved": "Link saved",
+            "removed": "Link removed",
+            "removeFailed": "Failed to remove link",
+            "folderAddFailed": "Failed to add folder",
+            "folderRemoveFailed": "Failed to remove folder",
+            "reorderFailed": "Failed to reorder links"
           }
         }
       }
@@ -6015,7 +6030,13 @@
           "b82f86d7d2": "リッチ Markdown のスペルチェック",
           "5195f0b9ef": "リッチ Markdown の編集中に、ブラウザのスペルミス下線と修正候補を表示します。",
           "7ddd66fede": "エディターのワードラップ",
-          "9b18de6eea": "水平スクロールを使わずに、ファイルエディターで長い行を折り返します。"
+          "9b18de6eea": "水平スクロールを使わずに、ファイルエディターで長い行を折り返します。",
+          "plantumltitle": "PlantUML Rendering",
+          "plantumldesc": "Render ```plantuml diagrams in markdown preview using a local plantuml.jar. Requires Java. Diagram source stays on your machine — no PlantUML server is contacted. Leave empty to disable.",
+          "plantumlhint": "Path to a local plantuml.jar. Requires Java on your PATH. Leave empty to disable.",
+          "plantumlplaceholder": "No jar selected",
+          "plantumlbrowse": "Browse…",
+          "plantumlclear": "Clear"
         },
         "AdvancedNetworkSettingsSection": {
           "3e431564b5": "localhost, 127.0.0.1, *.internal",
@@ -6078,7 +6099,10 @@
           "31fd7150cf": "アップデートをチェックしています…",
           "3394d1f663": "チェック中",
           "d69a09b672": "アップデートは起動時に自動的にチェックされます。",
-          "7173352632": "idle"
+          "7173352632": "idle",
+          "b5e2a7c1f0": "Automatic update checks are off. Use the button above to check manually.",
+          "a1c0e5d4b2": "Automatically check for updates",
+          "c3f8b7e6a9": "Periodically check for new versions in the background. When off, you can still check manually."
         },
         "GeneralWorkspaceSettingsSection": {
           "3d538a98f7": "ワークスペースの「開く」メニューから利用可能なアプリを選択します。",
@@ -8426,6 +8450,8 @@
             "4497e2e2bb": "リッチ Markdown の編集中に、ブラウザのスペルミス下線と修正候補を表示します。",
             "e61157e926": "エディターのワードラップ",
             "005be5c699": "水平スクロールを使わずに、ファイルエディターで長い行を折り返します。",
+            "plantumltitle": "PlantUML Rendering",
+            "plantumldesc": "Render ```plantuml diagrams in markdown preview using a local plantuml.jar.",
             "editorFontFamily": "エディターフォント",
             "editorFontFamilyDesc": "ファイルエディターと差分ビューで使用されるフォント。空の場合はターミナルフォントに従います。",
             "externalWorktrees": "外部ワークツリー",
@@ -11589,6 +11615,65 @@
               }
             }
           },
+          "projectLinks": {
+            "uncategorized": "Uncategorized",
+            "manageTitle": "Project Links",
+            "empty": "No links yet. Add one below.",
+            "open": "Open link",
+            "edit": "Edit link",
+            "delete": "Delete link",
+            "editingHeader": "Edit link",
+            "addHeader": "Add link",
+            "cancelEdit": "Cancel edit",
+            "namePlaceholder": "Name",
+            "urlPlaceholder": "https://example.com",
+            "categoryPlaceholder": "Category (e.g. Production, Test, Database)",
+            "save": "Save",
+            "add": "Add",
+            "menuTitle": "Project Links",
+            "noneYet": "No links yet",
+            "manage": "Manage links",
+            "emptyManaged": "No links yet. Add your first one below.",
+            "confirm": "Confirm",
+            "nameLabel": "Name",
+            "namePlaceholderShort": "Prod dashboard",
+            "categoryLabel": "Category",
+            "categoryPlaceholderShort": "Production, Test…",
+            "urlLabel": "URL",
+            "addFirst": "Add a link",
+            "categoryPlaceholderNested": "Production/Database",
+            "categoryHint": "Tip: use “/” in a category to create nested submenus, e.g. Production/Database.",
+            "sectionLabel": "Links",
+            "loading": "Loading links…",
+            "loadFailedTitle": "Could not load links",
+            "emptyTitle": "No links yet",
+            "emptyPanelDescription": "Save quick links to this project — test/prod environments, databases, deploy and config pages.",
+            "tabTitle": "Project Links",
+            "newLink": "New link",
+            "newFolder": "New folder",
+            "newLinkHere": "New link here",
+            "newSubfolder": "New subfolder",
+            "deleteFolder": "Delete folder",
+            "newFolderTitle": "New Folder",
+            "newSubfolderUnder": "New folder under “{{value0}}”",
+            "folderNameLabel": "Folder name",
+            "folderNamePlaceholder": "Production",
+            "cancel": "Cancel",
+            "create": "Create",
+            "export": "Export links",
+            "import": "Import links",
+            "exportSuccess": "Exported {count} link(s) to {path}",
+            "exportFailed": "Failed to export links",
+            "importSuccess": "Imported {imported} link(s), skipped {skipped}",
+            "importFailed": "Failed to import links",
+            "globalTab": "Global",
+            "localTab": "This project",
+            "globalGroup": "Global (all projects)",
+            "localGroup": "This project",
+            "newGlobalLink": "New global link",
+            "newGlobalFolder": "New global folder",
+            "newGlobalFolderTitle": "New global folder"
+          },
           "PluginPanel": {
             "unavailable": "このプラグインパネルは利用できなくなりました。",
             "loading": "プラグインパネルを読み込み中…",
@@ -13056,7 +13141,10 @@
           "026653f21f": "CSS",
           "4daed43ae3": "C++",
           "4227cf50fe": "Bash",
-          "13822cdfda": "プレーンテキスト"
+          "13822cdfda": "プレーンテキスト",
+          "plantuml": "PlantUML",
+          "plantumlcollapse": "Click to hide source",
+          "plantumlexpand": "Click to edit source"
         },
         "RichMarkdownDocLinkMenu": {
           "e17b987473": "↑↓ 移動 ↵ 選択 esc 閉じる",
@@ -13361,6 +13449,10 @@
         },
         "richMarkdownSourceOwningCutFeedback": {
           "selectLessContent": "保持されたHTML引用を切り取るには、選択範囲を小さくするかコードモードを使用してください。"
+        },
+        "PlantUmlBlock": {
+          "notconfigured": "PlantUML rendering is off. Set a plantuml.jar path in Settings → Editor.",
+          "error": "Diagram error:"
         },
         "editor": {
           "save": {

@@ -178,7 +178,8 @@
             "36761d9604": "未知的键绑定操作“{{value0}}”被忽略。",
             "d2e43e426a": "{{value0}} 必须是一个对象。",
             "fb290366b2": "无法在网络上使用。",
-            "76122208ca": "“{{value0}}”的快捷方式被忽略：{{value1}}"
+            "76122208ca": "“{{value0}}”的快捷方式被忽略：{{value1}}",
+            "plantumlunavailable": "PlantUML rendering is only available in the desktop app."
           }
         },
         "runtime": {
@@ -316,6 +317,20 @@
             "7d4bc516ee": "切换配置文件失败",
             "f518e89aa5": "该项目已存在于那个配置文件中",
             "f03ae7f27b": "转移项目失败"
+          }
+        },
+        "project": {
+          "links": {
+            "updateFailed": "Failed to update link",
+            "saveFailed": "Failed to save link",
+            "mustLoadFirst": "Links must load before saving.",
+            "updated": "Link updated",
+            "saved": "Link saved",
+            "removed": "Link removed",
+            "removeFailed": "Failed to remove link",
+            "folderAddFailed": "Failed to add folder",
+            "folderRemoveFailed": "Failed to remove folder",
+            "reorderFailed": "Failed to reorder links"
           }
         }
       }
@@ -6081,7 +6096,13 @@
           "b82f86d7d2": "Markdown 拼写检查（富文本）",
           "5195f0b9ef": "在编辑富 Markdown 时显示浏览器拼写下划线和建议。",
           "7ddd66fede": "编辑器自动换行",
-          "9b18de6eea": "在文件编辑器中自动换行长行，而无需水平滚动。"
+          "9b18de6eea": "在文件编辑器中自动换行长行，而无需水平滚动。",
+          "plantumltitle": "PlantUML Rendering",
+          "plantumldesc": "Render ```plantuml diagrams in markdown preview using a local plantuml.jar. Requires Java. Diagram source stays on your machine — no PlantUML server is contacted. Leave empty to disable.",
+          "plantumlhint": "Path to a local plantuml.jar. Requires Java on your PATH. Leave empty to disable.",
+          "plantumlplaceholder": "No jar selected",
+          "plantumlbrowse": "Browse…",
+          "plantumlclear": "Clear"
         },
         "AdvancedNetworkSettingsSection": {
           "3e431564b5": "本地主机，127.0.0.1，*.internal",
@@ -6144,7 +6165,10 @@
           "31fd7150cf": "正在检查更新...",
           "3394d1f663": "检查中",
           "d69a09b672": "启动时会自动检查更新。",
-          "7173352632": "空闲"
+          "7173352632": "空闲",
+          "b5e2a7c1f0": "已关闭自动检查更新。请使用上方按钮手动检查。",
+          "a1c0e5d4b2": "自动检查更新",
+          "c3f8b7e6a9": "定期在后台检查新版本。关闭后仍可手动检查。"
         },
         "GeneralWorkspaceSettingsSection": {
           "3d538a98f7": "从工作区的“打开方式”菜单中选择可用的应用程序。",
@@ -8459,6 +8483,8 @@
             "4497e2e2bb": "在编辑富 Markdown 时显示浏览器拼写下划线和建议。",
             "e61157e926": "编辑器自动换行",
             "005be5c699": "在文件编辑器中自动换行长行，而无需水平滚动。",
+            "plantumltitle": "PlantUML 渲染",
+            "plantumldesc": "在 Markdown 预览中使用本地 plantuml.jar 渲染 ```plantuml 图表。",
             "editorFontFamily": "编辑器字体",
             "editorFontFamilyDesc": "文件编辑器和差异视图使用的字体，留空则跟随终端字体。",
             "externalWorktrees": "外部工作树",
@@ -11667,6 +11693,65 @@
               }
             }
           },
+          "projectLinks": {
+            "uncategorized": "Uncategorized",
+            "manageTitle": "Project Links",
+            "empty": "No links yet. Add one below.",
+            "open": "Open link",
+            "edit": "Edit link",
+            "delete": "Delete link",
+            "editingHeader": "Edit link",
+            "addHeader": "Add link",
+            "cancelEdit": "Cancel edit",
+            "namePlaceholder": "Name",
+            "urlPlaceholder": "https://example.com",
+            "categoryPlaceholder": "Category (e.g. Production, Test, Database)",
+            "save": "Save",
+            "add": "Add",
+            "menuTitle": "Project Links",
+            "noneYet": "No links yet",
+            "manage": "Manage links",
+            "emptyManaged": "No links yet. Add your first one below.",
+            "confirm": "Confirm",
+            "nameLabel": "Name",
+            "namePlaceholderShort": "Prod dashboard",
+            "categoryLabel": "Category",
+            "categoryPlaceholderShort": "Production, Test…",
+            "urlLabel": "URL",
+            "addFirst": "Add a link",
+            "categoryPlaceholderNested": "Production/Database",
+            "categoryHint": "Tip: use “/” in a category to create nested submenus, e.g. Production/Database.",
+            "sectionLabel": "Links",
+            "loading": "Loading links…",
+            "loadFailedTitle": "Could not load links",
+            "emptyTitle": "No links yet",
+            "emptyPanelDescription": "Save quick links to this project — test/prod environments, databases, deploy and config pages.",
+            "tabTitle": "Project Links",
+            "newLink": "New link",
+            "newFolder": "New folder",
+            "newLinkHere": "New link here",
+            "newSubfolder": "New subfolder",
+            "deleteFolder": "Delete folder",
+            "newFolderTitle": "New Folder",
+            "newSubfolderUnder": "New folder under “{{value0}}”",
+            "folderNameLabel": "Folder name",
+            "folderNamePlaceholder": "Production",
+            "cancel": "Cancel",
+            "create": "Create",
+            "export": "导出链接",
+            "import": "导入链接",
+            "exportSuccess": "已导出 {count} 条链接到 {path}",
+            "exportFailed": "导出链接失败",
+            "importSuccess": "已导入 {imported} 条链接,跳过 {skipped} 条",
+            "importFailed": "导入链接失败",
+            "globalTab": "全局",
+            "localTab": "本项目",
+            "globalGroup": "全局(所有项目)",
+            "localGroup": "本项目",
+            "newGlobalLink": "新建全局链接",
+            "newGlobalFolder": "新建全局文件夹",
+            "newGlobalFolderTitle": "新建全局文件夹"
+          },
           "PluginPanel": {
             "unavailable": "此插件面板已不可用。",
             "loading": "正在加载插件面板...",
@@ -13134,7 +13219,10 @@
           "026653f21f": "CSS",
           "4daed43ae3": "C++",
           "4227cf50fe": "Bash",
-          "13822cdfda": "纯文本"
+          "13822cdfda": "纯文本",
+          "plantuml": "PlantUML",
+          "plantumlcollapse": "Click to hide source",
+          "plantumlexpand": "Click to edit source"
         },
         "RichMarkdownDocLinkMenu": {
           "e17b987473": "↑↓ 导航↵ 选择 esc 关闭",
@@ -13439,6 +13527,10 @@
         },
         "richMarkdownSourceOwningCutFeedback": {
           "selectLessContent": "请选择较少的内容，或使用代码模式剪切保留的 HTML 引用。"
+        },
+        "PlantUmlBlock": {
+          "notconfigured": "PlantUML 渲染未开启。请到 设置 → 编辑器 中设置 plantuml.jar 路径。",
+          "error": "图表错误："
         },
         "editor": {
           "save": {

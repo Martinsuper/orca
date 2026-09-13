@@ -74,6 +74,10 @@ export type GlobalSettings = {
   /** One-shot migration guard for the default-on rollout. Existing profiles
    *  without the guard are flipped on once; later explicit opt-outs stick. */
   autoRenameBranchFromWorkDefaultedOn?: boolean
+  /** Whether Orca checks for new releases automatically in the background.
+   *  When off, background and nudge checks stop; manual "Check for Updates"
+   *  still works. Defaults on; read as `!== false` so old saves stay enabled. */
+  autoCheckForUpdates?: boolean
   branchPrefix: BranchPrefixStrategy
   branchPrefixCustom: string
   theme: 'system' | 'dark' | 'light'
@@ -93,6 +97,10 @@ export type GlobalSettings = {
   editorWordWrap?: boolean
   /** Persisted opt-out for browser spellcheck noise in rich Markdown editing surfaces. */
   richMarkdownSpellcheckEnabled?: boolean
+  /** Optional local plantuml.jar path enabling PlantUML rendering of ```plantuml
+   *  blocks in markdown preview. Empty/unset disables PlantUML rendering, which
+   *  keeps diagram source on the local machine (no remote PlantUML server). */
+  plantumlJarPath?: string
   /** Whether local markdown review note controls and the review panel are shown. */
   markdownReviewToolsEnabled: boolean
   /** Why: mirrors terminal selection-paste muscle memory without mutating the

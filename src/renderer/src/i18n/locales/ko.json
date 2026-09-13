@@ -178,7 +178,8 @@
             "36761d9604": "알 수 없는 키 바인딩 작업 \"{{value0}}\"이(가) 무시되었습니다.",
             "d2e43e426a": "{{value0}}은(는) 객체여야 합니다.",
             "fb290366b2": "웹에서는 사용할 수 없습니다.",
-            "76122208ca": "\"{{value0}}\"에 대한 단축키가 무시되었습니다: {{value1}}"
+            "76122208ca": "\"{{value0}}\"에 대한 단축키가 무시되었습니다: {{value1}}",
+            "plantumlunavailable": "PlantUML rendering is only available in the desktop app."
           }
         },
         "runtime": {
@@ -316,6 +317,20 @@
             "7d4bc516ee": "프로필을 전환하지 못했습니다",
             "f518e89aa5": "프로젝트가 해당 프로필에 이미 있습니다",
             "f03ae7f27b": "프로젝트를 전송하지 못했습니다"
+          }
+        },
+        "project": {
+          "links": {
+            "updateFailed": "Failed to update link",
+            "saveFailed": "Failed to save link",
+            "mustLoadFirst": "Links must load before saving.",
+            "updated": "Link updated",
+            "saved": "Link saved",
+            "removed": "Link removed",
+            "removeFailed": "Failed to remove link",
+            "folderAddFailed": "Failed to add folder",
+            "folderRemoveFailed": "Failed to remove folder",
+            "reorderFailed": "Failed to reorder links"
           }
         }
       }
@@ -6020,7 +6035,13 @@
           "b82f86d7d2": "리치 Markdown 맞춤법 검사",
           "5195f0b9ef": "리치 Markdown을 편집하는 동안 브라우저 맞춤법 밑줄과 제안을 표시합니다.",
           "7ddd66fede": "편집기 자동 줄 바꿈",
-          "9b18de6eea": "가로 스크롤 대신 파일 편집기에서 긴 줄을 자동으로 줄 바꿈합니다."
+          "9b18de6eea": "가로 스크롤 대신 파일 편집기에서 긴 줄을 자동으로 줄 바꿈합니다.",
+          "plantumltitle": "PlantUML Rendering",
+          "plantumldesc": "Render ```plantuml diagrams in markdown preview using a local plantuml.jar. Requires Java. Diagram source stays on your machine — no PlantUML server is contacted. Leave empty to disable.",
+          "plantumlhint": "Path to a local plantuml.jar. Requires Java on your PATH. Leave empty to disable.",
+          "plantumlplaceholder": "No jar selected",
+          "plantumlbrowse": "Browse…",
+          "plantumlclear": "Clear"
         },
         "AdvancedNetworkSettingsSection": {
           "3e431564b5": "로컬호스트, 127.0.0.1, *.internal",
@@ -6083,7 +6104,10 @@
           "31fd7150cf": "업데이트 확인 중...",
           "3394d1f663": "확인 중",
           "d69a09b672": "업데이트는 시작 시 자동으로 확인됩니다.",
-          "7173352632": "idle"
+          "7173352632": "idle",
+          "b5e2a7c1f0": "Automatic update checks are off. Use the button above to check manually.",
+          "a1c0e5d4b2": "Automatically check for updates",
+          "c3f8b7e6a9": "Periodically check for new versions in the background. When off, you can still check manually."
         },
         "GeneralWorkspaceSettingsSection": {
           "3d538a98f7": "워크스페이스의 열기 메뉴에서 사용 가능한 앱을 선택하세요.",
@@ -8394,6 +8418,8 @@
             "4497e2e2bb": "리치 Markdown을 편집하는 동안 브라우저 맞춤법 밑줄과 제안을 표시합니다.",
             "e61157e926": "편집기 자동 줄 바꿈",
             "005be5c699": "가로 스크롤 대신 파일 편집기에서 긴 줄을 자동으로 줄 바꿈합니다.",
+            "plantumltitle": "PlantUML Rendering",
+            "plantumldesc": "Render ```plantuml diagrams in markdown preview using a local plantuml.jar.",
             "editorFontFamily": "편집기 글꼴",
             "editorFontFamilyDesc": "파일 편집기 및 diff 보기에서 사용되는 글꼴입니다. 비워두면 터미널 글꼴을 따릅니다.",
             "externalWorktrees": "외부 작업 트리",
@@ -11632,6 +11658,65 @@
               }
             }
           },
+          "projectLinks": {
+            "uncategorized": "Uncategorized",
+            "manageTitle": "Project Links",
+            "empty": "No links yet. Add one below.",
+            "open": "Open link",
+            "edit": "Edit link",
+            "delete": "Delete link",
+            "editingHeader": "Edit link",
+            "addHeader": "Add link",
+            "cancelEdit": "Cancel edit",
+            "namePlaceholder": "Name",
+            "urlPlaceholder": "https://example.com",
+            "categoryPlaceholder": "Category (e.g. Production, Test, Database)",
+            "save": "Save",
+            "add": "Add",
+            "menuTitle": "Project Links",
+            "noneYet": "No links yet",
+            "manage": "Manage links",
+            "emptyManaged": "No links yet. Add your first one below.",
+            "confirm": "Confirm",
+            "nameLabel": "Name",
+            "namePlaceholderShort": "Prod dashboard",
+            "categoryLabel": "Category",
+            "categoryPlaceholderShort": "Production, Test…",
+            "urlLabel": "URL",
+            "addFirst": "Add a link",
+            "categoryPlaceholderNested": "Production/Database",
+            "categoryHint": "Tip: use “/” in a category to create nested submenus, e.g. Production/Database.",
+            "sectionLabel": "Links",
+            "loading": "Loading links…",
+            "loadFailedTitle": "Could not load links",
+            "emptyTitle": "No links yet",
+            "emptyPanelDescription": "Save quick links to this project — test/prod environments, databases, deploy and config pages.",
+            "tabTitle": "Project Links",
+            "newLink": "New link",
+            "newFolder": "New folder",
+            "newLinkHere": "New link here",
+            "newSubfolder": "New subfolder",
+            "deleteFolder": "Delete folder",
+            "newFolderTitle": "New Folder",
+            "newSubfolderUnder": "New folder under “{{value0}}”",
+            "folderNameLabel": "Folder name",
+            "folderNamePlaceholder": "Production",
+            "cancel": "Cancel",
+            "create": "Create",
+            "export": "Export links",
+            "import": "Import links",
+            "exportSuccess": "Exported {count} link(s) to {path}",
+            "exportFailed": "Failed to export links",
+            "importSuccess": "Imported {imported} link(s), skipped {skipped}",
+            "importFailed": "Failed to import links",
+            "globalTab": "Global",
+            "localTab": "This project",
+            "globalGroup": "Global (all projects)",
+            "localGroup": "This project",
+            "newGlobalLink": "New global link",
+            "newGlobalFolder": "New global folder",
+            "newGlobalFolderTitle": "New global folder"
+          },
           "PluginPanel": {
             "unavailable": "이 플러그인 패널은 더 이상 사용할 수 없습니다.",
             "loading": "플러그인 패널 불러오는 중...",
@@ -13123,7 +13208,10 @@
           "026653f21f": "CSS",
           "4daed43ae3": "C++",
           "4227cf50fe": "Bash",
-          "13822cdfda": "일반 텍스트"
+          "13822cdfda": "일반 텍스트",
+          "plantuml": "PlantUML",
+          "plantumlcollapse": "Click to hide source",
+          "plantumlexpand": "Click to edit source"
         },
         "RichMarkdownDocLinkMenu": {
           "e17b987473": "↑↓ 탐색  ↵ 선택  esc 해제",
@@ -13428,6 +13516,10 @@
         },
         "richMarkdownSourceOwningCutFeedback": {
           "selectLessContent": "보존된 HTML 인용을 잘라내려면 더 적은 콘텐츠를 선택하거나 코드 모드를 사용하세요."
+        },
+        "PlantUmlBlock": {
+          "notconfigured": "PlantUML rendering is off. Set a plantuml.jar path in Settings → Editor.",
+          "error": "Diagram error:"
         },
         "editor": {
           "save": {

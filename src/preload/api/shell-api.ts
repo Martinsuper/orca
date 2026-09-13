@@ -28,5 +28,7 @@ export type ShellApi = {
   } | null>
   pickAudio: () => Promise<string | null>
   pickDirectory: (args: { defaultPath?: string }) => Promise<string | null>
+  // Fork: local plantuml.jar picker for markdown preview settings.
+  pickJarFile: () => Promise<string | null>
   copyFile: (args: { srcPath: string; destPath: string }) => Promise<void>
 }

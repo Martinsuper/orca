@@ -1,6 +1,6 @@
 import { ipcMain, shell, dialog } from 'electron'
 import { constants, copyFile, readFile, stat } from 'node:fs/promises'
-import { basename, extname, isAbsolute, normalize, posix, win32 } from 'node:path'
+import { basename, extname, isAbsolute, normalize } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type {
   ShellOpenExternalEditorRequest,
@@ -9,44 +9,18 @@ import type {
 } from '../../shared/shell-open-types'
 import { MAX_REPO_ICON_UPLOAD_BYTES } from '../../shared/repo-icon'
 import type { Store } from '../persistence'
+import { EXTERNAL_EDITOR_CLI_COMMAND } from '../external-editor-launch'
 import {
-  EXTERNAL_EDITOR_CLI_COMMAND,
-  launchExternalEditor,
-  resolveExternalEditorLaunchSpec,
-  resolveVsCodeRemoteSshLaunchSpec
-} from '../external-editor-launch'
-import { resolveVsCodeSshAuthority } from '../ssh/vscode-ssh-authority'
+  hasActiveRuntime,
+  pathExistsAsync,
+  validateLocalPathTarget
+} from './shell-local-path-guard'
+import { openInExternalEditor } from './shell-external-editor'
 
 export { EXTERNAL_EDITOR_CLI_COMMAND }
 
 const REPO_ICON_IMAGE_MIME_TYPES: Record<string, string> = {
   '.png': 'image/png'
-}
-
-async function pathExists(pathValue: string): Promise<boolean> {
-  try {
-    await stat(pathValue)
-    return true
-  } catch {
-    return false
-  }
-}
-
-async function validateLocalPathTarget(
-  pathValue: string
-): Promise<{ ok: true; path: string } | { ok: false; reason: 'not-absolute' | 'not-found' }> {
-  const normalizedPath = normalize(pathValue)
-  if (!isAbsolute(normalizedPath)) {
-    return { ok: false, reason: 'not-absolute' }
-  }
-  if (!(await pathExists(normalizedPath))) {
-    return { ok: false, reason: 'not-found' }
-  }
-  return { ok: true, path: normalizedPath }
-}
-
-function hasActiveRuntime(store: Store): boolean {
-  return Boolean(store.getSettings().activeRuntimeEnvironmentId?.trim())
 }
 
 async function openInFileManager(
@@ -64,58 +38,6 @@ async function openInFileManager(
     // Why: the file-manager action uses reveal semantics, matching the
     // previous sidebar behavior while still validating the path per click.
     shell.showItemInFolder(target.path)
-    return { ok: true }
-  } catch {
-    return { ok: false, reason: 'launch-failed' }
-  }
-}
-
-async function openInExternalEditor(
-  store: Store,
-  request: ShellOpenExternalEditorRequest
-): Promise<ShellOpenExternalEditorResult> {
-  if (hasActiveRuntime(store)) {
-    return { ok: false, reason: 'remote-runtime-unsupported' }
-  }
-
-  const connectionId = request.connectionId?.trim()
-  if (connectionId) {
-    const sshTarget = store.getSshTarget(connectionId)
-    if (!sshTarget) {
-      return { ok: false, reason: 'ssh-target-not-found' }
-    }
-    if (sshTarget.owner?.type === 'on-demand-runtime') {
-      return { ok: false, reason: 'remote-runtime-unsupported' }
-    }
-    if (!posix.isAbsolute(request.path) && !win32.isAbsolute(request.path)) {
-      return { ok: false, reason: 'not-absolute' }
-    }
-    const authority = resolveVsCodeSshAuthority(sshTarget)
-    if (!authority.ok) {
-      return authority
-    }
-    const launchSpec = resolveVsCodeRemoteSshLaunchSpec(
-      request.command,
-      request.path,
-      authority.authority
-    )
-    if (!launchSpec) {
-      return { ok: false, reason: 'remote-editor-unsupported' }
-    }
-    try {
-      await launchExternalEditor(launchSpec)
-      return { ok: true }
-    } catch {
-      return { ok: false, reason: 'launch-failed' }
-    }
-  }
-
-  const target = await validateLocalPathTarget(request.path)
-  if (!target.ok) {
-    return target
-  }
-  try {
-    await launchExternalEditor(resolveExternalEditorLaunchSpec(request.command, target.path))
     return { ok: true }
   } catch {
     return { ok: false, reason: 'launch-failed' }
@@ -205,7 +127,7 @@ export function registerShellHandlers(store: Store): void {
   })
 
   ipcMain.handle('shell:pathExists', async (_event, filePath: string): Promise<boolean> => {
-    return pathExists(filePath)
+    return pathExistsAsync(filePath)
   })
 
   ipcMain.handle(
@@ -229,6 +151,19 @@ export function registerShellHandlers(store: Store): void {
   ipcMain.handle('shell:pickAttachment', async (): Promise<string | null> => {
     const result = await dialog.showOpenDialog({
       properties: ['openFile']
+    })
+    if (result.canceled || result.filePaths.length === 0) {
+      return null
+    }
+    return result.filePaths[0]
+  })
+
+  // Why: lets the user pick a local plantuml.jar for markdown PlantUML rendering;
+  // filtering to .jar keeps the picker focused on the expected artifact.
+  ipcMain.handle('shell:pickJarFile', async (): Promise<string | null> => {
+    const result = await dialog.showOpenDialog({
+      properties: ['openFile'],
+      filters: [{ name: 'JAR', extensions: ['jar'] }]
     })
     if (result.canceled || result.filePaths.length === 0) {
       return null

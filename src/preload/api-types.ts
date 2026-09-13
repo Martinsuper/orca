@@ -1,3 +1,4 @@
+import type { PlantumlRenderArgs, PlantumlRenderResult, ProjectLink } from '../shared/types'
 import type {
   ClaudeAccountsApi,
   CodexAccountsApi,
@@ -73,6 +74,62 @@ export type PreloadApi = {
   repos: RepositoryApi
   projects: ProjectsApi
   projectGroups: ProjectGroupsApi
+  // Fork: quick-access project links (per-repo + global).
+  projectLinks: {
+    list: (args: { repoId: string }) => Promise<ProjectLink[]>
+    save: (args: {
+      repoId: string
+      id?: string
+      name: string
+      url: string
+      category: string
+    }) => Promise<ProjectLink>
+    remove: (args: { repoId: string; linkId: string }) => Promise<void>
+    reorder: (args: {
+      repoId: string
+      updates: { id: string; category: string; order: number }[]
+    }) => Promise<void>
+    onChanged: (callback: (data: { repoId: string }) => void) => () => void
+    listGlobal: () => Promise<ProjectLink[]>
+    saveGlobal: (args: {
+      id?: string
+      name: string
+      url: string
+      category: string
+    }) => Promise<ProjectLink>
+    removeGlobal: (args: { linkId: string }) => Promise<void>
+    reorderGlobal: (args: {
+      updates: { id: string; category: string; order: number }[]
+    }) => Promise<void>
+    onGlobalChanged: (callback: () => void) => () => void
+    export: (args: {
+      repoId: string
+    }) => Promise<
+      | { ok: true; filePath: string; linkCount: number; folderCount: number }
+      | { ok: false; cancelled?: boolean; error?: string }
+    >
+    import: (args: { repoId: string }) => Promise<
+      | {
+          ok: true
+          importedLinks: number
+          skippedLinks: number
+          duplicatesInFile: number
+          importedFolders: number
+          skippedFolders: number
+        }
+      | { ok: false; cancelled?: boolean; error?: string }
+    >
+  }
+  projectLinkFolders: {
+    list: (args: { repoId: string }) => Promise<string[]>
+    add: (args: { repoId: string; path: string }) => Promise<void>
+    remove: (args: { repoId: string; path: string }) => Promise<void>
+    onChanged: (callback: (data: { repoId: string }) => void) => () => void
+    listGlobal: () => Promise<string[]>
+    addGlobal: (args: { path: string }) => Promise<void>
+    removeGlobal: (args: { path: string }) => Promise<void>
+    onGlobalChanged: (callback: () => void) => () => void
+  }
   folderWorkspaces: FolderWorkspacesApi
   sparsePresets: SparsePresetsApi
   worktrees: WorktreeApi
@@ -80,6 +137,10 @@ export type PreloadApi = {
   workspaceSpace: WorkspaceSpaceApi
   workspacePorts: WorkspacePortsApi
   pty: PtyApi
+  // Fork: local plantuml.jar rendering for markdown preview.
+  plantuml: {
+    render: (args: PlantumlRenderArgs) => Promise<PlantumlRenderResult>
+  }
   feedback: FeedbackApi
   crashReports: CrashReportsApi
   export: ExportApi

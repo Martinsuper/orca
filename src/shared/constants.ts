@@ -1,7 +1,6 @@
 import type { GlobalSettings } from './global-settings-types'
 import type { NotificationSettings } from './notification-settings-types'
 import type { OnboardingChecklistState, OnboardingState } from './onboarding-state-types'
-import type { RepoHookSettings } from './orca-yaml-hook-types'
 import type { PersistedState } from './persisted-state-types'
 import type { PersistedUIState } from './persisted-ui-state-types'
 import type { AgentActivityDisplayMode } from './ui-chrome-types'
@@ -15,7 +14,7 @@ import { DEFAULT_AGENTS_GROUP_BY, DEFAULT_AGENTS_READ_FILTER } from './agents-vi
 import { DEFAULT_USAGE_PERCENTAGE_DISPLAY } from './usage-percentage-display'
 import { DEFAULT_STATUS_BAR_USAGE_MODE } from './status-bar-usage-mode'
 import { buildDefaultSettings } from './default-global-settings'
-import { DEFAULT_SETUP_AGENT_STARTUP_POLICY } from './setup-agent-startup-policy'
+export { getDefaultRepoHookSettings } from './default-repo-hook-settings'
 import { DEFAULT_BROWSER_PAGE_ZOOM_LEVEL } from './browser-page-zoom'
 
 export { DEFAULT_STATUS_BAR_ITEMS } from './status-bar-defaults'
@@ -192,18 +191,6 @@ export function getDefaultVoiceSettings(): VoiceSettings {
   }
 }
 
-export function getDefaultRepoHookSettings(): RepoHookSettings {
-  return {
-    mode: 'auto',
-    setupRunPolicy: 'run-by-default',
-    setupAgentStartupPolicy: DEFAULT_SETUP_AGENT_STARTUP_POLICY,
-    scripts: {
-      setup: '',
-      archive: ''
-    }
-  }
-}
-
 export function getDefaultPersistedState(homedir: string): PersistedState {
   return {
     schemaVersion: SCHEMA_VERSION,
@@ -213,6 +200,8 @@ export function getDefaultPersistedState(homedir: string): PersistedState {
     projectGroups: [],
     folderWorkspaces: [],
     sparsePresetsByRepo: {},
+    projectLinksByRepo: {},
+    projectLinkFoldersByRepo: {},
     retiredWorktreeNamesByRepo: {},
     retiredWorktreeNamesByNamespace: {},
     worktreeMeta: {},

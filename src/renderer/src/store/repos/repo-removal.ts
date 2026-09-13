@@ -4,6 +4,7 @@ import type { AppState } from '../types'
 import { getRepoIdFromWorktreeId } from '../../../../shared/worktree/id'
 import { getWorktreeIdFromVisitKey, getWorktreeVisitKey } from '@/lib/worktree-visit-recency'
 import { omitSparsePresetsForRepos } from '../slices/sparse-presets'
+import { omitProjectLinksForRepos } from '../slices/project-links'
 import { findRepoForHost, repoMatchesHostIdentity } from '../slices/repo-host-identity'
 import {
   callRuntimeRpc,
@@ -232,6 +233,7 @@ export function createRepoRemovalActions(
             repos: nextRepos,
             // Why: drop removed repos' sparse-preset maps so they don't outlive the repo for the whole session.
             ...omitSparsePresetsForRepos(s, removedRepoIds),
+            ...omitProjectLinksForRepos(s, removedRepoIds),
             ...mergeProjectCompatibilityForHostRepoChange({
               previous: { projects: s.projects, projectHostSetups: s.projectHostSetups },
               nextRepos,

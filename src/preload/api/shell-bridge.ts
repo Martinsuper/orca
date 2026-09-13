@@ -37,6 +37,8 @@ export const shellApi = {
   pickDirectory: (args: { defaultPath?: string }): Promise<string | null> =>
     ipcRenderer.invoke('shell:pickDirectory', args),
 
+  pickJarFile: (): Promise<string | null> => ipcRenderer.invoke('shell:pickJarFile'),
+
   copyFile: (args: { srcPath: string; destPath: string }): Promise<void> =>
     ipcRenderer.invoke('shell:copyFile', args)
 } satisfies PreloadApi['shell']
