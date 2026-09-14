@@ -1,3 +1,4 @@
+import { validatePathExistenceBatch } from '../../shared/path-existence-batch'
 import { ipcMain, shell, dialog } from 'electron'
 import { constants, copyFile, readFile, stat } from 'node:fs/promises'
 import { basename, extname, isAbsolute, normalize } from 'node:path'
@@ -124,6 +125,11 @@ export function registerShellHandlers(store: Store): void {
     }
 
     await openWithSystemDefault(target.path)
+  })
+
+  ipcMain.handle('shell:pathsExist', async (_event, paths: string[]): Promise<boolean[]> => {
+    validatePathExistenceBatch(paths)
+    return Promise.all(paths.map(pathExistsAsync))
   })
 
   ipcMain.handle('shell:pathExists', async (_event, filePath: string): Promise<boolean> => {
