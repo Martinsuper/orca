@@ -208,6 +208,9 @@ import Foundation
     precondition(directives.contains("script-src 'self'"))
     // React Native Web injects runtime styles with no nonce; see MobileWebShellCsp.
     precondition(directives.contains("style-src 'self' 'unsafe-inline'"))
+    // A file preview is a `data:<mime>;base64,` URI the page composed from a reply it already
+    // holds; see MobileWebShellCsp.
+    precondition(directives.contains("img-src 'self' data:"))
     precondition(directives.contains("connect-src 'self'"))
     precondition(directives.contains("worker-src 'none'"))
     precondition(directives.contains("frame-src 'none'"))
@@ -218,7 +221,9 @@ import Foundation
     // arrive as a fetched same-origin script, which is the directive that matters.
     precondition(directives.filter { $0.contains("unsafe-inline") } == ["style-src 'self' 'unsafe-inline'"])
     precondition(!header.contains("unsafe-eval"))
-    precondition(!header.contains("data:"))
+    // Narrowed rather than absent: `data:` is a fetch source for images and for nothing else, so a
+    // directive that grew one would fail here instead of passing a blanket absence check.
+    precondition(directives.filter { $0.contains("data:") } == ["img-src 'self' data:"])
     precondition(!header.contains("blob:"))
     precondition(!header.contains("\r") && !header.contains("\n"))
   }
@@ -232,8 +237,24 @@ import Foundation
     let progress = MobileWebShellLoadStateMachine()
     precondition(progress.started()?.state == "loading")
     precondition(progress.started() == nil)
+    progress.committed()
     precondition(progress.finished()?.state == "ready")
     precondition(progress.finished() == nil)
+
+    // The document's path is not an input here, and that is the point: the page rewrites its own
+    // with history.replaceState before its first render, so `didFinish` arrives at a URL no policy
+    // would allow. What is asked instead is whether this load committed.
+    let unseated = MobileWebShellLoadStateMachine()
+    _ = unseated.started()
+    precondition(unseated.finished() == nil)
+    unseated.committed()
+    precondition(unseated.finished()?.state == "ready")
+
+    // A document replaced mid-load: the finish belongs to the one that is already gone.
+    let replaced = MobileWebShellLoadStateMachine()
+    replaced.committed()
+    replaced.documentEnded()
+    precondition(replaced.finished() == nil)
 
     // A rule list compiles asynchronously, so it can fail after the generation was already refused.
     let refused = MobileWebShellLoadStateMachine()
