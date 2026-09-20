@@ -129,7 +129,7 @@ export function registerShellHandlers(store: Store): void {
 
   ipcMain.handle('shell:pathsExist', async (_event, paths: string[]): Promise<boolean[]> => {
     validatePathExistenceBatch(paths)
-    return Promise.all(paths.map(pathExists))
+    return Promise.all(paths.map(pathExistsAsync))
   })
 
   ipcMain.handle('shell:pathExists', async (_event, filePath: string): Promise<boolean> => {
