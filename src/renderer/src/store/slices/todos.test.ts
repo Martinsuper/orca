@@ -1,8 +1,14 @@
-import { create } from 'zustand'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Todo, TodoList } from '../../../../shared/types'
-import type { AppState } from '../types'
-import { createTodosSlice, getMyDayTodos } from './todos'
+import type { Todo } from '../../../../shared/types'
+import { getMyDayTodos } from './todos'
+import { createTodoInvalidationSubscriptions } from '../../app-shell/todo-invalidation-subscriptions'
+import {
+  createTestStore,
+  makeList,
+  makeTodo,
+  mockApi,
+  resetTodoApiMocks
+} from './todos-test-harness'
 
 vi.mock('sonner', () => ({
   toast: {
@@ -11,130 +17,9 @@ vi.mock('sonner', () => ({
   }
 }))
 
-const mockApi = {
-  todos: {
-    list: vi.fn(),
-    save: vi.fn(),
-    remove: vi.fn(),
-    toggle: vi.fn(),
-    listLists: vi.fn(),
-    saveList: vi.fn(),
-    removeList: vi.fn(),
-    listGlobal: vi.fn(),
-    saveGlobal: vi.fn(),
-    removeGlobal: vi.fn(),
-    toggleGlobal: vi.fn(),
-    listGlobalLists: vi.fn(),
-    saveGlobalList: vi.fn(),
-    removeGlobalList: vi.fn()
-  }
-}
-
-// @ts-expect-error -- test shim
-globalThis.window = { api: mockApi }
-
-function createTestStore() {
-  return create<AppState>()((...a) => ({ ...createTodosSlice(...a) }) as AppState)
-}
-
-function makeTodo(overrides: Partial<Todo> & { id: string; repoId: string }): Todo {
-  return {
-    title: overrides.id,
-    note: '',
-    done: false,
-    createdAt: 1,
-    updatedAt: 1,
-    listId: 'default',
-    important: false,
-    steps: [],
-    ...overrides
-  }
-}
-
-function makeList(overrides: Partial<TodoList> & { id: string; repoId: string }): TodoList {
-  return {
-    title: overrides.id,
-    createdAt: 1,
-    updatedAt: 1,
-    ...overrides
-  }
-}
-
 describe('createTodosSlice', () => {
   beforeEach(() => {
-    vi.clearAllMocks()
-    mockApi.todos.list.mockResolvedValue([])
-    mockApi.todos.save.mockImplementation((args: { id?: string; title: string; note?: string }) =>
-      Promise.resolve(
-        makeTodo({
-          id: args.id ?? `todo-${args.title}`,
-          repoId: 'repo-1',
-          title: args.title,
-          note: args.note ?? '',
-          updatedAt: 2
-        })
-      )
-    )
-    mockApi.todos.remove.mockResolvedValue(undefined)
-    mockApi.todos.toggle.mockImplementation((args: { todoId: string; done: boolean }) =>
-      Promise.resolve(
-        makeTodo({
-          id: args.todoId,
-          repoId: 'repo-1',
-          title: args.todoId,
-          done: args.done,
-          updatedAt: 3
-        })
-      )
-    )
-    mockApi.todos.listLists.mockResolvedValue([])
-    mockApi.todos.saveList.mockImplementation(
-      (args: { id?: string; title: string; repoId: string }) =>
-        Promise.resolve(
-          makeList({
-            id: args.id ?? `list-${args.title}`,
-            repoId: args.repoId,
-            title: args.title,
-            updatedAt: 2
-          })
-        )
-    )
-    mockApi.todos.removeList.mockResolvedValue(undefined)
-    mockApi.todos.listGlobal.mockResolvedValue([])
-    mockApi.todos.saveGlobal.mockImplementation((args: { id?: string; title: string }) =>
-      Promise.resolve(
-        makeTodo({
-          id: args.id ?? `global-${args.title}`,
-          repoId: '',
-          title: args.title,
-          updatedAt: 2
-        })
-      )
-    )
-    mockApi.todos.removeGlobal.mockResolvedValue(undefined)
-    mockApi.todos.toggleGlobal.mockImplementation((args: { todoId: string; done: boolean }) =>
-      Promise.resolve(
-        makeTodo({
-          id: args.todoId,
-          repoId: '',
-          title: args.todoId,
-          done: args.done,
-          updatedAt: 3
-        })
-      )
-    )
-    mockApi.todos.listGlobalLists.mockResolvedValue([])
-    mockApi.todos.saveGlobalList.mockImplementation((args: { id?: string; title: string }) =>
-      Promise.resolve(
-        makeList({
-          id: args.id ?? `global-list-${args.title}`,
-          repoId: '',
-          title: args.title,
-          updatedAt: 2
-        })
-      )
-    )
-    mockApi.todos.removeGlobalList.mockResolvedValue(undefined)
+    resetTodoApiMocks()
   })
 
   describe('per-repo todos', () => {
@@ -200,6 +85,7 @@ describe('createTodosSlice', () => {
 
       const saved = makeTodo({ id: 'todo-2', repoId: 'repo-1', title: 'New', updatedAt: 2 })
       mockApi.todos.save.mockResolvedValueOnce(saved)
+      mockApi.todos.list.mockResolvedValueOnce([existing, saved])
 
       const result = await store.getState().saveTodo({ repoId: 'repo-1', title: 'New' })
 
@@ -248,6 +134,7 @@ describe('createTodosSlice', () => {
       await store.getState().fetchTodos('repo-1')
 
       mockApi.todos.remove.mockRejectedValueOnce(new Error('disk failed'))
+      mockApi.todos.list.mockResolvedValueOnce([todo])
 
       await expect(
         store.getState().removeTodo({ repoId: 'repo-1', todoId: 'todo-1' })
@@ -264,6 +151,7 @@ describe('createTodosSlice', () => {
 
       const toggled = { ...todo, done: true, completedAt: 5, updatedAt: 5 }
       mockApi.todos.toggle.mockResolvedValueOnce(toggled)
+      mockApi.todos.list.mockResolvedValueOnce([toggled])
 
       await store.getState().toggleTodo({ repoId: 'repo-1', todoId: 'todo-1', done: true })
 
@@ -278,6 +166,7 @@ describe('createTodosSlice', () => {
       await store.getState().fetchTodos('repo-1')
 
       mockApi.todos.toggle.mockRejectedValueOnce(new Error('disk failed'))
+      mockApi.todos.list.mockResolvedValueOnce([todo])
 
       await store.getState().toggleTodo({ repoId: 'repo-1', todoId: 'todo-1', done: true })
 
@@ -314,6 +203,7 @@ describe('createTodosSlice', () => {
 
       const created = makeList({ id: 'list-2', repoId: 'repo-1', title: 'Shopping', updatedAt: 2 })
       mockApi.todos.saveList.mockResolvedValueOnce(created)
+      mockApi.todos.listLists.mockResolvedValueOnce([existing, created])
 
       const result = await store.getState().saveTodoList({ repoId: 'repo-1', title: 'Shopping' })
 
@@ -330,12 +220,20 @@ describe('createTodosSlice', () => {
       ])
       await store.getState().fetchTodoLists('repo-1')
 
+      mockApi.todos.list.mockResolvedValueOnce([])
+      await store.getState().fetchTodos('repo-1')
       mockApi.todos.removeList.mockResolvedValueOnce(undefined)
       mockApi.todos.list.mockResolvedValueOnce([])
+      mockApi.todos.listLists.mockResolvedValueOnce([
+        makeList({ id: 'default', repoId: 'repo-1', title: 'Tasks' })
+      ])
 
       await store.getState().removeTodoList({ repoId: 'repo-1', listId: 'list-x' })
+      await new Promise((resolve) => setTimeout(resolve, 0))
 
       expect(store.getState().todoListsByRepo['repo-1']).toHaveLength(1)
+      expect(mockApi.todos.list).toHaveBeenCalledTimes(2)
+      expect(mockApi.todos.listLists).toHaveBeenCalledTimes(2)
     })
   })
 
@@ -358,6 +256,7 @@ describe('createTodosSlice', () => {
 
       const saved = makeTodo({ id: 'g-2', repoId: '', title: 'New global', updatedAt: 2 })
       mockApi.todos.saveGlobal.mockResolvedValueOnce(saved)
+      mockApi.todos.listGlobal.mockResolvedValueOnce([saved])
 
       const result = await store.getState().saveGlobalTodo({ title: 'New global' })
 
@@ -372,6 +271,7 @@ describe('createTodosSlice', () => {
       await store.getState().fetchGlobalTodos()
 
       mockApi.todos.removeGlobal.mockRejectedValueOnce(new Error('disk failed'))
+      mockApi.todos.listGlobal.mockResolvedValueOnce([todo])
 
       await expect(store.getState().removeGlobalTodo({ todoId: 'g-1' })).rejects.toThrow(
         'disk failed'
@@ -388,6 +288,7 @@ describe('createTodosSlice', () => {
 
       const toggled = { ...todo, done: true, updatedAt: 5 }
       mockApi.todos.toggleGlobal.mockResolvedValueOnce(toggled)
+      mockApi.todos.listGlobal.mockResolvedValueOnce([toggled])
 
       await store.getState().toggleGlobalTodo({ todoId: 'g-1', done: true })
 
@@ -416,6 +317,10 @@ describe('createTodosSlice', () => {
 
       const created = makeList({ id: 'gl-2', repoId: '', title: 'Personal', updatedAt: 2 })
       mockApi.todos.saveGlobalList.mockResolvedValueOnce(created)
+      mockApi.todos.listGlobalLists.mockResolvedValueOnce([
+        makeList({ id: 'default', repoId: '', title: 'Tasks' }),
+        created
+      ])
 
       const result = await store.getState().saveGlobalTodoList({ title: 'Personal' })
 
@@ -431,12 +336,20 @@ describe('createTodosSlice', () => {
       ])
       await store.getState().fetchGlobalTodoLists()
 
+      mockApi.todos.listGlobal.mockResolvedValueOnce([])
+      await store.getState().fetchGlobalTodos()
       mockApi.todos.removeGlobalList.mockResolvedValueOnce(undefined)
       mockApi.todos.listGlobal.mockResolvedValueOnce([])
+      mockApi.todos.listGlobalLists.mockResolvedValueOnce([
+        makeList({ id: 'default', repoId: '', title: 'Tasks' })
+      ])
 
       await store.getState().removeGlobalTodoList({ listId: 'gl-x' })
+      await new Promise((resolve) => setTimeout(resolve, 0))
 
       expect(store.getState().globalTodoLists).toHaveLength(1)
+      expect(mockApi.todos.listGlobal).toHaveBeenCalledTimes(2)
+      expect(mockApi.todos.listGlobalLists).toHaveBeenCalledTimes(2)
     })
   })
 
@@ -499,6 +412,7 @@ describe('createTodosSlice', () => {
       store.getState().invalidateTodos('repo-1')
       await new Promise((r) => setTimeout(r, 0))
 
+      expect(mockApi.todos.list).toHaveBeenCalledTimes(2)
       expect(store.getState().todosByRepo['repo-1']).toEqual([refreshed])
     })
 
@@ -542,6 +456,59 @@ describe('createTodosSlice', () => {
       await new Promise((r) => setTimeout(r, 0))
 
       expect(store.getState().globalTodoLists).toEqual([list])
+    })
+  })
+
+  describe('todo invalidation subscriptions', () => {
+    it('routes all events and unsubscribes them during cleanup', () => {
+      const callbacks: Record<string, ((data?: { repoId: string }) => void) | undefined> = {}
+      const unsubscribes = [vi.fn(), vi.fn(), vi.fn(), vi.fn()]
+      const api = {
+        onChanged: vi.fn((callback) => {
+          callbacks.changed = callback
+          return unsubscribes[0]
+        }),
+        onListsChanged: vi.fn((callback) => {
+          callbacks.listsChanged = callback
+          return unsubscribes[1]
+        }),
+        onGlobalChanged: vi.fn((callback) => {
+          callbacks.globalChanged = callback
+          return unsubscribes[2]
+        }),
+        onGlobalListsChanged: vi.fn((callback) => {
+          callbacks.globalListsChanged = callback
+          return unsubscribes[3]
+        })
+      }
+      const target = {
+        invalidateTodos: vi.fn(),
+        invalidateTodoLists: vi.fn(),
+        invalidateGlobalTodos: vi.fn(),
+        invalidateGlobalTodoLists: vi.fn()
+      }
+
+      const cleanup = createTodoInvalidationSubscriptions(api, target)
+      callbacks.changed?.({ repoId: 'repo-1' })
+      callbacks.listsChanged?.({ repoId: 'repo-1' })
+      callbacks.globalChanged?.()
+      callbacks.globalListsChanged?.()
+
+      expect(target.invalidateTodos).toHaveBeenCalledWith('repo-1')
+      expect(target.invalidateTodoLists).toHaveBeenCalledWith('repo-1')
+      expect(target.invalidateGlobalTodos).toHaveBeenCalledOnce()
+      expect(target.invalidateGlobalTodoLists).toHaveBeenCalledOnce()
+
+      cleanup()
+      expect(unsubscribes).toEqual([
+        expect.any(Function),
+        expect.any(Function),
+        expect.any(Function),
+        expect.any(Function)
+      ])
+      for (const unsubscribe of unsubscribes) {
+        expect(unsubscribe).toHaveBeenCalledOnce()
+      }
     })
   })
 
