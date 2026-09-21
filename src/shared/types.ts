@@ -73,7 +73,6 @@ export type {
   BrowserCookieImportResult,
   BrowserLoadError,
   BrowserSessionProfile,
-  BrowserSessionProfileCreateOptions,
   BrowserSessionProfileScope,
   BrowserSessionProfileSource,
   BrowserViewportOverride
