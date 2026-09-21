@@ -566,6 +566,27 @@
               }
             }
           }
+        },
+        "project": {
+          "links": {
+            "updateFailed": "Failed to update link",
+            "saveFailed": "Failed to save link",
+            "mustLoadFirst": "Links must load before saving.",
+            "removeFailed": "Failed to remove link",
+            "reorderFailed": "Failed to reorder links",
+            "folderAddFailed": "Failed to add folder",
+            "folderRemoveFailed": "Failed to remove folder",
+            "exportSuccess": "Exported {count} link(s) to {path}",
+            "exportFailed": "Failed to export links",
+            "importSuccess": "Imported {imported} link(s), skipped {skipped}",
+            "importFailed": "Failed to import links",
+            "updated": "Link updated",
+            "saved": "Link saved",
+            "removed": "Link removed"
+          }
+        },
+        "todos": {
+          "todosMustLoadBeforeSaving": "Todos must load before saving."
         }
       }
     },
@@ -7210,7 +7231,13 @@
           "7ddd66fede": "Editor Word Wrap",
           "9b18de6eea": "Wrap long lines in file editors instead of requiring horizontal scrolling.",
           "collapseUnchangedTitle": "Collapse Unchanged Regions",
-          "collapseUnchangedDescription": "Show only changed lines and a little surrounding context in a file diff, hiding the rest behind expandable bands. The View All Changes diff always collapses this way."
+          "collapseUnchangedDescription": "Show only changed lines and a little surrounding context in a file diff, hiding the rest behind expandable bands. The View All Changes diff always collapses this way.",
+          "plantumltitle": "PlantUML Rendering",
+          "plantumldesc": "Render ```plantuml diagrams in markdown preview using a local plantuml.jar. Requires Java. Diagram source stays on your machine — no PlantUML server is contacted. Leave empty to disable.",
+          "plantumlhint": "Path to a local plantuml.jar. Requires Java on your PATH. Leave empty to disable.",
+          "plantumlplaceholder": "No jar selected",
+          "plantumlbrowse": "Browse…",
+          "plantumlclear": "Clear"
         },
         "AdvancedNetworkSettingsSection": {
           "3e431564b5": "localhost, 127.0.0.1, *.internal",
@@ -9783,7 +9810,14 @@
             "command": "command",
             "confirm": "confirm",
             "close": "close",
-            "omp": "OMP"
+            "omp": "OMP",
+            "plantumltitle": "PlantUML Rendering",
+            "plantumldesc": "Render ```plantuml diagrams in markdown preview using a local plantuml.jar.",
+            "plantuml": "plantuml",
+            "diagram": "diagram",
+            "uml": "uml",
+            "a7d2f1b9e3": "automatic",
+            "c4e8a06d5b": "auto update"
           }
         },
         "git": {
@@ -13534,6 +13568,101 @@
             "sourceMissing": "Transcript is no longer available",
             "metadataMatch": "Match in session metadata",
             "sourceActionsUnavailable": "The transcript source is unavailable."
+          },
+          "projectLinks": {
+            "uncategorized": "Uncategorized",
+            "sectionLabel": "Links",
+            "newLink": "New link",
+            "newFolder": "New folder",
+            "export": "Export links",
+            "import": "Import links",
+            "manage": "Manage links",
+            "loading": "Loading links…",
+            "loadFailedTitle": "Could not load links",
+            "newGlobalLink": "New global link",
+            "newGlobalFolder": "New global folder",
+            "emptyTitle": "No links yet",
+            "emptyPanelDescription": "Save quick links to this project — test/prod environments, databases, deploy and config pages.",
+            "addFirst": "Add a link",
+            "newLinkHere": "New link here",
+            "newSubfolder": "New subfolder",
+            "deleteFolder": "Delete folder",
+            "open": "Open link",
+            "delete": "Delete",
+            "newGlobalFolderTitle": "New Global Folder",
+            "newFolderTitle": "New Folder",
+            "newSubfolderUnder": "New folder under “{{value0}}”",
+            "folderNameLabel": "Folder name",
+            "folderNamePlaceholder": "Production",
+            "cancel": "Cancel",
+            "create": "Create",
+            "manageTitle": "Project Links",
+            "localTab": "This project",
+            "globalTab": "Global",
+            "editingHeader": "Edit link",
+            "addHeader": "Add link",
+            "cancelEdit": "Cancel edit",
+            "nameLabel": "Name",
+            "namePlaceholderShort": "Prod dashboard",
+            "categoryLabel": "Category",
+            "categoryPlaceholderNested": "Production/Database",
+            "urlLabel": "URL",
+            "urlPlaceholder": "https://example.com",
+            "categoryHint": "Tip: use “/” in a category to create nested submenus, e.g. Production/Database.",
+            "save": "Save",
+            "add": "Add",
+            "emptyManaged": "No links yet. Add your first one below.",
+            "edit": "Edit link",
+            "confirm": "Confirm",
+            "globalGroup": "Global (all projects)",
+            "localGroup": "This project",
+            "tabTitle": "Project Links"
+          },
+          "TodoEditDialog": {
+            "editTask": "Edit Task",
+            "title": "Title",
+            "note": "Note",
+            "list": "List",
+            "important": "Important",
+            "addToMyDay": "Add to My Day",
+            "dueDate": "Due date",
+            "reminder": "Reminder",
+            "steps": "Steps",
+            "markStepUndone": "Mark as not done",
+            "markStepDone": "Mark as done",
+            "removeStep": "Remove step",
+            "addStep": "Add a step…",
+            "cancel": "Cancel",
+            "save": "Save"
+          },
+          "TodoItemRow": {
+            "markUndone": "Mark as not done",
+            "markDone": "Mark as done",
+            "overdue": " (overdue)",
+            "myDay": "My Day",
+            "edit": "Edit todo",
+            "confirmDelete": "Confirm delete",
+            "delete": "Delete todo"
+          },
+          "TodoNavigation": {
+            "lists": "Lists",
+            "renameList": "Rename list",
+            "confirmDelete": "Confirm delete",
+            "deleteList": "Delete list",
+            "listName": "List name",
+            "newList": "New list"
+          },
+          "TodosPanel": {
+            "globalSource": "Global",
+            "myDayEmpty": "No tasks added to My Day. Add tasks from any list to focus on today.",
+            "noProject": "No project selected.",
+            "noCompleted": "No completed tasks.",
+            "empty": "No todos yet. Add your first one above.",
+            "addTodo": "Add a todo…",
+            "loadError": "Could not load todos: {{error}}"
+          },
+          "todos": {
+            "tabTitle": "Todo"
           }
         }
       },
@@ -15057,7 +15186,9 @@
           "026653f21f": "CSS",
           "4daed43ae3": "C++",
           "4227cf50fe": "Bash",
-          "13822cdfda": "Plain text"
+          "13822cdfda": "Plain text",
+          "plantumlcollapse": "Click to hide source",
+          "plantumlexpand": "Click to edit source"
         },
         "RichMarkdownDocLinkMenu": {
           "e17b987473": "↑↓ navigate&nbsp;&nbsp;↵ select&nbsp;&nbsp;esc dismiss",
@@ -15414,6 +15545,10 @@
           "a0af0198aa": "Large diffs are not rendered by default.",
           "c3d9f4a712": "This diff's size isn't known yet, so it loads on request.",
           "f7fa7a40d0": "Load diff"
+        },
+        "PlantUmlBlock": {
+          "notconfigured": "PlantUML rendering is off. Set a plantuml.jar path in Settings → Editor.",
+          "error": "Diagram error:"
         }
       },
       "diff": {

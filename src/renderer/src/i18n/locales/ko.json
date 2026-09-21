@@ -178,8 +178,7 @@
             "36761d9604": "알 수 없는 키 바인딩 작업 \"{{value0}}\"이(가) 무시되었습니다.",
             "d2e43e426a": "{{value0}}은(는) 객체여야 합니다.",
             "fb290366b2": "웹에서는 사용할 수 없습니다.",
-            "76122208ca": "\"{{value0}}\"에 대한 단축키가 무시되었습니다: {{value1}}",
-            "plantumlunavailable": "PlantUML rendering is only available in the desktop app."
+            "76122208ca": "\"{{value0}}\"에 대한 단축키가 무시되었습니다: {{value1}}"
           }
         },
         "runtime": {
@@ -6113,10 +6112,7 @@
           "31fd7150cf": "업데이트 확인 중...",
           "3394d1f663": "확인 중",
           "d69a09b672": "업데이트는 시작 시 자동으로 확인됩니다.",
-          "7173352632": "idle",
-          "b5e2a7c1f0": "Automatic update checks are off. Use the button above to check manually.",
-          "a1c0e5d4b2": "Automatically check for updates",
-          "c3f8b7e6a9": "Periodically check for new versions in the background. When off, you can still check manually."
+          "7173352632": "idle"
         },
         "GeneralWorkspaceSettingsSection": {
           "3d538a98f7": "워크스페이스의 열기 메뉴에서 사용 가능한 앱을 선택하세요.",
@@ -11693,27 +11689,21 @@
           "projectLinks": {
             "uncategorized": "Uncategorized",
             "manageTitle": "Project Links",
-            "empty": "No links yet. Add one below.",
             "open": "Open link",
             "edit": "Edit link",
             "delete": "Delete link",
             "editingHeader": "Edit link",
             "addHeader": "Add link",
             "cancelEdit": "Cancel edit",
-            "namePlaceholder": "Name",
             "urlPlaceholder": "https://example.com",
-            "categoryPlaceholder": "Category (e.g. Production, Test, Database)",
             "save": "Save",
             "add": "Add",
-            "menuTitle": "Project Links",
-            "noneYet": "No links yet",
             "manage": "Manage links",
             "emptyManaged": "No links yet. Add your first one below.",
             "confirm": "Confirm",
             "nameLabel": "Name",
             "namePlaceholderShort": "Prod dashboard",
             "categoryLabel": "Category",
-            "categoryPlaceholderShort": "Production, Test…",
             "urlLabel": "URL",
             "addFirst": "Add a link",
             "categoryPlaceholderNested": "Production/Database",
@@ -11737,10 +11727,6 @@
             "create": "Create",
             "export": "Export links",
             "import": "Import links",
-            "exportSuccess": "Exported {count} link(s) to {path}",
-            "exportFailed": "Failed to export links",
-            "importSuccess": "Imported {imported} link(s), skipped {skipped}",
-            "importFailed": "Failed to import links",
             "globalTab": "Global",
             "localTab": "This project",
             "globalGroup": "Global (all projects)",
@@ -13241,7 +13227,6 @@
           "4daed43ae3": "C++",
           "4227cf50fe": "Bash",
           "13822cdfda": "일반 텍스트",
-          "plantuml": "PlantUML",
           "plantumlcollapse": "Click to hide source",
           "plantumlexpand": "Click to edit source"
         },

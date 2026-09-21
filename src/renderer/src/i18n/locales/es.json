@@ -178,8 +178,7 @@
             "36761d9604": "Se ignoró la acción de atajo desconocida \"{{value0}}\".",
             "d2e43e426a": "{{value0}} debe ser un objeto.",
             "fb290366b2": "No está disponible en la web.",
-            "76122208ca": "Se ignoró el atajo para \"{{value0}}\": {{value1}}",
-            "plantumlunavailable": "PlantUML rendering is only available in the desktop app."
+            "76122208ca": "Se ignoró el atajo para \"{{value0}}\": {{value1}}"
           }
         },
         "runtime": {
@@ -6123,10 +6122,7 @@
           "31fd7150cf": "Buscando actualizaciones...",
           "3394d1f663": "de cheques",
           "d69a09b672": "Las actualizaciones se verifican automáticamente al iniciarse.",
-          "7173352632": "idle",
-          "b5e2a7c1f0": "Automatic update checks are off. Use the button above to check manually.",
-          "a1c0e5d4b2": "Automatically check for updates",
-          "c3f8b7e6a9": "Periodically check for new versions in the background. When off, you can still check manually."
+          "7173352632": "idle"
         },
         "GeneralWorkspaceSettingsSection": {
           "3d538a98f7": "Elige las apps disponibles en el menú Abrir en de un espacio de trabajo.",
@@ -11651,27 +11647,21 @@
           "projectLinks": {
             "uncategorized": "Uncategorized",
             "manageTitle": "Project Links",
-            "empty": "No links yet. Add one below.",
             "open": "Open link",
             "edit": "Edit link",
             "delete": "Delete link",
             "editingHeader": "Edit link",
             "addHeader": "Add link",
             "cancelEdit": "Cancel edit",
-            "namePlaceholder": "Name",
             "urlPlaceholder": "https://example.com",
-            "categoryPlaceholder": "Category (e.g. Production, Test, Database)",
             "save": "Save",
             "add": "Add",
-            "menuTitle": "Project Links",
-            "noneYet": "No links yet",
             "manage": "Manage links",
             "emptyManaged": "No links yet. Add your first one below.",
             "confirm": "Confirm",
             "nameLabel": "Name",
             "namePlaceholderShort": "Prod dashboard",
             "categoryLabel": "Category",
-            "categoryPlaceholderShort": "Production, Test…",
             "urlLabel": "URL",
             "addFirst": "Add a link",
             "categoryPlaceholderNested": "Production/Database",
@@ -11695,10 +11685,6 @@
             "create": "Create",
             "export": "Export links",
             "import": "Import links",
-            "exportSuccess": "Exported {count} link(s) to {path}",
-            "exportFailed": "Failed to export links",
-            "importSuccess": "Imported {imported} link(s), skipped {skipped}",
-            "importFailed": "Failed to import links",
             "globalTab": "Global",
             "localTab": "This project",
             "globalGroup": "Global (all projects)",
@@ -13175,7 +13161,6 @@
           "4daed43ae3": "C++",
           "4227cf50fe": "Bash",
           "13822cdfda": "Texto sin formato",
-          "plantuml": "PlantUML",
           "plantumlcollapse": "Click to hide source",
           "plantumlexpand": "Click to edit source"
         },

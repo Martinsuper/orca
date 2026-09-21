@@ -178,8 +178,7 @@
             "36761d9604": "未知的键绑定操作“{{value0}}”被忽略。",
             "d2e43e426a": "{{value0}} 必须是一个对象。",
             "fb290366b2": "无法在网络上使用。",
-            "76122208ca": "“{{value0}}”的快捷方式被忽略：{{value1}}",
-            "plantumlunavailable": "PlantUML rendering is only available in the desktop app."
+            "76122208ca": "“{{value0}}”的快捷方式被忽略：{{value1}}"
           }
         },
         "runtime": {
@@ -6174,10 +6173,7 @@
           "31fd7150cf": "正在检查更新...",
           "3394d1f663": "检查中",
           "d69a09b672": "启动时会自动检查更新。",
-          "7173352632": "空闲",
-          "b5e2a7c1f0": "已关闭自动检查更新。请使用上方按钮手动检查。",
-          "a1c0e5d4b2": "自动检查更新",
-          "c3f8b7e6a9": "定期在后台检查新版本。关闭后仍可手动检查。"
+          "7173352632": "空闲"
         },
         "GeneralWorkspaceSettingsSection": {
           "3d538a98f7": "从工作区的“打开方式”菜单中选择可用的应用程序。",
@@ -11731,27 +11727,21 @@
           "projectLinks": {
             "uncategorized": "Uncategorized",
             "manageTitle": "Project Links",
-            "empty": "No links yet. Add one below.",
             "open": "Open link",
             "edit": "Edit link",
             "delete": "Delete link",
             "editingHeader": "Edit link",
             "addHeader": "Add link",
             "cancelEdit": "Cancel edit",
-            "namePlaceholder": "Name",
             "urlPlaceholder": "https://example.com",
-            "categoryPlaceholder": "Category (e.g. Production, Test, Database)",
             "save": "Save",
             "add": "Add",
-            "menuTitle": "Project Links",
-            "noneYet": "No links yet",
             "manage": "Manage links",
             "emptyManaged": "No links yet. Add your first one below.",
             "confirm": "Confirm",
             "nameLabel": "Name",
             "namePlaceholderShort": "Prod dashboard",
             "categoryLabel": "Category",
-            "categoryPlaceholderShort": "Production, Test…",
             "urlLabel": "URL",
             "addFirst": "Add a link",
             "categoryPlaceholderNested": "Production/Database",
@@ -11775,10 +11765,6 @@
             "create": "Create",
             "export": "导出链接",
             "import": "导入链接",
-            "exportSuccess": "已导出 {count} 条链接到 {path}",
-            "exportFailed": "导出链接失败",
-            "importSuccess": "已导入 {imported} 条链接,跳过 {skipped} 条",
-            "importFailed": "导入链接失败",
             "globalTab": "全局",
             "localTab": "本项目",
             "globalGroup": "全局(所有项目)",
@@ -13255,7 +13241,6 @@
           "4daed43ae3": "C++",
           "4227cf50fe": "Bash",
           "13822cdfda": "纯文本",
-          "plantuml": "PlantUML",
           "plantumlcollapse": "Click to hide source",
           "plantumlexpand": "Click to edit source"
         },

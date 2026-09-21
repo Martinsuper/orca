@@ -998,6 +998,9 @@
             "ef182dcb12": "search",
             "fc3095d2ed": "explorer"
           },
+          "projectLinks": {
+            "delete": "Delete"
+          },
           "pull": {
             "policy": {
               "notice": {
