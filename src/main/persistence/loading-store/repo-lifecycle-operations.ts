@@ -18,14 +18,15 @@ import { retireLocalWorktreeMetadataPruneStateForRepo } from '../../local-worktr
 import { hydrateRepo as hydrateRepoOperation } from '../tracking-repos/repo-hydration'
 import { RepoUpdatePersistenceOperations } from '../tracking-repos/repo-update-operations'
 import { ProjectHostSetupPersistenceOperations } from '../tracking-repos/project-host-setup-update'
-import { bumpLocalWorktreeScanGeneration } from '../../local-worktree-scan-generation'
-import type { PersistedState } from '../../../shared/persisted-state-types'
-import { getRepoIdFromWorktreeId } from '../../../shared/worktree/id'
+import {
+  bumpLocalWorktreeScanGeneration,
+  retireLocalWorktreeScanGeneration
+} from '../../local-worktree-scan-generation'
 
 import type { StoreRuntimeState } from './store-runtime-state'
 import type { WriteSchedulingOperations } from './write-scheduling'
 import { scheduleSave } from './write-scheduling'
-
+import { pruneDeregisteredRepoUiResidue } from './repo-lifecycle-ui-residue'
 type RepoLifecycleOperationsRuntime = Pick<
   StoreRuntimeState,
   | 'gitUsernameCache'
@@ -69,7 +70,7 @@ export class RepoLifecycleOperations {
       repoLifecycleOperationsContext
     ].runtime.state.repos.filter((r) => r.id !== id)
     if (repoRemoved) {
-      bumpLocalWorktreeScanGeneration(id)
+      retireLocalWorktreeScanGeneration(id)
     }
     syncProjectHostSetupCompatibilityState(this)
     deleteRepoScopedState(this[repoLifecycleOperationsContext].runtime.state, id)
@@ -100,12 +101,11 @@ export class RepoLifecycleOperations {
     const idStillPresent = this[repoLifecycleOperationsContext].runtime.state.repos.some(
       (r) => r.id === id
     )
-    // Why: presets and retirements are repo-id-scoped (not host-scoped); drop them only when the last host's copy is gone.
     if (!idStillPresent) {
+      retireLocalWorktreeScanGeneration(id)
       deleteRepoScopedState(this[repoLifecycleOperationsContext].runtime.state, id)
     }
     syncProjectHostSetupCompatibilityState(this)
-    // Why: prune only this host's worktree metas if the id survives elsewhere; otherwise prune everything (matches removeProject).
     pruneWorktreeStateForRepo(this, id, idStillPresent ? hostId : null)
     if (!idStillPresent) {
       this[repoLifecycleOperationsContext].runtime.state.workspaceSession =
@@ -133,7 +133,6 @@ export class RepoLifecycleOperations {
 
   /**
    * Drop every persisted row owned by a repo id that is no longer registered.
-   *
    * Runs at load to reach leftover local rows after deregistration. Rows owned by a `runtime:*`
    * host are exempt: this runs before pairing, so their absence from the local catalog cannot
    * establish deletion. Only an explicit `removeProjectForHost` retires them.
@@ -145,6 +144,7 @@ export class RepoLifecycleOperations {
       return []
     }
     for (const repoId of orphanRepoIds) {
+      retireLocalWorktreeScanGeneration(repoId)
       pruneWorktreeStateForRepo(this, repoId, null)
       state.workspaceSession = removeRepoFromWorkspaceSession(state.workspaceSession, repoId)
       state.workspaceSessionsByHostId = removeRepoFromHostWorkspaceSessions(
@@ -228,8 +228,6 @@ export function pruneWorktreeStateForRepo(
     hostId,
     (matchesWorktreeId) => pruneMobileClientTabSelections(owner, matchesWorktreeId)
   )
-  // Why: this drops metadata, lineage, leases and session owners in bulk, which can unpin rows in
-  // other repos, and a full removal retires this repo's own gate state (#17775).
   retireLocalWorktreeMetadataPruneStateForRepo(id, hostId)
 }
 
@@ -248,26 +246,6 @@ export function pruneMobileClientTabSelections(
     if (Object.keys(selectionsByWorktree).length === 0) {
       delete owner[repoLifecycleOperationsContext].runtime.state
         .mobileClientTabSelectionsByDeviceId?.[clientNavigationId]
-    }
-  }
-}
-
-function pruneDeregisteredRepoUiResidue(
-  ui: PersistedState['ui'],
-  orphanRepoIds: ReadonlySet<string>
-): void {
-  const isOrphanWorktree = (worktreeId: string): boolean =>
-    orphanRepoIds.has(getRepoIdFromWorktreeId(worktreeId))
-  if (ui.lastActiveRepoId && orphanRepoIds.has(ui.lastActiveRepoId)) {
-    ui.lastActiveRepoId = null
-  }
-  if (ui.lastActiveWorktreeId && isOrphanWorktree(ui.lastActiveWorktreeId)) {
-    ui.lastActiveWorktreeId = null
-  }
-  ui.filterRepoIds = ui.filterRepoIds?.filter((repoId) => !orphanRepoIds.has(repoId)) ?? []
-  for (const worktreeId of Object.keys(ui.showDotfilesByWorktree ?? {})) {
-    if (isOrphanWorktree(worktreeId)) {
-      delete ui.showDotfilesByWorktree?.[worktreeId]
     }
   }
 }
