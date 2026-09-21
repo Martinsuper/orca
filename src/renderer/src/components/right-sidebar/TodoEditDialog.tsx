@@ -14,9 +14,9 @@ export type TodoEditDialogResult = {
   note: string
   listId: string
   important: boolean
-  dueDate: string | undefined
-  reminderAt: number | undefined
-  myDayDate: string | undefined
+  dueDate: string | null
+  reminderAt: number | null
+  myDayDate: string | null
   steps: TodoStep[]
 }
 
@@ -37,7 +37,7 @@ function todayLocalDate(): string {
   return `${yyyy}-${mm}-${dd}`
 }
 
-function epochToDatetimeLocal(epoch: number | undefined): string {
+function epochToDatetimeLocal(epoch: number | null | undefined): string {
   if (!epoch) {
     return ''
   }
@@ -82,21 +82,26 @@ export function TodoEditDialog({
   const [steps, setSteps] = useState<TodoStep[]>(initial.steps ?? [])
   const [newStepTitle, setNewStepTitle] = useState('')
   const titleRef = useRef<HTMLInputElement>(null)
+  const initialRef = useRef(initial)
+  const listsRef = useRef(lists)
+  initialRef.current = initial
+  listsRef.current = lists
 
   useEffect(() => {
     if (open) {
-      setTitle(initial.title ?? '')
-      setNote(initial.note ?? '')
-      setListId(initial.listId ?? lists[0]?.id ?? '')
-      setImportant(initial.important ?? false)
-      setDueDate(initial.dueDate ?? '')
-      setReminderLocal(epochToDatetimeLocal(initial.reminderAt))
-      setMyDay(!!initial.myDayDate)
-      setSteps(initial.steps ?? [])
+      const currentInitial = initialRef.current
+      setTitle(currentInitial.title ?? '')
+      setNote(currentInitial.note ?? '')
+      setListId(currentInitial.listId ?? listsRef.current[0]?.id ?? '')
+      setImportant(currentInitial.important ?? false)
+      setDueDate(currentInitial.dueDate ?? '')
+      setReminderLocal(epochToDatetimeLocal(currentInitial.reminderAt))
+      setMyDay(!!currentInitial.myDayDate)
+      setSteps(currentInitial.steps ?? [])
       setNewStepTitle('')
       requestAnimationFrame(() => titleRef.current?.focus())
     }
-  }, [open, initial, lists])
+  }, [open])
 
   if (!open) {
     return null
@@ -112,9 +117,9 @@ export function TodoEditDialog({
       note: note.trim(),
       listId,
       important,
-      dueDate: dueDate || undefined,
-      reminderAt: datetimeLocalToEpoch(reminderLocal),
-      myDayDate: myDay ? todayLocalDate() : undefined,
+      dueDate: dueDate || null,
+      reminderAt: datetimeLocalToEpoch(reminderLocal) ?? null,
+      myDayDate: myDay ? todayLocalDate() : null,
       steps: steps.filter((s) => s.title.trim())
     })
   }

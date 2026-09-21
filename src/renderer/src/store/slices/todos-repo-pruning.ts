@@ -6,8 +6,11 @@ type TodosMaps = Pick<
   | 'todosLoadingByRepo'
   | 'todosLoadStatusByRepo'
   | 'todosErrorByRepo'
+  | 'todosRequestGenerationByRepo'
   | 'todoListsByRepo'
   | 'todoListsLoadingByRepo'
+  | 'todoListsRequestGenerationByRepo'
+  | 'todoNavigationByScope'
 >
 
 export function omitTodosForRepos(
@@ -46,6 +49,11 @@ export function omitTodosForRepos(
   if (error !== state.todosErrorByRepo) {
     result.todosErrorByRepo = error
   }
+  const todoGenerations = { ...state.todosRequestGenerationByRepo }
+  for (const repoId of removed) {
+    todoGenerations[repoId] = (todoGenerations[repoId] ?? 0) + 1
+  }
+  result.todosRequestGenerationByRepo = todoGenerations
   const listsByRepo = omit(state.todoListsByRepo)
   if (listsByRepo !== state.todoListsByRepo) {
     result.todoListsByRepo = listsByRepo
@@ -53,6 +61,23 @@ export function omitTodosForRepos(
   const listsLoading = omit(state.todoListsLoadingByRepo)
   if (listsLoading !== state.todoListsLoadingByRepo) {
     result.todoListsLoadingByRepo = listsLoading
+  }
+  const listGenerations = { ...state.todoListsRequestGenerationByRepo }
+  for (const repoId of removed) {
+    listGenerations[repoId] = (listGenerations[repoId] ?? 0) + 1
+  }
+  result.todoListsRequestGenerationByRepo = listGenerations
+  const navigation = { ...state.todoNavigationByScope }
+  let navigationChanged = false
+  for (const repoId of removed) {
+    const scopeKey = `project:${repoId}`
+    if (scopeKey in navigation) {
+      delete navigation[scopeKey]
+      navigationChanged = true
+    }
+  }
+  if (navigationChanged) {
+    result.todoNavigationByScope = navigation
   }
   return result
 }

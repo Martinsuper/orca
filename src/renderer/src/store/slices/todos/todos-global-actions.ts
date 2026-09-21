@@ -1,4 +1,5 @@
 import { toast } from 'sonner'
+import { translate } from '@/i18n/i18n'
 import type { TodosSlice, TodosSliceGet, TodosSliceSet } from './todos-slice-contract'
 import { ERROR_TOAST_DURATION, compareTodos } from './todos-slice-contract'
 
@@ -16,31 +17,46 @@ export function createTodosGlobalActions(
   | 'removeGlobalTodoList'
 > {
   return {
-    fetchGlobalTodos: async () => {
+    fetchGlobalTodos: async (options) => {
       const state = get()
-      if (state.globalTodos !== undefined || state.globalTodosLoading) {
+      if (!options?.force && (state.globalTodos !== undefined || state.globalTodosLoading)) {
         return
       }
-      set(() => ({
-        globalTodosLoading: true,
-        globalTodosLoadStatus: 'loading',
-        globalTodosError: undefined
-      }))
+      let generation = 0
+      set((s) => {
+        generation = s.globalTodosRequestGeneration + 1
+        return {
+          globalTodosRequestGeneration: generation,
+          globalTodosLoading: true,
+          globalTodosLoadStatus: s.globalTodos === undefined ? 'loading' : 'loaded',
+          globalTodosError: undefined
+        }
+      })
       try {
         const todos = await window.api.todos.listGlobal()
-        set(() => ({
-          globalTodos: todos,
-          globalTodosLoading: false,
-          globalTodosLoadStatus: 'loaded',
-          globalTodosError: undefined
-        }))
+        set((s) => {
+          if (s.globalTodosRequestGeneration !== generation) {
+            return {}
+          }
+          return {
+            globalTodos: todos,
+            globalTodosLoading: false,
+            globalTodosLoadStatus: 'loaded',
+            globalTodosError: undefined
+          }
+        })
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err)
-        set(() => ({
-          globalTodosLoading: false,
-          globalTodosLoadStatus: 'error',
-          globalTodosError: message
-        }))
+        set((s) => {
+          if (s.globalTodosRequestGeneration !== generation) {
+            return {}
+          }
+          return {
+            globalTodosLoading: false,
+            globalTodosLoadStatus: 'error',
+            globalTodosError: message
+          }
+        })
         console.error('Failed to fetch global todos:', err)
       }
     },
@@ -51,7 +67,10 @@ export function createTodosGlobalActions(
           await get().fetchGlobalTodos()
           if (get().globalTodos === undefined) {
             toast.error('Failed to save todo', {
-              description: 'Todos must load before saving.',
+              description: translate(
+                'auto.store.slices.todos.todosMustLoadBeforeSaving',
+                'Todos must load before saving.'
+              ),
               duration: ERROR_TOAST_DURATION
             })
             return null
@@ -62,9 +81,13 @@ export function createTodosGlobalActions(
           const existing = s.globalTodos ?? []
           const without = existing.filter((todo) => todo.id !== saved.id)
           return {
-            globalTodos: [...without, saved].sort(compareTodos)
+            globalTodos: [...without, saved].sort(compareTodos),
+            globalTodosLoading: false,
+            globalTodosLoadStatus: 'loaded',
+            globalTodosRequestGeneration: s.globalTodosRequestGeneration + 1
           }
         })
+        get().invalidateGlobalTodos()
         toast.success(args.id ? 'Todo updated' : 'Todo saved', { description: saved.title })
         return saved
       } catch (err) {
@@ -79,14 +102,28 @@ export function createTodosGlobalActions(
 
     removeGlobalTodo: async ({ todoId }) => {
       const previous = get().globalTodos ?? []
-      set(() => ({
-        globalTodos: previous.filter((todo) => todo.id !== todoId)
-      }))
+      let generation = 0
+      set((s) => {
+        generation = s.globalTodosRequestGeneration + 1
+        return {
+          globalTodos: previous.filter((todo) => todo.id !== todoId),
+          globalTodosRequestGeneration: generation
+        }
+      })
       try {
         await window.api.todos.removeGlobal({ todoId })
+        if (get().globalTodosRequestGeneration === generation) {
+          get().invalidateGlobalTodos()
+        }
         toast.success('Todo removed')
       } catch (err) {
-        set(() => ({ globalTodos: previous }))
+        if (get().globalTodosRequestGeneration === generation) {
+          set((s) => ({
+            globalTodos: previous,
+            globalTodosRequestGeneration: s.globalTodosRequestGeneration + 1
+          }))
+          get().invalidateGlobalTodos()
+        }
         const message = err instanceof Error ? err.message : String(err)
         toast.error('Failed to remove todo', {
           description: message,
@@ -98,18 +135,32 @@ export function createTodosGlobalActions(
 
     toggleGlobalTodo: async ({ todoId, done }) => {
       const previous = get().globalTodos ?? []
-      set(() => ({
-        globalTodos: previous.map((todo) => (todo.id === todoId ? { ...todo, done } : todo))
-      }))
+      let generation = 0
+      set((s) => {
+        generation = s.globalTodosRequestGeneration + 1
+        return {
+          globalTodos: previous.map((todo) => (todo.id === todoId ? { ...todo, done } : todo)),
+          globalTodosRequestGeneration: generation
+        }
+      })
       try {
         const updated = await window.api.todos.toggleGlobal({ todoId, done })
-        set((s) => ({
-          globalTodos: (s.globalTodos ?? []).map((todo) =>
-            todo.id === updated.id ? updated : todo
-          )
-        }))
+        if (get().globalTodosRequestGeneration === generation) {
+          set((s) => ({
+            globalTodos: (s.globalTodos ?? []).map((todo) =>
+              todo.id === updated.id ? updated : todo
+            )
+          }))
+          get().invalidateGlobalTodos()
+        }
       } catch (err) {
-        set(() => ({ globalTodos: previous }))
+        if (get().globalTodosRequestGeneration === generation) {
+          set((s) => ({
+            globalTodos: previous,
+            globalTodosRequestGeneration: s.globalTodosRequestGeneration + 1
+          }))
+          get().invalidateGlobalTodos()
+        }
         const message = err instanceof Error ? err.message : String(err)
         toast.error('Failed to toggle todo', {
           description: message,
@@ -118,19 +169,40 @@ export function createTodosGlobalActions(
       }
     },
 
-    fetchGlobalTodoLists: async () => {
-      if (get().globalTodoLists !== undefined || get().globalTodoListsLoading) {
+    fetchGlobalTodoLists: async (options) => {
+      const state = get()
+      if (
+        !options?.force &&
+        (state.globalTodoLists !== undefined || state.globalTodoListsLoading)
+      ) {
         return
       }
-      set(() => ({ globalTodoListsLoading: true }))
+      let generation = 0
+      set((s) => {
+        generation = s.globalTodoListsRequestGeneration + 1
+        return {
+          globalTodoListsRequestGeneration: generation,
+          globalTodoListsLoading: true
+        }
+      })
       try {
         const lists = await window.api.todos.listGlobalLists()
-        set(() => ({
-          globalTodoLists: lists,
-          globalTodoListsLoading: false
-        }))
+        set((s) => {
+          if (s.globalTodoListsRequestGeneration !== generation) {
+            return {}
+          }
+          return {
+            globalTodoLists: lists,
+            globalTodoListsLoading: false
+          }
+        })
       } catch (err) {
-        set(() => ({ globalTodoListsLoading: false }))
+        set((s) => {
+          if (s.globalTodoListsRequestGeneration !== generation) {
+            return {}
+          }
+          return { globalTodoListsLoading: false }
+        })
         console.error('Failed to fetch global todo lists:', err)
       }
     },
@@ -140,11 +212,14 @@ export function createTodosGlobalActions(
         const saved = await window.api.todos.saveGlobalList(args)
         set((s) => {
           const existing = s.globalTodoLists ?? []
-          const without = existing.filter((l) => l.id !== saved.id)
+          const without = existing.filter((list) => list.id !== saved.id)
           return {
-            globalTodoLists: [...without, saved].sort((a, b) => a.createdAt - b.createdAt)
+            globalTodoLists: [...without, saved].sort((a, b) => a.createdAt - b.createdAt),
+            globalTodoListsLoading: false,
+            globalTodoListsRequestGeneration: s.globalTodoListsRequestGeneration + 1
           }
         })
+        get().invalidateGlobalTodoLists()
         toast.success(args.id ? 'List updated' : 'List created', { description: saved.title })
         return saved
       } catch (err) {
@@ -159,15 +234,29 @@ export function createTodosGlobalActions(
 
     removeGlobalTodoList: async ({ listId }) => {
       const previousLists = get().globalTodoLists ?? []
-      set(() => ({
-        globalTodoLists: previousLists.filter((l) => l.id !== listId)
-      }))
+      let generation = 0
+      set((s) => {
+        generation = s.globalTodoListsRequestGeneration + 1
+        return {
+          globalTodoLists: previousLists.filter((list) => list.id !== listId),
+          globalTodoListsRequestGeneration: generation
+        }
+      })
       try {
         await window.api.todos.removeGlobalList({ listId, confirmed: true })
-        await get().fetchGlobalTodos()
+        if (get().globalTodoListsRequestGeneration === generation) {
+          get().invalidateGlobalTodos()
+          get().invalidateGlobalTodoLists()
+        }
         toast.success('List removed')
       } catch (err) {
-        set(() => ({ globalTodoLists: previousLists }))
+        if (get().globalTodoListsRequestGeneration === generation) {
+          set((s) => ({
+            globalTodoLists: previousLists,
+            globalTodoListsRequestGeneration: s.globalTodoListsRequestGeneration + 1
+          }))
+          get().invalidateGlobalTodoLists()
+        }
         const message = err instanceof Error ? err.message : String(err)
         toast.error('Failed to remove list', {
           description: message,

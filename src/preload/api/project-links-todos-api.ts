@@ -55,9 +55,9 @@ export type TodosApi = {
     title: string
     note?: string
     important?: boolean
-    dueDate?: string
-    reminderAt?: number
-    myDayDate?: string
+    dueDate?: string | null
+    reminderAt?: number | null
+    myDayDate?: string | null
     steps?: TodoStep[]
   }) => Promise<Todo>
   remove: (args: { repoId: string; todoId: string }) => Promise<void>
@@ -74,9 +74,9 @@ export type TodosApi = {
     title: string
     note?: string
     important?: boolean
-    dueDate?: string
-    reminderAt?: number
-    myDayDate?: string
+    dueDate?: string | null
+    reminderAt?: number | null
+    myDayDate?: string | null
     steps?: TodoStep[]
   }) => Promise<Todo>
   removeGlobal: (args: { todoId: string }) => Promise<void>

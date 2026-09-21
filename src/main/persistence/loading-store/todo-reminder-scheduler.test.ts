@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Todo } from '../../../shared/types'
 import type { NotificationDispatchRequest } from '../../../shared/notification-settings-types'
-import { TodoReminderScheduler } from './todo-reminder-scheduler'
+import { TodoReminderScheduler, type TodoReminderStore } from './todo-reminder-scheduler'
 
 vi.mock('electron', () => ({
   powerMonitor: {
@@ -10,22 +10,30 @@ vi.mock('electron', () => ({
   }
 }))
 
-type MockStore = {
-  getRepos: ReturnType<typeof vi.fn>
-  getTodos: ReturnType<typeof vi.fn>
-  getGlobalTodos: ReturnType<typeof vi.fn>
-  saveTodo: ReturnType<typeof vi.fn>
-  saveGlobalTodo: ReturnType<typeof vi.fn>
-}
+class MockStore implements TodoReminderStore {
+  readonly getRepos = vi.fn(() => Object.keys(this.todosByRepo).map((id) => ({ id })))
+  readonly getTodos = vi.fn((repoId: string) => this.todosByRepo[repoId] ?? [])
+  readonly getGlobalTodos = vi.fn(() => this.globalTodos)
+  readonly saveTodo = vi.fn((todo: Todo): Todo => {
+    this.todosByRepo[todo.repoId] = this.replaceTodo(this.todosByRepo[todo.repoId] ?? [], todo)
+    return todo
+  })
+  readonly saveGlobalTodo = vi.fn((todo: Todo): Todo => {
+    this.globalTodos = this.replaceTodo(this.globalTodos, todo)
+    return todo
+  })
 
-function makeStore(todosByRepo: Record<string, Todo[]> = {}, globalTodos: Todo[] = []): MockStore {
-  const repoIds = Object.keys(todosByRepo)
-  return {
-    getRepos: vi.fn(() => repoIds.map((id) => ({ id }))),
-    getTodos: vi.fn((repoId: string) => todosByRepo[repoId] ?? []),
-    getGlobalTodos: vi.fn(() => globalTodos),
-    saveTodo: vi.fn(),
-    saveGlobalTodo: vi.fn()
+  constructor(
+    private todosByRepo: Record<string, Todo[]> = {},
+    private globalTodos: Todo[] = []
+  ) {}
+
+  setGlobalTodos(todos: Todo[]): void {
+    this.globalTodos = todos
+  }
+
+  private replaceTodo(todos: Todo[], todo: Todo): Todo[] {
+    return todos.map((existing) => (existing.id === todo.id ? todo : existing))
   }
 }
 
@@ -43,36 +51,10 @@ function makeTodo(overrides: Partial<Todo> = {}): Todo {
 }
 
 function createScheduler(
-  store: MockStore,
-  now: number,
-  dispatch: (req: NotificationDispatchRequest) => void
+  store: TodoReminderStore,
+  dispatch: (request: NotificationDispatchRequest) => void
 ) {
-  const timers: { fn: () => void; delay: number }[] = []
-  const setTimeoutMock = vi.fn((fn: () => void, delay: number) => {
-    const handle = { fn, delay }
-    timers.push(handle)
-    return handle as unknown as ReturnType<typeof setTimeout>
-  })
-  const clearTimeoutMock = vi.fn((handle: ReturnType<typeof setTimeout>) => {
-    const idx = timers.indexOf(handle as unknown as { fn: () => void; delay: number })
-    if (idx !== -1) {
-      timers.splice(idx, 1)
-    }
-  })
-  const scheduler = new TodoReminderScheduler({
-    store: store as never,
-    dispatch,
-    now: () => now,
-    setTimeout: setTimeoutMock as never,
-    clearTimeout: clearTimeoutMock as never
-  })
-  return { scheduler, timers, setTimeoutMock, clearTimeoutMock }
-}
-
-function fireTimer(timers: { fn: () => void; delay: number }[]): void {
-  if (timers.length > 0) {
-    timers[0].fn()
-  }
+  return new TodoReminderScheduler({ store, dispatch })
 }
 
 describe('TodoReminderScheduler', () => {
@@ -80,95 +62,117 @@ describe('TodoReminderScheduler', () => {
 
   beforeEach(() => {
     now = 100_000
+    vi.useFakeTimers()
+    vi.setSystemTime(now)
     vi.clearAllMocks()
   })
 
   afterEach(() => {
+    vi.useRealTimers()
     vi.restoreAllMocks()
   })
 
   it('schedules a timer for the nearest upcoming reminder on hydrate', () => {
+    const store = new MockStore({}, [makeTodo({ reminderAt: now + 5000 })])
+    const scheduler = createScheduler(store, vi.fn())
+
+    scheduler.hydrate()
+
+    expect(vi.getTimerCount()).toBe(1)
+    scheduler.dispose()
+  })
+
+  it('does not schedule when no todos have eligible reminders', () => {
+    const store = new MockStore({}, [
+      makeTodo({ id: 'missing', reminderAt: undefined }),
+      makeTodo({ id: 'done', reminderAt: now + 5000, done: true }),
+      makeTodo({ id: 'delivered', reminderAt: now + 5000, reminderDeliveredAt: now + 5000 }),
+      makeTodo({ id: 'invalid', reminderAt: Number.POSITIVE_INFINITY })
+    ])
+    const scheduler = createScheduler(store, vi.fn())
+
+    scheduler.hydrate()
+
+    expect(vi.getTimerCount()).toBe(0)
+    scheduler.dispose()
+  })
+
+  it('picks the nearest reminder among global and per-repo todos', () => {
+    const store = new MockStore(
+      { 'repo-1': [makeTodo({ id: 'repo', repoId: 'repo-1', reminderAt: now + 3000 })] },
+      [makeTodo({ id: 'global', reminderAt: now + 10_000 })]
+    )
+    const dispatch = vi.fn()
+    const scheduler = createScheduler(store, dispatch)
+
+    scheduler.hydrate()
+    vi.advanceTimersByTime(3000)
+
+    expect(dispatch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: 'todo-reminder',
+        notificationId: 'todo-reminder:repo'
+      })
+    )
+    scheduler.dispose()
+  })
+
+  it('does not fire a long-delay reminder when the timer delay is clamped', () => {
+    const reminderAt = now + 2 ** 31
+    const store = new MockStore({}, [makeTodo({ reminderAt })])
+    const dispatch = vi.fn()
+    const scheduler = createScheduler(store, dispatch)
+
+    scheduler.hydrate()
+    vi.advanceTimersByTime(2 ** 31 - 1)
+
+    expect(dispatch).not.toHaveBeenCalled()
+    expect(store.saveGlobalTodo).not.toHaveBeenCalled()
+    scheduler.dispose()
+  })
+
+  it('does not dispatch when the reminder was cleared before its timer fires', () => {
     const todo = makeTodo({ reminderAt: now + 5000 })
-    const store = makeStore({}, [todo])
+    const store = new MockStore({}, [todo])
     const dispatch = vi.fn()
-    const { scheduler, timers, setTimeoutMock } = createScheduler(store, now, dispatch)
+    const scheduler = createScheduler(store, dispatch)
 
     scheduler.hydrate()
-    expect(setTimeoutMock).toHaveBeenCalledTimes(1)
-    expect(timers).toHaveLength(1)
+    store.setGlobalTodos([{ ...todo, reminderAt: undefined }])
+    vi.advanceTimersByTime(5000)
+
+    expect(dispatch).not.toHaveBeenCalled()
+    expect(store.saveGlobalTodo).not.toHaveBeenCalled()
     scheduler.dispose()
   })
 
-  it('does not schedule when no todos have reminders', () => {
-    const todo = makeTodo({ reminderAt: undefined })
-    const store = makeStore({}, [todo])
+  it('does not dispatch when the reminder was moved later before its timer fires', () => {
+    const todo = makeTodo({ reminderAt: now + 5000 })
+    const store = new MockStore({}, [todo])
     const dispatch = vi.fn()
-    const { scheduler, setTimeoutMock } = createScheduler(store, now, dispatch)
+    const scheduler = createScheduler(store, dispatch)
 
     scheduler.hydrate()
-    expect(setTimeoutMock).not.toHaveBeenCalled()
-    scheduler.dispose()
-  })
+    store.setGlobalTodos([{ ...todo, reminderAt: now + 10_000 }])
+    vi.advanceTimersByTime(5000)
 
-  it('does not schedule for done todos', () => {
-    const todo = makeTodo({ reminderAt: now + 5000, done: true })
-    const store = makeStore({}, [todo])
-    const dispatch = vi.fn()
-    const { scheduler, setTimeoutMock } = createScheduler(store, now, dispatch)
-
-    scheduler.hydrate()
-    expect(setTimeoutMock).not.toHaveBeenCalled()
-    scheduler.dispose()
-  })
-
-  it('does not schedule for already-delivered reminders', () => {
-    const todo = makeTodo({
-      reminderAt: now + 5000,
-      reminderDeliveredAt: now + 5000
-    })
-    const store = makeStore({}, [todo])
-    const dispatch = vi.fn()
-    const { scheduler, setTimeoutMock } = createScheduler(store, now, dispatch)
-
-    scheduler.hydrate()
-    expect(setTimeoutMock).not.toHaveBeenCalled()
-    scheduler.dispose()
-  })
-
-  it('picks the nearest reminder among multiple todos', () => {
-    const t1 = makeTodo({ id: 't1', reminderAt: now + 10_000 })
-    const t2 = makeTodo({ id: 't2', reminderAt: now + 3_000 })
-    const t3 = makeTodo({ id: 't3', reminderAt: now + 50_000 })
-    const store = makeStore({}, [t1, t2, t3])
-    const dispatch = vi.fn()
-    const { scheduler, timers } = createScheduler(store, now, dispatch)
-
-    scheduler.hydrate()
-    expect(timers).toHaveLength(1)
-    expect(timers[0].delay).toBeLessThanOrEqual(3_000)
-    scheduler.dispose()
-  })
-
-  it('includes per-repo todos', () => {
-    const todo = makeTodo({ id: 'repo-todo', repoId: 'repo-1', reminderAt: now + 5000 })
-    const store = makeStore({ 'repo-1': [todo] }, [])
-    const dispatch = vi.fn()
-    const { scheduler, timers } = createScheduler(store, now, dispatch)
-
-    scheduler.hydrate()
-    expect(timers).toHaveLength(1)
-    scheduler.dispose()
-  })
-
-  it('dispatches a notification when the timer fires', () => {
-    const todo = makeTodo({ id: 'fire-test', reminderAt: now + 5000, title: 'Do thing' })
-    const store = makeStore({}, [todo])
-    const dispatch = vi.fn()
-    const { scheduler, timers } = createScheduler(store, now, dispatch)
-
-    scheduler.hydrate()
-    fireTimer(timers)
+    expect(dispatch).not.toHaveBeenCalled()
+    vi.advanceTimersByTime(5000)
     expect(dispatch).toHaveBeenCalledTimes(1)
+    scheduler.dispose()
+  })
+
+  it('dispatches once when the clock reaches the current reminder due time', () => {
+    const todo = makeTodo({ id: 'fire-test', reminderAt: now + 5000, title: 'Do thing' })
+    const store = new MockStore({}, [todo])
+    const dispatch = vi.fn()
+    const scheduler = createScheduler(store, dispatch)
+
+    scheduler.hydrate()
+    vi.advanceTimersByTime(4999)
+    expect(dispatch).not.toHaveBeenCalled()
+
+    vi.advanceTimersByTime(1)
     expect(dispatch).toHaveBeenCalledWith(
       expect.objectContaining({
         source: 'todo-reminder',
@@ -176,151 +180,72 @@ describe('TodoReminderScheduler', () => {
         agentLastAssistantMessage: 'Do thing'
       })
     )
-    scheduler.dispose()
-  })
-
-  it('marks reminderDeliveredAt after firing to prevent duplicates', () => {
-    const todo = makeTodo({ id: 'dedup-test', reminderAt: now + 5000 })
-    const store = makeStore({}, [todo])
-    const dispatch = vi.fn()
-    const { scheduler, timers } = createScheduler(store, now, dispatch)
-
-    scheduler.hydrate()
-    fireTimer(timers)
     expect(store.saveGlobalTodo).toHaveBeenCalledWith(
       expect.objectContaining({
-        id: 'dedup-test',
-        reminderDeliveredAt: now
+        id: 'fire-test',
+        reminderDeliveredAt: now + 5000
       })
     )
+
+    vi.advanceTimersByTime(60_000)
+    expect(dispatch).toHaveBeenCalledTimes(1)
     scheduler.dispose()
   })
 
-  it('does not dispatch if todo was completed before timer fires', () => {
-    const todo = makeTodo({ id: 'done-test', reminderAt: now + 5000 })
-    const store = makeStore({}, [todo])
+  it('does not dispatch if the todo was completed before the timer fires', () => {
+    const todo = makeTodo({ reminderAt: now + 5000 })
+    const store = new MockStore({}, [todo])
     const dispatch = vi.fn()
-    const { scheduler, timers } = createScheduler(store, now, dispatch)
+    const scheduler = createScheduler(store, dispatch)
 
     scheduler.hydrate()
-    // Simulate the todo being completed before the timer fires
-    store.getGlobalTodos.mockReturnValue([{ ...todo, done: true, completedAt: now }])
-    fireTimer(timers)
+    store.setGlobalTodos([{ ...todo, done: true, completedAt: now }])
+    vi.advanceTimersByTime(5000)
+
     expect(dispatch).not.toHaveBeenCalled()
     scheduler.dispose()
   })
 
-  it('does not dispatch if todo was deleted before timer fires', () => {
-    const todo = makeTodo({ id: 'deleted-test', reminderAt: now + 5000 })
-    const store = makeStore({}, [todo])
+  it('does not dispatch if the todo was deleted before the timer fires', () => {
+    const store = new MockStore({}, [makeTodo({ reminderAt: now + 5000 })])
     const dispatch = vi.fn()
-    const { scheduler, timers } = createScheduler(store, now, dispatch)
+    const scheduler = createScheduler(store, dispatch)
 
     scheduler.hydrate()
-    store.getGlobalTodos.mockReturnValue([])
-    fireTimer(timers)
+    store.setGlobalTodos([])
+    vi.advanceTimersByTime(5000)
+
     expect(dispatch).not.toHaveBeenCalled()
     scheduler.dispose()
   })
 
-  it('does not dispatch if reminder was already delivered before timer fires', () => {
-    const todo = makeTodo({ id: 'already-delivered', reminderAt: now + 5000 })
-    const store = makeStore({}, [todo])
-    const dispatch = vi.fn()
-    const { scheduler, timers } = createScheduler(store, now, dispatch)
+  it('reschedules after reconcile and does not schedule after disposal', () => {
+    const todo = makeTodo({ reminderAt: now + 50_000 })
+    const store = new MockStore({}, [todo])
+    const scheduler = createScheduler(store, vi.fn())
 
     scheduler.hydrate()
-    store.getGlobalTodos.mockReturnValue([{ ...todo, reminderDeliveredAt: now + 5000 }])
-    fireTimer(timers)
-    expect(dispatch).not.toHaveBeenCalled()
-    scheduler.dispose()
-  })
-
-  it('reschedules after firing to pick up the next reminder', () => {
-    const t1 = makeTodo({ id: 't1', reminderAt: now + 5000 })
-    const t2 = makeTodo({ id: 't2', reminderAt: now + 15_000 })
-    const store = makeStore({}, [t1, t2])
-    const dispatch = vi.fn()
-    const { scheduler, timers, setTimeoutMock } = createScheduler(store, now, dispatch)
-
-    scheduler.hydrate()
-    expect(setTimeoutMock).toHaveBeenCalledTimes(1)
-    fireTimer(timers)
-    // After firing, reconcile should have scheduled the next timer
-    expect(setTimeoutMock).toHaveBeenCalledTimes(2)
-    scheduler.dispose()
-  })
-
-  it('cancels and reschedules on reconcile after mutation', () => {
-    const todo = makeTodo({ id: 'mutate-test', reminderAt: now + 50_000 })
-    const store = makeStore({}, [todo])
-    const dispatch = vi.fn()
-    const { scheduler, clearTimeoutMock, setTimeoutMock } = createScheduler(store, now, dispatch)
-
-    scheduler.hydrate()
-    expect(setTimeoutMock).toHaveBeenCalledTimes(1)
-
-    // Simulate a mutation that changes the reminder to sooner
-    store.getGlobalTodos.mockReturnValue([{ ...todo, reminderAt: now + 2_000 }])
+    store.setGlobalTodos([{ ...todo, reminderAt: now + 2000 }])
     scheduler.reconcile()
-    expect(clearTimeoutMock).toHaveBeenCalled()
-    expect(setTimeoutMock).toHaveBeenCalledTimes(2)
-    scheduler.dispose()
-  })
-
-  it('cancels timer on reconcile when no eligible reminders remain', () => {
-    const todo = makeTodo({ id: 'cancel-test', reminderAt: now + 5000 })
-    const store = makeStore({}, [todo])
-    const dispatch = vi.fn()
-    const { scheduler, clearTimeoutMock } = createScheduler(store, now, dispatch)
-
-    scheduler.hydrate()
-    // Simulate the todo being removed
-    store.getGlobalTodos.mockReturnValue([])
-    scheduler.reconcile()
-    expect(clearTimeoutMock).toHaveBeenCalled()
-    scheduler.dispose()
-  })
-
-  it('does not schedule after dispose', () => {
-    const todo = makeTodo({ id: 'disposed-test', reminderAt: now + 5000 })
-    const store = makeStore({}, [todo])
-    const dispatch = vi.fn()
-    const { scheduler, setTimeoutMock } = createScheduler(store, now, dispatch)
-
+    vi.advanceTimersByTime(2000)
     scheduler.dispose()
     scheduler.reconcile()
-    expect(setTimeoutMock).not.toHaveBeenCalled()
+
+    expect(vi.getTimerCount()).toBe(0)
   })
 
-  it('uses min delay of 1s even if reminder is in the past', () => {
-    const todo = makeTodo({ id: 'past-test', reminderAt: now - 1000 })
-    const store = makeStore({}, [todo])
-    const dispatch = vi.fn()
-    const { scheduler, timers } = createScheduler(store, now, dispatch)
+  it('marks delivered per-repo todos via saveTodo', () => {
+    const todo = makeTodo({ id: 'repo-deliver', repoId: 'repo-1', reminderAt: now + 5000 })
+    const store = new MockStore({ 'repo-1': [todo] })
+    const scheduler = createScheduler(store, vi.fn())
 
     scheduler.hydrate()
-    expect(timers).toHaveLength(1)
-    expect(timers[0].delay).toBeGreaterThanOrEqual(1000)
-    scheduler.dispose()
-  })
+    vi.advanceTimersByTime(5000)
 
-  it('marks delivered for per-repo todos via saveTodo', () => {
-    const todo = makeTodo({
-      id: 'repo-deliver',
-      repoId: 'repo-1',
-      reminderAt: now + 5000
-    })
-    const store = makeStore({ 'repo-1': [todo] }, [])
-    const dispatch = vi.fn()
-    const { scheduler, timers } = createScheduler(store, now, dispatch)
-
-    scheduler.hydrate()
-    fireTimer(timers)
     expect(store.saveTodo).toHaveBeenCalledWith(
       expect.objectContaining({
         id: 'repo-deliver',
-        reminderDeliveredAt: now
+        reminderDeliveredAt: now + 5000
       })
     )
     expect(store.saveGlobalTodo).not.toHaveBeenCalled()

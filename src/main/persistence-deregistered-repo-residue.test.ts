@@ -101,6 +101,71 @@ describe('deregistered repo residue', () => {
     expect(session.sleepingAgentSessionsByPaneKey ?? {}).toEqual({})
   })
 
+  it.each(['todosByRepo', 'todoListsByRepo'] as const)(
+    'cleans an unregistered repo with only a %s bucket on restart',
+    async (field) => {
+      const entry = {
+        id: 'task-or-list',
+        repoId: GONE_REPO,
+        title: 'Orphan',
+        done: false,
+        note: '',
+        createdAt: 1,
+        updatedAt: 1
+      }
+      writeDataFile({
+        schemaVersion: 1,
+        repos: [makeRepo({ id: LIVE_REPO, path: '/workspace/live' })],
+        worktreeMeta: {},
+        [field]: { [GONE_REPO]: [entry], [LIVE_REPO]: [{ ...entry, repoId: LIVE_REPO }] }
+      })
+
+      const store = await createStore()
+      store.flush()
+      expect(readDataFile()).toEqual(
+        expect.objectContaining({
+          todosByRepo: expect.not.objectContaining({ [GONE_REPO]: expect.anything() }),
+          todoListsByRepo: expect.not.objectContaining({ [GONE_REPO]: expect.anything() }),
+          [field]: expect.objectContaining({ [LIVE_REPO]: expect.any(Array) })
+        })
+      )
+      const reloaded = await createStore()
+      expect(reloaded.sweepDeregisteredRepoResidue()).toEqual([])
+    }
+  )
+
+  it('retains Todo buckets belonging to a paired host absent from the local catalog', async () => {
+    writeDataFile({
+      schemaVersion: 1,
+      repos: [],
+      worktreeMeta: {},
+      todosByRepo: {
+        [GONE_REPO]: [
+          {
+            id: 'task',
+            repoId: GONE_REPO,
+            title: 'Remote',
+            done: false,
+            createdAt: 1,
+            updatedAt: 1
+          }
+        ]
+      },
+      todoListsByRepo: {
+        [GONE_REPO]: [
+          { id: 'list', repoId: GONE_REPO, title: 'Remote list', createdAt: 1, updatedAt: 1 }
+        ]
+      },
+      workspaceSessionsByHostId: { [RUNTIME_HOST]: sessionFor(GONE_WORKTREE) }
+    })
+    const store = await createStore()
+    expect(store.getTodos(GONE_REPO)).toEqual([expect.objectContaining({ id: 'task' })])
+    expect(store.getTodoLists(GONE_REPO)).toEqual(
+      expect.arrayContaining([expect.objectContaining({ id: 'list' })])
+    )
+    expect(store.sweepDeregisteredRepoResidue()).toEqual([])
+  })
+
   it('keeps a remote session whose repo is not registered on the desktop', async () => {
     writeDataFile({
       schemaVersion: 1,

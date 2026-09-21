@@ -84,4 +84,14 @@ describe('TodoNavigation', () => {
     fireEvent.keyDown(input, { key: 'Enter' })
     expect(onCreateList).toHaveBeenCalledWith('New Project')
   })
+
+  it('requires a second click to delete a list', () => {
+    const onDeleteList = vi.fn()
+    render(<TodoNavigation {...defaultProps} onDeleteList={onDeleteList} />)
+    const deleteButton = screen.getAllByLabelText('Delete list')[0]
+    fireEvent.click(deleteButton)
+    expect(onDeleteList).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByLabelText('Confirm delete'))
+    expect(onDeleteList).toHaveBeenCalledWith('list-1')
+  })
 })

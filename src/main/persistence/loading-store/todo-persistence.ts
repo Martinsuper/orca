@@ -1,14 +1,18 @@
 import type { Todo, TodoList } from '../../../shared/types'
 import type { PersistedState } from '../../../shared/persisted-state-types'
-import type { StoreRuntimeState } from './store-runtime-state'
 import type { WriteSchedulingOperations } from './write-scheduling'
 import { scheduleSave } from './write-scheduling'
 import { DEFAULT_TODO_LIST_ID, makeDefaultTodoList } from './todo-normalization'
 
 const todoPersistenceContext = Symbol('TodoPersistence')
+type TodoState = Pick<
+  PersistedState,
+  'todosByRepo' | 'todoListsByRepo' | 'globalTodos' | 'globalTodoLists'
+>
+
 type TodoPersistenceContext = {
-  runtime: Pick<StoreRuntimeState, 'state'>
-  scheduling: WriteSchedulingOperations
+  runtime: { state: TodoState }
+  scheduling?: WriteSchedulingOperations
 }
 
 function sortTodos(todos: readonly Todo[]): Todo[] {
@@ -27,7 +31,7 @@ function sortLists(lists: readonly TodoList[]): TodoList[] {
   })
 }
 
-function ensureLists(state: PersistedState, repoId: string): TodoList[] {
+function ensureLists(state: TodoState, repoId: string): TodoList[] {
   if (!state.todoListsByRepo) {
     state.todoListsByRepo = {}
   }
@@ -49,7 +53,7 @@ function ensureLists(state: PersistedState, repoId: string): TodoList[] {
 export class TodoPersistence {
   readonly [todoPersistenceContext]: TodoPersistenceContext
 
-  constructor(runtime: Pick<StoreRuntimeState, 'state'>, scheduling: WriteSchedulingOperations) {
+  constructor(runtime: { state: TodoState }, scheduling?: WriteSchedulingOperations) {
     this[todoPersistenceContext] = { runtime, scheduling }
   }
 
@@ -65,7 +69,9 @@ export class TodoPersistence {
     const index = existing.findIndex((entry) => entry.id === todo.id)
     runtime.state.todosByRepo[todo.repoId] =
       index === -1 ? [...existing, todo] : existing.map((entry, i) => (i === index ? todo : entry))
-    scheduleSave(scheduling)
+    if (scheduling) {
+      scheduleSave(scheduling)
+    }
     return todo
   }
 
@@ -74,7 +80,9 @@ export class TodoPersistence {
     runtime.state.todosByRepo[repoId] = (runtime.state.todosByRepo[repoId] ?? []).filter(
       (entry) => entry.id !== todoId
     )
-    scheduleSave(scheduling)
+    if (scheduling) {
+      scheduleSave(scheduling)
+    }
   }
 
   toggleTodo(repoId: string, todoId: string, done: boolean): Todo | null {
@@ -88,6 +96,8 @@ export class TodoPersistence {
           ...entry,
           done,
           completedAt: done ? now : undefined,
+          reminderAt: done ? undefined : entry.reminderAt,
+          reminderDeliveredAt: done ? undefined : entry.reminderDeliveredAt,
           updatedAt: now
         }
         return updated
@@ -95,7 +105,9 @@ export class TodoPersistence {
       return entry
     })
     if (updated) {
-      scheduleSave(scheduling)
+      if (scheduling) {
+        scheduleSave(scheduling)
+      }
     }
     return updated
   }
@@ -112,7 +124,9 @@ export class TodoPersistence {
     const index = existing.findIndex((entry) => entry.id === todo.id)
     runtime.state.globalTodos =
       index === -1 ? [...existing, todo] : existing.map((entry, i) => (i === index ? todo : entry))
-    scheduleSave(scheduling)
+    if (scheduling) {
+      scheduleSave(scheduling)
+    }
     return todo
   }
 
@@ -121,7 +135,9 @@ export class TodoPersistence {
     runtime.state.globalTodos = (runtime.state.globalTodos ?? []).filter(
       (entry) => entry.id !== todoId
     )
-    scheduleSave(scheduling)
+    if (scheduling) {
+      scheduleSave(scheduling)
+    }
   }
 
   toggleGlobalTodo(todoId: string, done: boolean): Todo | null {
@@ -135,6 +151,8 @@ export class TodoPersistence {
           ...entry,
           done,
           completedAt: done ? now : undefined,
+          reminderAt: done ? undefined : entry.reminderAt,
+          reminderDeliveredAt: done ? undefined : entry.reminderDeliveredAt,
           updatedAt: now
         }
         return updated
@@ -142,7 +160,9 @@ export class TodoPersistence {
       return entry
     })
     if (updated) {
-      scheduleSave(scheduling)
+      if (scheduling) {
+        scheduleSave(scheduling)
+      }
     }
     return updated
   }
@@ -166,7 +186,9 @@ export class TodoPersistence {
     } else {
       state.todoListsByRepo![list.repoId] = updated
     }
-    scheduleSave(scheduling)
+    if (scheduling) {
+      scheduleSave(scheduling)
+    }
     return list
   }
 
@@ -177,12 +199,24 @@ export class TodoPersistence {
     }
     const state = runtime.state
     const lists = ensureLists(state, repoId)
-    state.todoListsByRepo![repoId] = lists.filter((entry) => entry.id !== listId)
-    const remainingTodos = (state.todosByRepo[repoId] ?? []).map((todo) =>
+    const remainingLists = lists.filter((entry) => entry.id !== listId)
+    if (repoId === '') {
+      state.globalTodoLists = remainingLists
+    } else {
+      state.todoListsByRepo![repoId] = remainingLists
+    }
+    const todos = repoId === '' ? (state.globalTodos ?? []) : (state.todosByRepo[repoId] ?? [])
+    const remainingTodos = todos.map((todo) =>
       todo.listId === listId ? { ...todo, listId: DEFAULT_TODO_LIST_ID } : todo
     )
-    state.todosByRepo[repoId] = remainingTodos
-    scheduleSave(scheduling)
+    if (repoId === '') {
+      state.globalTodos = remainingTodos
+    } else {
+      state.todosByRepo[repoId] = remainingTodos
+    }
+    if (scheduling) {
+      scheduleSave(scheduling)
+    }
   }
 
   // ── Global todo lists ────────────────────────────────────────
@@ -199,7 +233,9 @@ export class TodoPersistence {
     const index = existing.findIndex((entry) => entry.id === list.id)
     state.globalTodoLists =
       index === -1 ? [...existing, list] : existing.map((entry, i) => (i === index ? list : entry))
-    scheduleSave(scheduling)
+    if (scheduling) {
+      scheduleSave(scheduling)
+    }
     return list
   }
 
@@ -214,7 +250,9 @@ export class TodoPersistence {
       todo.listId === listId ? { ...todo, listId: DEFAULT_TODO_LIST_ID } : todo
     )
     state.globalTodos = remainingTodos
-    scheduleSave(scheduling)
+    if (scheduling) {
+      scheduleSave(scheduling)
+    }
   }
 
   // ── Repo lifecycle cleanup ──────────────────────────────────
@@ -226,7 +264,9 @@ export class TodoPersistence {
     if (state.todoListsByRepo) {
       delete state.todoListsByRepo[repoId]
     }
-    scheduleSave(scheduling)
+    if (scheduling) {
+      scheduleSave(scheduling)
+    }
   }
 }
 

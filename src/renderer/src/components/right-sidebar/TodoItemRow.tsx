@@ -10,9 +10,9 @@ type TodoItemRowProps = {
   lists: TodoList[]
   canChangeList: boolean
   projectLabel?: string
-  onToggle: (todoId: string, done: boolean) => void
-  onEdit: (todoId: string, result: TodoEditDialogResult) => void
-  onRemove: (todoId: string) => void
+  onToggle: (todo: Todo, done: boolean) => void
+  onEdit: (todo: Todo, result: TodoEditDialogResult) => void
+  onRemove: (todo: Todo) => void
 }
 
 function isOverdue(dueDate: string | undefined, done: boolean): boolean {
@@ -44,7 +44,7 @@ export function TodoItemRow({
 
   const handleRemove = () => {
     if (armed) {
-      onRemove(todo.id)
+      onRemove(todo)
     } else {
       setArmed(true)
       setTimeout(() => setArmed(false), 3000)
@@ -56,7 +56,7 @@ export function TodoItemRow({
       <div className="group flex items-start gap-2 px-2 py-1.5 hover:bg-muted/50">
         <button
           className="mt-0.5 shrink-0"
-          onClick={() => onToggle(todo.id, !todo.done)}
+          onClick={() => onToggle(todo, !todo.done)}
           aria-label={
             todo.done
               ? translate(
@@ -169,7 +169,7 @@ export function TodoItemRow({
         canChangeList={canChangeList}
         onClose={() => setEditOpen(false)}
         onSave={(result) => {
-          onEdit(todo.id, result)
+          onEdit(todo, result)
           setEditOpen(false)
         }}
       />

@@ -9,9 +9,9 @@ type SaveTodoArgs = {
   title: string
   note?: string
   important?: boolean
-  dueDate?: string
-  reminderAt?: number
-  myDayDate?: string
+  dueDate?: string | null
+  reminderAt?: number | null
+  myDayDate?: string | null
   steps?: TodoStep[]
 }
 
@@ -45,9 +45,9 @@ export const todosApi = {
     title: string
     note?: string
     important?: boolean
-    dueDate?: string
-    reminderAt?: number
-    myDayDate?: string
+    dueDate?: string | null
+    reminderAt?: number | null
+    myDayDate?: string | null
     steps?: TodoStep[]
   }) => ipcRenderer.invoke('todos:saveGlobal', args) as Promise<Todo>,
   removeGlobal: (args: { todoId: string }) =>

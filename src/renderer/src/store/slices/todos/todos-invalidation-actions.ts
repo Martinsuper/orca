@@ -6,6 +6,7 @@ export function createTodosInvalidationActions(
 ): Pick<
   TodosSlice,
   | 'setTodoScope'
+  | 'setTodoNavigation'
   | 'invalidateTodos'
   | 'invalidateGlobalTodos'
   | 'invalidateTodoLists'
@@ -16,61 +17,41 @@ export function createTodosInvalidationActions(
       set({ todoScope: scope })
     },
 
+    setTodoNavigation: (scopeKey, target) => {
+      set((s) => ({
+        todoNavigationByScope: { ...s.todoNavigationByScope, [scopeKey]: target }
+      }))
+    },
+
     invalidateTodos: (repoId) => {
-      set((s) => {
-        if (s.todosByRepo[repoId] === undefined) {
-          return {}
-        }
-        const todosByRepo = { ...s.todosByRepo }
-        delete todosByRepo[repoId]
-        const loadingByRepo = { ...s.todosLoadingByRepo }
-        delete loadingByRepo[repoId]
-        const statusByRepo = { ...s.todosLoadStatusByRepo }
-        delete statusByRepo[repoId]
-        return {
-          todosByRepo,
-          todosLoadingByRepo: loadingByRepo,
-          todosLoadStatusByRepo: statusByRepo
-        }
-      })
-      get().fetchTodos(repoId)
+      const state = get()
+      if (state.todosByRepo[repoId] !== undefined || state.todosLoadingByRepo[repoId] === true) {
+        void get().fetchTodos(repoId, { force: true })
+      }
     },
 
     invalidateGlobalTodos: () => {
-      if (get().globalTodos === undefined) {
-        return
+      const state = get()
+      if (state.globalTodos !== undefined || state.globalTodosLoading) {
+        void get().fetchGlobalTodos({ force: true })
       }
-      set(() => ({
-        globalTodos: undefined,
-        globalTodosLoading: false,
-        globalTodosLoadStatus: 'idle'
-      }))
-      get().fetchGlobalTodos()
     },
 
     invalidateTodoLists: (repoId) => {
-      set((s) => {
-        if (s.todoListsByRepo[repoId] === undefined) {
-          return {}
-        }
-        const todoListsByRepo = { ...s.todoListsByRepo }
-        delete todoListsByRepo[repoId]
-        const loadingByRepo = { ...s.todoListsLoadingByRepo }
-        delete loadingByRepo[repoId]
-        return { todoListsByRepo, todoListsLoadingByRepo: loadingByRepo }
-      })
-      get().fetchTodoLists(repoId)
+      const state = get()
+      if (
+        state.todoListsByRepo[repoId] !== undefined ||
+        state.todoListsLoadingByRepo[repoId] === true
+      ) {
+        void get().fetchTodoLists(repoId, { force: true })
+      }
     },
 
     invalidateGlobalTodoLists: () => {
-      if (get().globalTodoLists === undefined) {
-        return
+      const state = get()
+      if (state.globalTodoLists !== undefined || state.globalTodoListsLoading) {
+        void get().fetchGlobalTodoLists({ force: true })
       }
-      set(() => ({
-        globalTodoLists: undefined,
-        globalTodoListsLoading: false
-      }))
-      get().fetchGlobalTodoLists()
     }
   }
 }

@@ -4,6 +4,10 @@ import type { Todo, TodoList, TodoStep } from '../../../../../shared/types'
 
 export type TodosLoadStatus = 'idle' | 'loading' | 'loaded' | 'error'
 
+export type TodoNavigationTarget =
+  | { kind: 'smart-view'; view: 'my-day' | 'important' | 'planned' | 'all' | 'completed' }
+  | { kind: 'list'; listId: string }
+
 export type TodoSaveArgs = {
   repoId: string
   id?: string
@@ -11,9 +15,9 @@ export type TodoSaveArgs = {
   title: string
   note?: string
   important?: boolean
-  dueDate?: string
-  reminderAt?: number
-  myDayDate?: string
+  dueDate?: string | null
+  reminderAt?: number | null
+  myDayDate?: string | null
   steps?: TodoStep[]
 }
 
@@ -22,30 +26,36 @@ type TodosSliceState = {
   todosLoadingByRepo: Record<string, boolean>
   todosLoadStatusByRepo: Record<string, TodosLoadStatus>
   todosErrorByRepo: Record<string, string | undefined>
+  todosRequestGenerationByRepo: Record<string, number>
   todoListsByRepo: Record<string, TodoList[]>
   todoListsLoadingByRepo: Record<string, boolean>
+  todoListsRequestGenerationByRepo: Record<string, number>
   globalTodos: Todo[] | undefined
   globalTodosLoading: boolean
   globalTodosLoadStatus: TodosLoadStatus
   globalTodosError: string | undefined
+  globalTodosRequestGeneration: number
   globalTodoLists: TodoList[] | undefined
   globalTodoListsLoading: boolean
+  globalTodoListsRequestGeneration: number
   todoScope: 'project' | 'global'
-  fetchTodos: (repoId: string) => Promise<void>
+  todoNavigationByScope: Record<string, TodoNavigationTarget>
+  fetchTodos: (repoId: string, options?: { force?: boolean }) => Promise<void>
   saveTodo: (args: TodoSaveArgs) => Promise<Todo | null>
   removeTodo: (args: { repoId: string; todoId: string }) => Promise<void>
   toggleTodo: (args: { repoId: string; todoId: string; done: boolean }) => Promise<void>
-  fetchTodoLists: (repoId: string) => Promise<void>
+  fetchTodoLists: (repoId: string, options?: { force?: boolean }) => Promise<void>
   saveTodoList: (args: { repoId: string; id?: string; title: string }) => Promise<TodoList | null>
   removeTodoList: (args: { repoId: string; listId: string }) => Promise<void>
-  fetchGlobalTodos: () => Promise<void>
+  fetchGlobalTodos: (options?: { force?: boolean }) => Promise<void>
   saveGlobalTodo: (args: Omit<TodoSaveArgs, 'repoId'>) => Promise<Todo | null>
   removeGlobalTodo: (args: { todoId: string }) => Promise<void>
   toggleGlobalTodo: (args: { todoId: string; done: boolean }) => Promise<void>
-  fetchGlobalTodoLists: () => Promise<void>
+  fetchGlobalTodoLists: (options?: { force?: boolean }) => Promise<void>
   saveGlobalTodoList: (args: { id?: string; title: string }) => Promise<TodoList | null>
   removeGlobalTodoList: (args: { listId: string }) => Promise<void>
   setTodoScope: (scope: 'project' | 'global') => void
+  setTodoNavigation: (scopeKey: string, target: TodoNavigationTarget) => void
   invalidateTodos: (repoId: string) => void
   invalidateGlobalTodos: () => void
   invalidateTodoLists: (repoId: string) => void

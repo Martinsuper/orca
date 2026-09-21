@@ -1,16 +1,22 @@
 import { powerMonitor } from 'electron'
 import type { Todo } from '../../../shared/types'
 import type { NotificationDispatchRequest } from '../../../shared/notification-settings-types'
-import type { Store } from './store'
-
 const SCHEDULER_LOG_PREFIX = '[todo-reminder-scheduler]'
 const MAX_TIMER_DELAY_MS = 2 ** 31 - 1
 const MIN_DELAY_MS = 1000
 
 export type ReminderDispatchFn = (request: NotificationDispatchRequest) => void
 
+export type TodoReminderStore = {
+  getRepos: () => readonly { id: string }[]
+  getTodos: (repoId: string) => Todo[]
+  getGlobalTodos: () => Todo[]
+  saveTodo: (todo: Todo) => Todo
+  saveGlobalTodo: (todo: Todo) => Todo
+}
+
 type SchedulerDeps = {
-  store: Store
+  store: TodoReminderStore
   dispatch: ReminderDispatchFn
   now?: () => number
   setTimeout?: typeof setTimeout
@@ -28,7 +34,7 @@ function defaultNow(): number {
   return Date.now()
 }
 
-function collectAllTodos(store: Store): Todo[] {
+function collectAllTodos(store: TodoReminderStore): Todo[] {
   const todos: Todo[] = []
   for (const repo of store.getRepos()) {
     todos.push(...store.getTodos(repo.id))
@@ -38,13 +44,21 @@ function collectAllTodos(store: Store): Todo[] {
 }
 
 function isReminderEligible(todo: Todo): boolean {
-  if (todo.done) {
+  const reminderAt = todo.reminderAt
+  const reminderDeliveredAt = todo.reminderDeliveredAt
+  if (
+    todo.done ||
+    typeof reminderAt !== 'number' ||
+    !Number.isFinite(reminderAt) ||
+    reminderAt <= 0
+  ) {
     return false
   }
-  if (!todo.reminderAt || todo.reminderAt <= 0) {
-    return false
-  }
-  if (todo.reminderDeliveredAt && todo.reminderDeliveredAt >= todo.reminderAt) {
+  if (
+    typeof reminderDeliveredAt === 'number' &&
+    Number.isFinite(reminderDeliveredAt) &&
+    reminderDeliveredAt >= reminderAt
+  ) {
     return false
   }
   return true
@@ -53,11 +67,12 @@ function isReminderEligible(todo: Todo): boolean {
 function findNextReminder(todos: readonly Todo[]): ScheduledReminder | null {
   let next: ScheduledReminder | null = null
   for (const todo of todos) {
-    if (!isReminderEligible(todo)) {
+    const reminderAt = todo.reminderAt
+    if (!isReminderEligible(todo) || typeof reminderAt !== 'number') {
       continue
     }
-    if (!next || todo.reminderAt! < next.fireAt) {
-      next = { todo, fireAt: todo.reminderAt! }
+    if (!next || reminderAt < next.fireAt) {
+      next = { todo, fireAt: reminderAt }
     }
   }
   return next
@@ -128,11 +143,13 @@ export class TodoReminderScheduler {
     }
     const now = this.deps.now()
     const current = this.findTodoById(todo.id, todo.repoId)
-    if (!current || current.done) {
-      this.reconcile()
-      return
-    }
-    if (current.reminderDeliveredAt && current.reminderDeliveredAt >= current.reminderAt!) {
+    const reminderAt = current?.reminderAt
+    if (
+      !current ||
+      !isReminderEligible(current) ||
+      typeof reminderAt !== 'number' ||
+      now < reminderAt
+    ) {
       this.reconcile()
       return
     }

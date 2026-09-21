@@ -1,18 +1,22 @@
 import { describe, expect, it } from 'vitest'
-import type { AppState } from '../types'
 import type { Todo, TodoList } from '../../../../shared/types'
 import { omitTodosForRepos } from './todos-repo-pruning'
 
-function makeState(overrides: Partial<AppState>): AppState {
+type TodosState = Parameters<typeof omitTodosForRepos>[0]
+
+function makeState(overrides: Partial<TodosState>): TodosState {
   return {
     todosByRepo: {},
     todosLoadingByRepo: {},
     todosLoadStatusByRepo: {},
     todosErrorByRepo: {},
+    todosRequestGenerationByRepo: {},
     todoListsByRepo: {},
     todoListsLoadingByRepo: {},
+    todoListsRequestGenerationByRepo: {},
+    todoNavigationByScope: {},
     ...overrides
-  } as unknown as AppState
+  }
 }
 
 function makeTodo(id: string, repoId: string): Todo {
@@ -76,6 +80,27 @@ describe('omitTodosForRepos', () => {
     const result = omitTodosForRepos(state, ['repo-1'])
     expect(result.todoListsByRepo).toEqual({ 'repo-2': [makeList('l2', 'repo-2')] })
     expect(result.todoListsLoadingByRepo).toEqual({ 'repo-2': false })
+  })
+
+  it('removes request generations and project navigation for removed repos', () => {
+    const state = makeState({
+      todosRequestGenerationByRepo: { 'repo-1': 3, 'repo-2': 1 },
+      todoListsRequestGenerationByRepo: { 'repo-1': 2, 'repo-2': 1 },
+      todoNavigationByScope: {
+        'project:repo-1': { kind: 'list', listId: 'list-1' },
+        'project:repo-2': { kind: 'smart-view', view: 'all' },
+        global: { kind: 'smart-view', view: 'all' }
+      }
+    })
+
+    const result = omitTodosForRepos(state, ['repo-1'])
+
+    expect(result.todosRequestGenerationByRepo).toEqual({ 'repo-1': 4, 'repo-2': 1 })
+    expect(result.todoListsRequestGenerationByRepo).toEqual({ 'repo-1': 3, 'repo-2': 1 })
+    expect(result.todoNavigationByScope).toEqual({
+      'project:repo-2': { kind: 'smart-view', view: 'all' },
+      global: { kind: 'smart-view', view: 'all' }
+    })
   })
 
   it('does not mutate the original state', () => {

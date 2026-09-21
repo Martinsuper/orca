@@ -76,7 +76,11 @@ export function createNotificationDeliveryService(
       const notificationOptions = buildNotificationOptions(request)
 
       // Why: desktop focus only means this computer sees the worktree; the paired phone may still need the alert.
-      if (deps.dispatchMobileNotification && request.source !== 'test') {
+      if (
+        deps.dispatchMobileNotification &&
+        request.source !== 'test' &&
+        request.source !== 'todo-reminder'
+      ) {
         if (
           reserveNotificationCooldown(
             recentMobileNotifications,
@@ -120,7 +124,7 @@ export function createNotificationDeliveryService(
       }
 
       // Why: the Settings test button is an explicit, often-repeated user action, so it bypasses burst dedupe.
-      if (request.source !== 'test') {
+      if (request.source !== 'test' && request.source !== 'todo-reminder') {
         // Dedupe by worktree, not source — agent-finish and terminal-bell often fire in one chunk; surface only the first.
         if (
           !reserveNotificationCooldown(

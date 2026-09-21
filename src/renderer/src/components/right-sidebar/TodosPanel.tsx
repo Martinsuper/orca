@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo } from 'react'
 import { Loader2 } from 'lucide-react'
-import type { Todo } from '../../../../shared/types'
+import type { Todo, TodoList } from '../../../../shared/types'
 import { useAppStore } from '@/store'
 import { useActiveRepo } from '@/store/selectors'
 import { translate } from '@/i18n/i18n'
@@ -12,6 +12,7 @@ import { getMyDayTodos, type TodoSaveArgs } from '@/store/slices/todos'
 import { filterByList, filterBySmartView } from './todo-view-filters'
 import { smartViewTitle, type TodoNavItem } from './todo-nav-types'
 import type { TodoEditDialogResult } from './TodoEditDialog'
+import { useTodoLocalDate } from './use-todo-local-date'
 
 const SCOPE_TABS = [
   {
@@ -26,14 +27,6 @@ const SCOPE_TABS = [
   }
 ]
 
-function todayLocalDate(): string {
-  const d = new Date()
-  const yyyy = d.getFullYear()
-  const mm = String(d.getMonth() + 1).padStart(2, '0')
-  const dd = String(d.getDate()).padStart(2, '0')
-  return `${yyyy}-${mm}-${dd}`
-}
-
 function getActiveRepoName(
   state: ReturnType<typeof useAppStore.getState>,
   repoId: string | null
@@ -45,12 +38,23 @@ function getActiveRepoName(
   return repo?.displayName
 }
 
+function getTodoListsForOwner(
+  todo: Todo,
+  todoListsByRepo: Record<string, TodoList[]>,
+  globalTodoLists: TodoList[] | undefined
+): TodoList[] {
+  return todo.repoId ? (todoListsByRepo[todo.repoId] ?? []) : (globalTodoLists ?? [])
+}
+
 export default function TodosPanel(): React.JSX.Element {
   const repo = useActiveRepo()
   const repoId = repo?.id ?? null
+  const localDate = useTodoLocalDate()
 
   const scope = useAppStore((s) => s.todoScope)
   const setTodoScope = useAppStore((s) => s.setTodoScope)
+  const todoNavigationByScope = useAppStore((s) => s.todoNavigationByScope)
+  const setTodoNavigation = useAppStore((s) => s.setTodoNavigation)
 
   const todosByRepo = useAppStore((s) => s.todosByRepo)
   const todosLoadStatus = useAppStore((s) => (repoId ? s.todosLoadStatusByRepo[repoId] : undefined))
@@ -61,6 +65,9 @@ export default function TodosPanel(): React.JSX.Element {
   const toggleTodo = useAppStore((s) => s.toggleTodo)
 
   const todoListsByRepo = useAppStore((s) => s.todoListsByRepo)
+  const todoListsLoading = useAppStore((s) =>
+    repoId ? (s.todoListsLoadingByRepo[repoId] ?? false) : false
+  )
   const fetchTodoLists = useAppStore((s) => s.fetchTodoLists)
   const saveTodoList = useAppStore((s) => s.saveTodoList)
   const removeTodoList = useAppStore((s) => s.removeTodoList)
@@ -74,75 +81,75 @@ export default function TodosPanel(): React.JSX.Element {
   const toggleGlobalTodo = useAppStore((s) => s.toggleGlobalTodo)
 
   const globalTodoLists = useAppStore((s) => s.globalTodoLists)
+  const globalTodoListsLoading = useAppStore((s) => s.globalTodoListsLoading)
   const fetchGlobalTodoLists = useAppStore((s) => s.fetchGlobalTodoLists)
   const saveGlobalTodoList = useAppStore((s) => s.saveGlobalTodoList)
   const removeGlobalTodoList = useAppStore((s) => s.removeGlobalTodoList)
 
-  const invalidateGlobalTodos = useAppStore((s) => s.invalidateGlobalTodos)
-
   const isProjectScope = scope === 'project'
   const hasRepo = repoId !== null
   const effectiveRepoId = isProjectScope ? repoId : null
-
-  const [activeNav, setActiveNav] = useState<TodoNavItem | undefined>({
-    kind: 'smart-view',
-    view: 'all'
-  })
-
+  const scopeKey = isProjectScope ? (repoId ? `project:${repoId}` : 'project:no-repo') : 'global'
+  const activeNav: TodoNavItem | undefined = todoNavigationByScope[scopeKey]
   const repoName = useAppStore((s) => getActiveRepoName(s, repoId))
 
   useEffect(() => {
-    // Load primary scope + always load opposite scope for My Day aggregation
-    if (isProjectScope && hasRepo && repoId) {
+    if (repoId) {
       fetchTodos(repoId)
       fetchTodoLists(repoId)
-      fetchGlobalTodos()
-      fetchGlobalTodoLists()
-    } else if (!isProjectScope) {
-      fetchGlobalTodos()
-      fetchGlobalTodoLists()
-      if (hasRepo && repoId) {
-        fetchTodos(repoId)
-        fetchTodoLists(repoId)
-      }
     }
-  }, [
-    isProjectScope,
-    hasRepo,
-    repoId,
-    fetchTodos,
-    fetchTodoLists,
-    fetchGlobalTodos,
-    fetchGlobalTodoLists
-  ])
+    fetchGlobalTodos()
+    fetchGlobalTodoLists()
+  }, [repoId, fetchTodos, fetchTodoLists, fetchGlobalTodos, fetchGlobalTodoLists])
 
-  const activeTodos = effectiveRepoId ? (todosByRepo[effectiveRepoId] ?? undefined) : globalTodos
-  const activeLists = useMemo(
-    () => (effectiveRepoId ? (todoListsByRepo[effectiveRepoId] ?? []) : (globalTodoLists ?? [])),
-    [effectiveRepoId, todoListsByRepo, globalTodoLists]
-  )
-
-  const loadStatus = effectiveRepoId ? todosLoadStatus : globalTodosLoadStatus
-  const error = effectiveRepoId ? todosError : globalTodosError
-
+  const activeTodos = isProjectScope
+    ? effectiveRepoId
+      ? todosByRepo[effectiveRepoId]
+      : undefined
+    : globalTodos
+  const loadedLists = isProjectScope
+    ? effectiveRepoId
+      ? todoListsByRepo[effectiveRepoId]
+      : undefined
+    : globalTodoLists
+  const activeLists = useMemo(() => loadedLists ?? [], [loadedLists])
+  const listsLoading = isProjectScope
+    ? effectiveRepoId
+      ? todoListsLoading
+      : false
+    : globalTodoListsLoading
+  const loadStatus = isProjectScope
+    ? effectiveRepoId
+      ? todosLoadStatus
+      : undefined
+    : globalTodosLoadStatus
+  const error = isProjectScope ? (effectiveRepoId ? todosError : undefined) : globalTodosError
   const isLoading = loadStatus === 'loading'
-  const isLoaded = loadStatus === 'loaded'
+
+  useEffect(() => {
+    if (
+      loadedLists !== undefined &&
+      !listsLoading &&
+      activeNav?.kind === 'list' &&
+      !loadedLists.some((list) => list.id === activeNav.listId)
+    ) {
+      setTodoNavigation(scopeKey, { kind: 'smart-view', view: 'all' })
+    }
+  }, [activeNav, listsLoading, loadedLists, scopeKey, setTodoNavigation])
 
   const isMyDayView = activeNav?.kind === 'smart-view' && activeNav.view === 'my-day'
   const isCompletedView = activeNav?.kind === 'smart-view' && activeNav.view === 'completed'
 
-  // For My Day: aggregate global + current project todos
   const myDayTodos = useMemo(() => {
     if (!isMyDayView) {
       return []
     }
-    const today = todayLocalDate()
     const repoTodosMap: Record<string, Todo[]> = {}
     if (repoId && todosByRepo[repoId]) {
-      repoTodosMap[repoId] = todosByRepo[repoId]!
+      repoTodosMap[repoId] = todosByRepo[repoId]
     }
-    return getMyDayTodos(repoTodosMap, globalTodos, today)
-  }, [isMyDayView, repoId, todosByRepo, globalTodos])
+    return getMyDayTodos(repoTodosMap, globalTodos, localDate)
+  }, [globalTodos, isMyDayView, localDate, repoId, todosByRepo])
 
   const visibleTodos = useMemo(() => {
     if (isMyDayView) {
@@ -166,46 +173,42 @@ export default function TodosPanel(): React.JSX.Element {
           return filtered.completed
       }
     }
-    if (activeNav.kind === 'list') {
-      return filterByList(source, activeNav.listId)
-    }
-    return []
+    return filterByList(source, activeNav.listId)
   }, [activeNav, activeTodos, isMyDayView, myDayTodos])
 
-  const isEmpty = isLoaded && visibleTodos.length === 0 && !isMyDayView
-  const myDayEmpty = isMyDayView && myDayTodos.length === 0
+  const isEmpty = activeTodos !== undefined && visibleTodos.length === 0 && !isMyDayView
+  const myDayDataReady = globalTodos !== undefined && (!repoId || todosByRepo[repoId] !== undefined)
+  const myDayEmpty = isMyDayView && myDayDataReady && myDayTodos.length === 0
 
-  const handleAdd = async (title: string) => {
+  const handleAdd = (title: string) => {
     const targetListId = activeNav?.kind === 'list' ? activeNav.listId : activeLists[0]?.id
     if (effectiveRepoId) {
       void saveTodo({ repoId: effectiveRepoId, title, listId: targetListId })
-    } else {
+    } else if (!isProjectScope) {
       const args: Omit<TodoSaveArgs, 'repoId'> = { title, listId: targetListId }
-      await saveGlobalTodo(args)
-      invalidateGlobalTodos()
+      void saveGlobalTodo(args)
     }
   }
 
-  const handleToggle = (todoId: string, done: boolean) => {
-    if (effectiveRepoId) {
-      void toggleTodo({ repoId: effectiveRepoId, todoId, done })
+  const handleToggle = (todo: Todo, done: boolean) => {
+    if (todo.repoId) {
+      void toggleTodo({ repoId: todo.repoId, todoId: todo.id, done })
     } else {
-      void toggleGlobalTodo({ todoId, done })
+      void toggleGlobalTodo({ todoId: todo.id, done })
     }
   }
 
-  const handleRemove = (todoId: string) => {
-    if (effectiveRepoId) {
-      void removeTodo({ repoId: effectiveRepoId, todoId })
+  const handleRemove = (todo: Todo) => {
+    if (todo.repoId) {
+      void removeTodo({ repoId: todo.repoId, todoId: todo.id })
     } else {
-      void removeGlobalTodo({ todoId })
+      void removeGlobalTodo({ todoId: todo.id })
     }
   }
 
-  const handleEdit = async (todoId: string, result: TodoEditDialogResult) => {
-    const editRepoId = effectiveRepoId ?? ''
+  const handleEdit = (todo: Todo, result: TodoEditDialogResult) => {
     const args = {
-      id: todoId,
+      id: todo.id,
       title: result.title,
       note: result.note,
       listId: result.listId,
@@ -215,18 +218,17 @@ export default function TodosPanel(): React.JSX.Element {
       myDayDate: result.myDayDate,
       steps: result.steps
     }
-    if (effectiveRepoId) {
-      void saveTodo({ repoId: editRepoId, ...args })
+    if (todo.repoId) {
+      void saveTodo({ repoId: todo.repoId, ...args })
     } else {
       void saveGlobalTodo(args)
-      invalidateGlobalTodos()
     }
   }
 
   const handleCreateList = (title: string) => {
     if (effectiveRepoId) {
       void saveTodoList({ repoId: effectiveRepoId, title })
-    } else {
+    } else if (!isProjectScope) {
       void saveGlobalTodoList({ title })
     }
   }
@@ -234,7 +236,7 @@ export default function TodosPanel(): React.JSX.Element {
   const handleRenameList = (listId: string, title: string) => {
     if (effectiveRepoId) {
       void saveTodoList({ repoId: effectiveRepoId, id: listId, title })
-    } else {
+    } else if (!isProjectScope) {
       void saveGlobalTodoList({ id: listId, title })
     }
   }
@@ -242,28 +244,24 @@ export default function TodosPanel(): React.JSX.Element {
   const handleDeleteList = (listId: string) => {
     if (effectiveRepoId) {
       void removeTodoList({ repoId: effectiveRepoId, listId })
-    } else {
+    } else if (!isProjectScope) {
       void removeGlobalTodoList({ listId })
     }
     if (activeNav?.kind === 'list' && activeNav.listId === listId) {
-      setActiveNav({ kind: 'smart-view', view: 'all' })
+      setTodoNavigation(scopeKey, { kind: 'smart-view', view: 'all' })
     }
   }
 
   const navTitle = useMemo(() => {
-    if (!activeNav) {
-      return translate('auto.components.right.sidebar.TodosPanel.all', 'All')
+    if (!activeNav || activeNav.kind === 'smart-view') {
+      const view = activeNav?.kind === 'smart-view' ? activeNav.view : 'all'
+      const title = smartViewTitle(view)
+      return translate(title.key, title.fallback)
     }
-    if (activeNav.kind === 'smart-view') {
-      const t = smartViewTitle(activeNav.view)
-      return translate(t.key, t.fallback)
-    }
-    return activeLists.find((l) => l.id === activeNav.listId)?.title ?? ''
-  }, [activeNav, activeLists])
+    return activeLists.find((list) => list.id === activeNav.listId)?.title ?? ''
+  }, [activeLists, activeNav])
 
   const canQuickAdd = !isCompletedView && !isMyDayView && (!isProjectScope || hasRepo)
-  const canChangeList = activeLists.length > 0
-
   const projectLabelForMyDay = (todo: Todo): string | undefined => {
     if (!isMyDayView) {
       return undefined
@@ -274,7 +272,8 @@ export default function TodosPanel(): React.JSX.Element {
     return todo.repoId === repoId ? repoName : undefined
   }
 
-  const showEmpty = (isEmpty || myDayEmpty) && !error
+  const showEmpty =
+    (isEmpty || myDayEmpty || (!isMyDayView && isProjectScope && !hasRepo)) && !error
   const emptyStateMessage = myDayEmpty
     ? translate(
         'auto.components.right.sidebar.TodosPanel.myDayEmpty',
@@ -308,11 +307,11 @@ export default function TodosPanel(): React.JSX.Element {
       </div>
 
       <div className="flex min-h-0 flex-1">
-        <div className="w-44 shrink-0 overflow-y-auto scrollbar-sleek border-r p-1">
+        <div className="w-44 shrink-0 overflow-y-auto border-r p-1 scrollbar-sleek">
           <TodoNavigation
             lists={activeLists}
             activeNav={activeNav}
-            onNavChange={setActiveNav}
+            onNavChange={(target) => setTodoNavigation(scopeKey, target)}
             onCreateList={handleCreateList}
             onRenameList={handleRenameList}
             onDeleteList={handleDeleteList}
@@ -327,14 +326,10 @@ export default function TodosPanel(): React.JSX.Element {
           {canQuickAdd && (
             <TodoAddInput
               onAdd={handleAdd}
-              placeholder={
-                isProjectScope && !hasRepo
-                  ? translate(
-                      'auto.components.right.sidebar.TodosPanel.selectProject',
-                      'Select a project first…'
-                    )
-                  : translate('auto.components.right.sidebar.TodosPanel.addTodo', 'Add a todo…')
-              }
+              placeholder={translate(
+                'auto.components.right.sidebar.TodosPanel.addTodo',
+                'Add a todo…'
+              )}
             />
           )}
 
@@ -357,21 +352,22 @@ export default function TodosPanel(): React.JSX.Element {
 
             {showEmpty && <TodoEmptyState message={emptyStateMessage} />}
 
-            {isLoaded &&
-              !error &&
-              !showEmpty &&
-              visibleTodos.map((todo) => (
-                <TodoItemRow
-                  key={todo.id}
-                  todo={todo}
-                  lists={activeLists}
-                  canChangeList={canChangeList}
-                  projectLabel={projectLabelForMyDay(todo)}
-                  onToggle={handleToggle}
-                  onEdit={handleEdit}
-                  onRemove={handleRemove}
-                />
-              ))}
+            {!showEmpty &&
+              visibleTodos.map((todo) => {
+                const lists = getTodoListsForOwner(todo, todoListsByRepo, globalTodoLists)
+                return (
+                  <TodoItemRow
+                    key={`${todo.repoId}:${todo.id}`}
+                    todo={todo}
+                    lists={lists}
+                    canChangeList={lists.length > 0}
+                    projectLabel={projectLabelForMyDay(todo)}
+                    onToggle={handleToggle}
+                    onEdit={handleEdit}
+                    onRemove={handleRemove}
+                  />
+                )
+              })}
           </div>
         </div>
       </div>
