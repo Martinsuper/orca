@@ -7,6 +7,7 @@ import type { OpenFile } from './editor'
 import { createRepoSlice } from './repos'
 import { createSparsePresetsSlice } from './sparse-presets'
 import { createProjectLinksSlice } from './project-links'
+import { createTodosSlice } from './todos'
 import { createWorktreeSlice } from './worktrees'
 import { createTerminalSlice } from './terminals'
 import { createTabsSlice } from './tabs'
@@ -65,6 +66,7 @@ export function createTestStore() {
     ...createRepoSlice(...a),
     ...createSparsePresetsSlice(...a),
     ...createProjectLinksSlice(...a),
+    ...createTodosSlice(...a),
     ...createWorktreeSlice(...a),
     ...createTerminalSlice(...a),
     ...createTabsSlice(...a),

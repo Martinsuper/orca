@@ -25,6 +25,16 @@ import {
   resetNotificationPermissionEvidence
 } from './notification-permission-probe'
 
+export type NotificationDispatcher = (
+  args: NotificationDispatchRequest
+) => NotificationDispatchResult | Promise<NotificationDispatchResult>
+
+let activeDispatcher: NotificationDispatcher | null = null
+
+export function getActiveNotificationDispatcher(): NotificationDispatcher | null {
+  return activeDispatcher
+}
+
 export function registerNotificationHandlers(store: Store, runtime?: OrcaRuntimeService): void {
   ipcMain.removeHandler('notifications:getDesktopAwayState')
   ipcMain.handle('notifications:getDesktopAwayState', () => readDesktopAwayState(powerMonitor))
@@ -119,6 +129,8 @@ export function registerNotificationHandlers(store: Store, runtime?: OrcaRuntime
     platform: process.platform,
     now: () => Date.now()
   })
+  const dispatcher = deliveryService.dispatch
+  activeDispatcher = dispatcher
 
   ipcMain.removeHandler('notifications:dispatch')
   ipcMain.handle(
@@ -126,8 +138,7 @@ export function registerNotificationHandlers(store: Store, runtime?: OrcaRuntime
     (
       _event,
       args: NotificationDispatchRequest
-    ): NotificationDispatchResult | Promise<NotificationDispatchResult> =>
-      deliveryService.dispatch(args)
+    ): NotificationDispatchResult | Promise<NotificationDispatchResult> => dispatcher(args)
   )
 
   registerNotificationSoundHandlers(store)

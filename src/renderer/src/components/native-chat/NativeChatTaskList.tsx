@@ -74,8 +74,8 @@ function Checklist({ list }: { list: TaskList }): React.JSX.Element {
       aria-label={translate('components.native-chat.taskList.title', 'Tasks')}
       className="space-y-1 py-1"
     >
-      {list.tasks.map((task, index) => (
-        <TaskRow key={`${task.content}:${index}`} task={task} />
+      {list.tasks.map((task) => (
+        <TaskRow key={task.id ?? task.content} task={task} />
       ))}
     </ul>
   )
@@ -147,9 +147,9 @@ export function NativeChatTaskList({
         <>
           {changes.length > 0 ? (
             <ul className="space-y-1 py-1">
-              {changes.map((change, index) => (
+              {changes.map((change) => (
                 <TaskRow
-                  key={`${change.kind}:${index}`}
+                  key={`${change.kind}:${change.task.id ?? change.task.content}`}
                   task={change.task}
                   label={changeLabel(change)}
                 />

@@ -9,6 +9,7 @@ const ChecksPanel = lazy(() => import('./ChecksPanel'))
 const PortsPanel = lazy(() => import('./PortsPanel'))
 const AiVaultPanel = lazy(() => import('./AiVaultPanel'))
 const LinksPanel = lazy(() => import('./LinksPanel'))
+const TodosPanel = lazy(() => import('./TodosPanel'))
 const FolderWorkspaceWorktreesPanel = lazy(() => import('./FolderWorkspaceWorktreesPanel'))
 const FolderWorkspacePrChecksPanel = lazy(() => import('./FolderWorkspacePrChecksPanel'))
 const PluginPanel = lazy(() => import('./PluginPanel'))
@@ -29,6 +30,7 @@ export function RightSidebarPanelContent({
         {effectiveTab === 'source-control' && <SourceControl />}
         {effectiveTab === 'checks' && <ChecksPanel />}
         {effectiveTab === 'links' && <LinksPanel />}
+        {effectiveTab === 'todos' && <TodosPanel />}
         {/* Why: SSH port forwarding still depends on the raw ports.detect data,
             which the workspace-scoped status bar popover intentionally does not
             expose. Keep this panel reachable only for SSH worktrees. */}

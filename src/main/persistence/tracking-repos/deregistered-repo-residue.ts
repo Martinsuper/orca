@@ -57,6 +57,14 @@ export function collectDeregisteredRepoIds(state: PersistedState): Set<string> {
     }
   }
   const orphanRepoIds = new Set<string>()
+  for (const repoId of [
+    ...Object.keys(state.todosByRepo ?? {}),
+    ...Object.keys(state.todoListsByRepo ?? {})
+  ]) {
+    if (repoId && !liveRepoIds.has(repoId)) {
+      orphanRepoIds.add(repoId)
+    }
+  }
   // Only a full `<repoId>::<path>` locator seeds the set. A bare key -- a folder workspace id, a
   // repo-keyed topology revision, a test-shaped locator -- cannot be told apart from a repo id, and
   // guessing wrong here deletes live session state.

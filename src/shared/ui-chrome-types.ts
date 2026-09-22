@@ -96,6 +96,8 @@ export type RightSidebarTab =
   | 'ports'
   // Fork: quick-access project links panel.
   | 'links'
+  // Fork: todo panel (global + per-project todos).
+  | 'todos'
   // Plugin-contributed panels are keyed `plugin:<pluginId>/<panelId>` so the
   // static union stays closed while plugin tabs remain type-representable.
   | `plugin:${string}`

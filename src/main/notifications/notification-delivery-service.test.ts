@@ -12,6 +12,7 @@ function makeSettings(overrides: Partial<NotificationSettings> = {}): Notificati
     enabled: true,
     agentTaskComplete: true,
     terminalBell: true,
+    todoReminder: true,
     suppressWhenFocused: false,
     customSoundId: 'system',
     customSoundPath: null,
@@ -140,6 +141,38 @@ describe('createNotificationDeliveryService', () => {
       delivered: false,
       reason: 'cooldown'
     })
+  })
+
+  it.each([
+    { settings: {}, supported: true, reason: undefined },
+    { settings: { enabled: false }, supported: true, reason: 'disabled' },
+    { settings: { todoReminder: false }, supported: true, reason: 'source-disabled' },
+    { settings: {}, supported: false, reason: 'not-supported' }
+  ])('keeps Todo reminders local with $reason', ({ settings, supported, reason }) => {
+    const harness = makeHarness(makeSettings(settings))
+    harness.deps.isNotificationSupported = () => supported
+    const result = createNotificationDeliveryService(harness.deps).dispatch(
+      makeRequest({ source: 'todo-reminder', terminalTitle: 'Private task' })
+    )
+
+    expect(harness.dispatchMobileNotification).not.toHaveBeenCalled()
+    expect(harness.setTrayAttention).toHaveBeenCalledWith(true)
+    expect(result).toEqual(reason ? { delivered: false, reason } : { delivered: true })
+    expect(harness.deliverNative).toHaveBeenCalledTimes(reason ? 0 : 1)
+  })
+
+  it('does not drop simultaneous Todo reminders or suppress nearby agent notifications', () => {
+    const harness = makeHarness(makeSettings())
+    const service = createNotificationDeliveryService(harness.deps)
+    expect(
+      service.dispatch(makeRequest({ source: 'todo-reminder', notificationId: 'task-1' }))
+    ).toEqual({ delivered: true })
+    expect(
+      service.dispatch(makeRequest({ source: 'todo-reminder', notificationId: 'task-2' }))
+    ).toEqual({ delivered: true })
+    expect(service.dispatch(makeRequest())).toEqual({ delivered: true })
+    expect(harness.deliverNative).toHaveBeenCalledTimes(3)
+    expect(harness.dispatchMobileNotification).toHaveBeenCalledTimes(1)
   })
 
   it('skips mobile fan-out entirely when no runtime is paired', () => {

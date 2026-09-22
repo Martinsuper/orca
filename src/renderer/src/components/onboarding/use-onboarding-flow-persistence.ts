@@ -31,7 +31,8 @@ export function buildCompletedOnboardingNotificationSettings(
     ...notifications,
     enabled: true,
     agentTaskComplete: true,
-    terminalBell: true
+    terminalBell: true,
+    todoReminder: true
   }
 }
 

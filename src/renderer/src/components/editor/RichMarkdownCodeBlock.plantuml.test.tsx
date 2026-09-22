@@ -60,5 +60,23 @@ describe('RichMarkdownCodeBlock PlantUML preview', () => {
     expect(container.querySelector('[data-testid="plantuml-diagram"]')?.textContent).toBe(
       '@startuml\nAlice -> Bob\n@enduml'
     )
+    const preview = container.querySelector<HTMLElement>('.plantuml-preview')
+    expect(container.querySelector('.plantuml-source-collapsed')).not.toBeNull()
+    expect(preview?.getAttribute('title')).toBe('Click to edit source')
+    expect(preview?.nextElementSibling?.tagName).toBe('SELECT')
+
+    act(() => {
+      preview?.click()
+    })
+
+    expect(container.querySelector('.plantuml-source-collapsed')).toBeNull()
+    expect(preview?.getAttribute('title')).toBe('Click to hide source')
+    expect(preview?.nextElementSibling?.tagName).toBe('SELECT')
+
+    act(() => {
+      preview?.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+    })
+
+    expect(container.querySelector('.plantuml-source-collapsed')).not.toBeNull()
   })
 })

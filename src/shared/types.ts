@@ -15,6 +15,48 @@ export type ProjectLink = {
   updatedAt: number
 }
 
+export type TodoStep = {
+  id: string
+  title: string
+  done: boolean
+  /** Epoch-ms of last step-level state change. */
+  updatedAt: number
+}
+
+export type Todo = {
+  id: string
+  /** Project-level todo = worktree repoId; global todo = '' */
+  repoId: string
+  title: string
+  note: string
+  done: boolean
+  /** Epoch-ms of completion; set when `done` transitions to true. */
+  completedAt?: number
+  createdAt: number
+  updatedAt: number
+  /** Owning list id. Missing on old data — normalized to the default list on load. */
+  listId?: string
+  important?: boolean
+  /** ISO date string `YYYY-MM-DD` or undefined. */
+  dueDate?: string
+  /** UTC epoch-ms for a single reminder, or undefined. */
+  reminderAt?: number
+  /** UTC epoch-ms when the reminder was last fired, to prevent duplicates after restart. */
+  reminderDeliveredAt?: number
+  /** Local date string `YYYY-MM-DD` when the task was added to My Day. */
+  myDayDate?: string
+  steps?: TodoStep[]
+}
+
+export type TodoList = {
+  id: string
+  /** Project-level list = worktree repoId; global list = '' */
+  repoId: string
+  title: string
+  createdAt: number
+  updatedAt: number
+}
+
 export type PlantumlRenderArgs = {
   source: string
   jarPath: string

@@ -27,6 +27,7 @@ import type { StoreRuntimeState } from './store-runtime-state'
 import type { WriteSchedulingOperations } from './write-scheduling'
 import { scheduleSave } from './write-scheduling'
 import { pruneDeregisteredRepoUiResidue } from './repo-lifecycle-ui-residue'
+import type { PersistedState } from '../../../shared/persisted-state-types'
 type RepoLifecycleOperationsRuntime = Pick<
   StoreRuntimeState,
   | 'gitUsernameCache'
@@ -73,8 +74,7 @@ export class RepoLifecycleOperations {
       retireLocalWorktreeScanGeneration(id)
     }
     syncProjectHostSetupCompatibilityState(this)
-    delete this[repoLifecycleOperationsContext].runtime.state.sparsePresetsByRepo[id]
-    delete this[repoLifecycleOperationsContext].runtime.state.retiredWorktreeNamesByRepo?.[id]
+    deleteRepoScopedState(this[repoLifecycleOperationsContext].runtime.state, id)
     pruneWorktreeStateForRepo(this, id, null)
     this[repoLifecycleOperationsContext].runtime.state.workspaceSession =
       removeRepoFromWorkspaceSession(
@@ -104,8 +104,7 @@ export class RepoLifecycleOperations {
     )
     if (!idStillPresent) {
       retireLocalWorktreeScanGeneration(id)
-      delete this[repoLifecycleOperationsContext].runtime.state.sparsePresetsByRepo[id]
-      delete this[repoLifecycleOperationsContext].runtime.state.retiredWorktreeNamesByRepo?.[id]
+      deleteRepoScopedState(this[repoLifecycleOperationsContext].runtime.state, id)
     }
     syncProjectHostSetupCompatibilityState(this)
     pruneWorktreeStateForRepo(this, id, idStillPresent ? hostId : null)
@@ -153,6 +152,7 @@ export class RepoLifecycleOperations {
         state.workspaceSessionsByHostId,
         repoId
       )
+      deleteRepoScopedState(state, repoId)
     }
     pruneDeregisteredRepoUiResidue(state.ui, orphanRepoIds)
     return [...orphanRepoIds]
@@ -209,6 +209,13 @@ export function getRepoOrderOperations(
       scheduleSave: () => scheduleSave(owner[repoLifecycleOperationsContext].scheduling)
     })
   return owner[repoLifecycleOperationsContext].runtime.repoOrderOperations
+}
+
+function deleteRepoScopedState(state: PersistedState, repoId: string): void {
+  delete state.sparsePresetsByRepo[repoId]
+  delete state.retiredWorktreeNamesByRepo?.[repoId]
+  delete state.todosByRepo[repoId]
+  delete state.todoListsByRepo?.[repoId]
 }
 
 export function pruneWorktreeStateForRepo(
