@@ -12,7 +12,8 @@ export function getDefaultNotificationSettings(): NotificationSettings {
     suppressWhenFocused: true,
     customSoundId: 'system',
     customSoundPath: null,
-    customSoundVolume: 100
+    customSoundVolume: 100,
+    mutedNotificationSourceIds: []
   }
 }
 

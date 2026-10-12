@@ -63,32 +63,6 @@ export class RepoLifecycleOperations {
     return getRepoOrderOperations(this).reorderReposForHost(orderedIds, hostId)
   }
 
-  removeProject(id: string): void {
-    const repoRemoved = this[repoLifecycleOperationsContext].runtime.state.repos.some(
-      (repo) => repo.id === id
-    )
-    this[repoLifecycleOperationsContext].runtime.state.repos = this[
-      repoLifecycleOperationsContext
-    ].runtime.state.repos.filter((r) => r.id !== id)
-    if (repoRemoved) {
-      retireLocalWorktreeScanGeneration(id)
-    }
-    syncProjectHostSetupCompatibilityState(this)
-    deleteRepoScopedState(this[repoLifecycleOperationsContext].runtime.state, id)
-    pruneWorktreeStateForRepo(this, id, null)
-    this[repoLifecycleOperationsContext].runtime.state.workspaceSession =
-      removeRepoFromWorkspaceSession(
-        this[repoLifecycleOperationsContext].runtime.state.workspaceSession,
-        id
-      )
-    this[repoLifecycleOperationsContext].runtime.state.workspaceSessionsByHostId =
-      removeRepoFromHostWorkspaceSessions(
-        this[repoLifecycleOperationsContext].runtime.state.workspaceSessionsByHostId,
-        id
-      )
-    scheduleSave(this[repoLifecycleOperationsContext].scheduling)
-  }
-
   removeProjectForHost(id: string, hostId: ExecutionHostId): void {
     const repoRemoved = this[repoLifecycleOperationsContext].runtime.state.repos.some(
       (repo) => repo.id === id && getRepoExecutionHostId(repo) === hostId
@@ -306,13 +280,4 @@ export function updateIndependentProjectHostSetup(
 
 export function hydrateRepo(owner: RepoLifecycleOperations, repo: Repo): Repo {
   return hydrateRepoOperation(repo, owner[repoLifecycleOperationsContext].runtime.gitUsernameCache)
-}
-
-export function installRepoLifecycleOperationsContext(
-  target: RepoLifecycleOperations,
-  source: RepoLifecycleOperations
-): void {
-  Object.defineProperty(target, repoLifecycleOperationsContext, {
-    value: source[repoLifecycleOperationsContext]
-  })
 }

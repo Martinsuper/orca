@@ -26,6 +26,7 @@ export function createShellApi(): NonNullable<Partial<PreloadApi>['shell']> {
     pathsExist: (paths) => Promise.all(paths.map((path) => pathExistsOnRuntime(path))),
     pickAttachment: () => Promise.resolve(null),
     pickJarFile: () => Promise.resolve(null),
+    pickAttachments: () => Promise.resolve([]),
     pickImage: () => Promise.resolve(null),
     pickRepoIconImage: () => Promise.resolve(null),
     pickAudio: () => Promise.resolve(null),

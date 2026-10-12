@@ -1,6 +1,6 @@
 import { isAbsolute, normalize } from 'node:path'
 import { stat } from 'node:fs/promises'
-import type { Store } from '../persistence'
+import { parseRoutableExecutionHostId } from '../../shared/execution-host'
 
 async function pathExists(pathValue: string): Promise<boolean> {
   try {
@@ -24,8 +24,11 @@ export async function validateLocalPathTarget(
   return { ok: true, path: normalizedPath }
 }
 
-export function hasActiveRuntime(store: Store): boolean {
-  return Boolean(store.getSettings().activeRuntimeEnvironmentId?.trim())
+// Why: the path's owner decides, never the focused server; an absent owner is refused.
+export function isLocallyOwned(ownerHostId: unknown): boolean {
+  return (
+    typeof ownerHostId === 'string' && parseRoutableExecutionHostId(ownerHostId)?.kind === 'local'
+  )
 }
 
 export async function pathExistsAsync(pathValue: string): Promise<boolean> {

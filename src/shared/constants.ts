@@ -2,14 +2,20 @@ import type { GlobalSettings } from './global-settings-types'
 import type { PersistedState } from './persisted-state-types'
 import { EMPTY_CODEX_RESET_CREDIT_ATTEMPT_LEDGER } from './codex-reset-credit-attempt-ledger'
 import { buildDefaultSettings } from './default-global-settings'
-import { DEFAULT_APP_FONT_FAMILY, DEFAULT_TERMINAL_INACTIVE_PANE_OPACITY } from './default-ui-state'
-import { getDefaultOnboardingState } from './default-onboarding-state'
+import { getDefaultNotificationSettings } from './notification-settings-defaults'
+import { getDefaultOnboardingState } from './onboarding-defaults'
 import {
-  getDefaultNotificationSettings,
-  getDefaultVoiceSettings
-} from './default-notification-voice-hook-settings'
+  defaultTerminalFontFamily,
+  getDefaultPrimarySelectionMiddleClickPaste,
+  getDefaultTerminalRightClickToPaste
+} from './terminal-platform-defaults'
 import { getDefaultUIState } from './default-ui-state'
 import { getDefaultWorkspaceSession } from './default-workspace-session'
+import {
+  DEFAULT_APP_FONT_FAMILY,
+  DEFAULT_TERMINAL_INACTIVE_PANE_OPACITY
+} from './default-ui-state'
+import { getDefaultVoiceSettings } from './default-notification-voice-hook-settings'
 
 export { DEFAULT_STATUS_BAR_ITEMS } from './status-bar-defaults'
 export {
@@ -29,7 +35,11 @@ export {
   DEFAULT_TERMINAL_INACTIVE_PANE_OPACITY,
   normalizeAgentActivityDisplayMode
 } from './default-ui-state'
-export { getDefaultOnboardingState } from './default-onboarding-state'
+export {
+  getDefaultOnboardingState,
+  ONBOARDING_FINAL_STEP,
+  ONBOARDING_FLOW_VERSION
+} from './onboarding-defaults'
 export {
   getDefaultNotificationSettings,
   getDefaultRepoHookSettings,
@@ -39,10 +49,6 @@ export { getDefaultUIState } from './default-ui-state'
 export { getDefaultWorkspaceSession } from './default-workspace-session'
 
 export const SCHEMA_VERSION = 1
-
-export const ONBOARDING_FINAL_STEP = 5
-export const ONBOARDING_FLOW_VERSION = 4
-
 export const ORCA_BROWSER_PARTITION = 'persist:orca-browser'
 // Why: inert blank-tab URL shared by main/renderer so the attach policy can allow just this one data URL and reject others.
 export const ORCA_BROWSER_BLANK_URL = 'data:text/html,'
@@ -62,26 +68,6 @@ export const BROWSER_FAMILY_LABELS: Record<string, string> = {
   safari: 'Safari',
   manual: 'File'
 }
-
-// Why: only the initial value shown in Settings; buildFontFamily() adds the real cross-platform fallback chain.
-function defaultTerminalFontFamily(): string {
-  const platform = typeof process !== 'undefined' ? process.platform : ''
-  if (platform === 'win32') {
-    return 'Cascadia Mono'
-  }
-  if (platform === 'linux') {
-    return 'DejaVu Sans Mono'
-  }
-  return 'SF Mono'
-}
-
-export const getDefaultPrimarySelectionMiddleClickPaste = (
-  platform = typeof process !== 'undefined' ? process.platform : ''
-): boolean => platform === 'linux' || platform === 'darwin'
-
-export const getDefaultTerminalRightClickToPaste = (
-  platform = typeof process !== 'undefined' ? process.platform : ''
-): boolean => platform === 'win32'
 
 /** Why: ProseMirror renders the whole document without virtualization. After the
  *  parser/highlighter work in #17134/#17147/#17158, M-series Electron measurements
@@ -117,6 +103,8 @@ export const REPO_COLORS = [
 
 export const DEFAULT_REPO_BADGE_COLOR = REPO_COLORS[0]
 
+/** The stock worktree root. Exported so callers can tell an untouched default apart
+ *  from a workspace directory the user actually chose. */
 export function getDefaultWorkspaceDir(homeDir: string): string {
   const separator = homeDir.includes('\\') ? '\\' : '/'
   const trimmedHomeDir = homeDir.replace(/[\\/]+$/, '')
@@ -135,7 +123,6 @@ export function getDefaultSettings(homedir: string): GlobalSettings {
     terminalInactivePaneOpacity: DEFAULT_TERMINAL_INACTIVE_PANE_OPACITY,
     terminalRightClickToPaste: getDefaultTerminalRightClickToPaste(),
     notifications: getDefaultNotificationSettings(),
-
     voice: getDefaultVoiceSettings()
   })
 }
@@ -169,7 +156,6 @@ export function getDefaultPersistedState(homedir: string): PersistedState {
     deletedSshConfigAliases: [],
     sshRemotePtyLeases: [],
     sshPtyConsumerRecoveries: [],
-    claudeLivePtySessionIds: [],
     migrationUnsupportedPtyEntries: [],
     legacyPaneKeyAliasEntries: [],
     automations: [],
