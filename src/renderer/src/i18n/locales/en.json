@@ -14448,6 +14448,7 @@
           },
           "TodoEditDialog": {
             "editTask": "Edit Task",
+            "newTask": "New Task",
             "title": "Title",
             "note": "Note",
             "list": "List",
@@ -14461,7 +14462,8 @@
             "removeStep": "Remove step",
             "addStep": "Add a step…",
             "cancel": "Cancel",
-            "save": "Save"
+            "save": "Save",
+            "add": "Add"
           },
           "TodoItemRow": {
             "markUndone": "Mark as not done",
@@ -14473,20 +14475,33 @@
             "delete": "Delete todo"
           },
           "TodoNavigation": {
+            "myDay": "My Day",
+            "important": "Important",
+            "planned": "Planned",
+            "all": "All",
+            "completed": "Completed",
             "lists": "Lists",
             "renameList": "Rename list",
             "confirmDelete": "Confirm delete",
             "deleteList": "Delete list",
             "listName": "List name",
-            "newList": "New list"
+            "newList": "New list",
+            "defaultList": "Tasks"
           },
           "TodosPanel": {
+            "thisProject": "This project",
+            "global": "Global",
+            "myDay": "My Day",
+            "important": "Important",
+            "planned": "Planned",
+            "all": "All",
+            "completed": "Completed",
             "globalSource": "Global",
             "myDayEmpty": "No tasks added to My Day. Add tasks from any list to focus on today.",
             "noProject": "No project selected.",
             "noCompleted": "No completed tasks.",
             "empty": "No todos yet. Add your first one above.",
-            "addTodo": "Add a todo…",
+            "addTodo": "Add a todo",
             "loadError": "Could not load todos: {{error}}"
           },
           "todos": {

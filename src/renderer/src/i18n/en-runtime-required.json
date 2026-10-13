@@ -1004,6 +1004,22 @@
             "74168d7ada": "idle",
             "d8f40128ee": "{basePrompt} is Orca's default prompt."
           },
+          "TodoNavigation": {
+            "all": "All",
+            "completed": "Completed",
+            "important": "Important",
+            "myDay": "My Day",
+            "planned": "Planned"
+          },
+          "TodosPanel": {
+            "all": "All",
+            "completed": "Completed",
+            "global": "Global",
+            "important": "Important",
+            "myDay": "My Day",
+            "planned": "Planned",
+            "thisProject": "This project"
+          },
           "activity": {
             "bar": {
               "buttons": {

@@ -1,14 +1,16 @@
-import { useEffect, useMemo } from 'react'
-import { Loader2 } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Loader2, Plus } from 'lucide-react'
 import type { Todo, TodoList } from '../../../../shared/types'
 import { useAppStore } from '@/store'
 import { useActiveRepo } from '@/store/selectors'
 import { translate } from '@/i18n/i18n'
-import { TodoAddInput } from './TodoAddInput'
+import { Button } from '@/components/ui/button'
+import { TodoEditDialog } from './TodoEditDialog'
+import { displayTodoListTitle } from './todo-list-display'
 import { TodoItemRow } from './TodoItemRow'
 import { TodoEmptyState } from './TodoEmptyState'
 import { TodoNavigation } from './TodoNavigation'
-import { getMyDayTodos, type TodoSaveArgs } from '@/store/slices/todos'
+import { getMyDayTodos } from '@/store/slices/todos'
 import { filterByList, filterBySmartView } from './todo-view-filters'
 import { smartViewTitle, type TodoNavItem } from './todo-nav-types'
 import type { TodoEditDialogResult } from './TodoEditDialog'
@@ -139,6 +141,7 @@ export default function TodosPanel(): React.JSX.Element {
 
   const isMyDayView = activeNav?.kind === 'smart-view' && activeNav.view === 'my-day'
   const isCompletedView = activeNav?.kind === 'smart-view' && activeNav.view === 'completed'
+  const [createOpen, setCreateOpen] = useState(false)
 
   const myDayTodos = useMemo(() => {
     if (!isMyDayView) {
@@ -180,13 +183,27 @@ export default function TodosPanel(): React.JSX.Element {
   const myDayDataReady = globalTodos !== undefined && (!repoId || todosByRepo[repoId] !== undefined)
   const myDayEmpty = isMyDayView && myDayDataReady && myDayTodos.length === 0
 
-  const handleAdd = (title: string) => {
-    const targetListId = activeNav?.kind === 'list' ? activeNav.listId : activeLists[0]?.id
-    if (effectiveRepoId) {
-      void saveTodo({ repoId: effectiveRepoId, title, listId: targetListId })
-    } else if (!isProjectScope) {
-      const args: Omit<TodoSaveArgs, 'repoId'> = { title, listId: targetListId }
-      void saveGlobalTodo(args)
+  const targetListId = activeNav?.kind === 'list' ? activeNav.listId : activeLists[0]?.id
+
+  const handleCreateTodo = async (result: TodoEditDialogResult) => {
+    const listId = result.listId || targetListId
+    const args = {
+      title: result.title,
+      note: result.note,
+      listId,
+      important: result.important,
+      dueDate: result.dueDate,
+      reminderAt: result.reminderAt,
+      myDayDate: result.myDayDate,
+      steps: result.steps
+    }
+    const saved = effectiveRepoId
+      ? await saveTodo({ repoId: effectiveRepoId, ...args })
+      : !isProjectScope
+        ? await saveGlobalTodo(args)
+        : null
+    if (saved) {
+      setCreateOpen(false)
     }
   }
 
@@ -225,12 +242,17 @@ export default function TodosPanel(): React.JSX.Element {
     }
   }
 
-  const handleCreateList = (title: string) => {
-    if (effectiveRepoId) {
-      void saveTodoList({ repoId: effectiveRepoId, title })
-    } else if (!isProjectScope) {
-      void saveGlobalTodoList({ title })
+  const handleCreateList = async (title: string): Promise<boolean> => {
+    const saved = effectiveRepoId
+      ? await saveTodoList({ repoId: effectiveRepoId, title })
+      : !isProjectScope
+        ? await saveGlobalTodoList({ title })
+        : null
+    if (!saved) {
+      return false
     }
+    setTodoNavigation(scopeKey, { kind: 'list', listId: saved.id })
+    return true
   }
 
   const handleRenameList = (listId: string, title: string) => {
@@ -258,10 +280,11 @@ export default function TodosPanel(): React.JSX.Element {
       const title = smartViewTitle(view)
       return translate(title.key, title.fallback)
     }
-    return activeLists.find((list) => list.id === activeNav.listId)?.title ?? ''
+    const activeList = activeLists.find((list) => list.id === activeNav.listId)
+    return activeList ? displayTodoListTitle(activeList) : ''
   }, [activeLists, activeNav])
 
-  const canQuickAdd = !isCompletedView && !isMyDayView && (!isProjectScope || hasRepo)
+  const canAdd = !isCompletedView && !isMyDayView && (!isProjectScope || hasRepo)
   const projectLabelForMyDay = (todo: Todo): string | undefined => {
     if (!isMyDayView) {
       return undefined
@@ -309,10 +332,12 @@ export default function TodosPanel(): React.JSX.Element {
       <div className="flex min-h-0 flex-1">
         <div className="w-44 shrink-0 overflow-y-auto border-r p-1 scrollbar-sleek">
           <TodoNavigation
+            key={scopeKey}
             lists={activeLists}
             activeNav={activeNav}
             onNavChange={(target) => setTodoNavigation(scopeKey, target)}
             onCreateList={handleCreateList}
+            canCreateList={!isProjectScope || hasRepo}
             onRenameList={handleRenameList}
             onDeleteList={handleDeleteList}
           />
@@ -323,13 +348,29 @@ export default function TodosPanel(): React.JSX.Element {
             <span className="text-sm font-semibold">{navTitle}</span>
           </div>
 
-          {canQuickAdd && (
-            <TodoAddInput
-              onAdd={handleAdd}
-              placeholder={translate(
-                'auto.components.right.sidebar.TodosPanel.addTodo',
-                'Add a todo…'
-              )}
+          {canAdd && (
+            <div className="border-b px-2 py-1.5">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="w-full justify-start"
+                onClick={() => setCreateOpen(true)}
+              >
+                <Plus size={14} className="shrink-0" />
+                {translate('auto.components.right.sidebar.TodosPanel.addTodo', 'Add a todo')}
+              </Button>
+            </div>
+          )}
+
+          {canAdd && (
+            <TodoEditDialog
+              open={createOpen}
+              mode="create"
+              initial={{ title: '', listId: targetListId }}
+              lists={activeLists}
+              canChangeList={activeLists.length > 0}
+              onClose={() => setCreateOpen(false)}
+              onSave={handleCreateTodo}
             />
           )}
 
