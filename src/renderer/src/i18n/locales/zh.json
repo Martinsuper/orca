@@ -15,6 +15,28 @@
     "retrying": "正在重试..."
   },
   "settings": {
+    "chat": {
+      "permissionsTitle": "新聊天的权限",
+      "permissionsDescription": "仅适用于新聊天。在终端中打开的智能体使用设置 → 智能体 → 智能体权限。",
+      "description": "选择聊天的外观和命名方式。",
+      "names": {
+        "title": "聊天名称",
+        "description": "使用智能体根据首条消息为新聊天生成名称。未生成名称时，聊天仍显示为 Claude Chat 或 Codex Chat。",
+        "enable": "自动为聊天命名",
+        "recipe": "聊天名称",
+        "recipeDescription": "根据新聊天的首条消息生成简短名称。",
+        "customCommandDescription": "选择自定义命令的配置共用此命令行。使用 {prompt} 将输入作为参数传递，否则通过标准输入传递。",
+        "saveFailed": "无法保存聊天命名设置。",
+        "searchAgent": "智能体",
+        "searchTemplate": "命令模板"
+      }
+    },
+    "terminal": {
+      "optionLayoutAlt": "ABC 或 U.S. — Option 键发送 Alt/Esc 序列",
+      "optionLayoutCompose": "此布局使用 Option 键输入 @、€、[、] 等字符",
+      "optionLayoutUnknown": "未知布局 — Option 键输入字符（安全的默认设置）",
+      "optionShortcutHint": "选择“两个都”使用 Option 快捷键，选择“关”输入重音字符和符号，或选择“左边”/“右边”让两个 Option 键各司其职。"
+    },
     "appearance": {
       "language": {
         "title": "语言",
@@ -3037,7 +3059,8 @@
           }
         },
         "dialog": {
-          "f26c4baeda": "关闭"
+          "f26c4baeda": "关闭",
+          "minimize": "最小化"
         },
         "repo": {
           "multi": {
@@ -4116,7 +4139,12 @@
             "checkTooltip": "重启后 Orca 未能恢复或未能确认已恢复的聊天。点击查看详情。",
             "resumingTooltip": "正在恢复中断的聊天并请它们继续…",
             "resumingProgressLabel": "正在恢复聊天 {{value0}}/{{value1}}",
-            "resumingProgressAria": "正在恢复聊天，已完成 {{value0}}/{{value1}}。点击查看详情。"
+            "resumingProgressAria": "正在恢复聊天，已完成 {{value0}}/{{value1}}。点击查看详情。",
+            "resumedLabelOne": "已恢复 1 个聊天",
+            "resumedLabel": "已恢复 {{value0}} 个聊天",
+            "resumedAriaOne": "已恢复 1 个聊天。点击查看。",
+            "resumedAria": "已恢复 {{value0}} 个聊天。点击查看。",
+            "resumedTooltip": "重启后 Orca 恢复的聊天。点击查看。"
           },
           "provider": {
             "extra": {
@@ -11195,7 +11223,7 @@
           "sourceControlAiDefaults": "方案、提示和托管评审默认值由此客户端共享；模型选择和发现则限定在智能体运行的主机内。",
           "projectOnThisHost": "此主机上的项目",
           "repositorySourceControlAi": "这些覆盖项应用于此项目设置，并继承客户端的源代码管理 AI 默认值，直至自定义。",
-          "agentLaunchDefaults": "默认智能体、命令覆盖、CLI 参数和启动环境是客户端偏好。SSH 和远程服务器启动仍会在运行时验证主机可用性。",
+          "agentLaunchDefaults": "默认代理、命令覆盖、CLI 参数和启动环境保存在所选主机上。",
           "clientDefaultProjectScopes": "客户端默认 + 项目范围",
           "terminalQuickCommands": "命令保存在此客户端，然后限定为全局或某项目设置，以便从所选终端上下文运行。",
           "hostOverride": "主机覆盖",
@@ -12534,18 +12562,7 @@
           "olderTerminalsUnverifiable": "Orca 无法确认由旧版本 Orca 启动的终端是否已退出。请重新连接后重试。",
           "olderTerminals_one": "由旧版本 Orca 启动的 {{count}} 个终端仍在此主机上运行，且不会自行停止。请在该版本的 Orca 中关闭它们，或在主机上结束它们，然后重新连接。",
           "olderTerminals_other": "由旧版本 Orca 启动的 {{count}} 个终端仍在此主机上运行，且不会自行停止。请在该版本的 Orca 中关闭它们，或在主机上结束它们，然后重新连接。",
-          "olderTerminals": "由旧版本 Orca 启动的 {{count}} 个终端仍在此主机上运行，且不会自行停止。请在该版本的 Orca 中关闭它们，或在主机上结束它们，然后重新连接。",
-          "oldTerminalsStopLead": "要在主机上结束它们，请运行：",
-          "oldTerminalsStopLeadPids": "要在主机上结束它们（进程 ID {{pids}}），请运行：",
-          "endOldTerminals": {
-            "action": "结束此主机上的旧终端",
-            "title": "结束此主机上的旧终端？",
-            "description": "这会结束旧版本 Orca 以此账户在此主机上留下并仍在运行的所有终端，包括从其他计算机打开的终端。其中运行的 shell 和代理都会停止。支持恢复的代理之后可以恢复；普通 shell 无法恢复。",
-            "confirm": "结束终端",
-            "running": "正在结束旧终端…",
-            "connected": "旧终端已结束。主机已连接。",
-            "failed": "Orca 无法结束旧终端。"
-          }
+          "olderTerminals": "由旧版本 Orca 启动的 {{count}} 个终端仍在此主机上运行，且不会自行停止。请在该版本的 Orca 中关闭它们，或在主机上结束它们，然后重新连接。"
         },
         "deltaMove": {
           "action": "迁移新项目…",
@@ -17795,7 +17812,8 @@
         "expandNode": "展开 {{value0}}",
         "selectMachine": "选择 {{value0}} 上的全部聊天",
         "sshHost": "SSH",
-        "done": "完成"
+        "done": "完成",
+        "resultListLabel": "本次恢复的聊天"
       },
       "linear-issue-attribute-filter-coverage-notice": {
         "statusPartialTeamCoverage": "过滤 {{value1}} 团队状态中的 {{value0}} — 不包括其余团队的问题。",
@@ -17897,7 +17915,11 @@
         "resumedTitleOne": "已恢复 {{value0}}/1 个聊天",
         "resumingTitleOne": "正在恢复 1 个聊天",
         "resumingTitle": "正在恢复 {{value0}} 个聊天",
-        "description": "每个聊天都会带着完整上下文恢复，并被要求检查它停在了哪里。你可以关闭此窗口，状态栏会继续显示进度。"
+        "description": "每个聊天都会带着完整上下文恢复，并被要求检查它停在了哪里。你可以关闭此窗口，状态栏会继续显示进度。",
+        "finished": "Orca 关闭时这些聊天正在工作。Orca 已将每个聊天恢复到停止的位置并保留完整上下文，并让智能体在继续之前先检查它之前在做什么。你自己的提示没有被重新发送。",
+        "finishedUpdate": "Orca 安装更新时这些聊天正在工作。Orca 已将每个聊天恢复到停止的位置并保留完整上下文，并让智能体在继续之前先检查它之前在做什么。你自己的提示没有被重新发送。",
+        "finishedPartial": "Orca 关闭时这些聊天正在工作。Orca 恢复的聊天已回到停止的位置并保留完整上下文，并被要求在继续之前先检查之前在做什么。你自己的提示没有被重新发送。请在列表中查看仍需处理或可以恢复的聊天。",
+        "finishedPartialUpdate": "Orca 安装更新时这些聊天正在工作。Orca 恢复的聊天已回到停止的位置并保留完整上下文，并被要求在继续之前先检查之前在做什么。你自己的提示没有被重新发送。请在列表中查看仍需处理或可以恢复的聊天。"
       },
       "NativeChatResumeRunStatusIcon": {
         "waitingForReply": "等待回复",
@@ -17917,6 +17939,11 @@
         "attention": "需要处理",
         "running": "已运行 {{value0}}",
         "filter": "显示聊天"
+      },
+      "NativeChatResumeAutoNote": {
+        "resuming": "重启后正在自动恢复。",
+        "resumed": "重启后已自动恢复。",
+        "changeInSettings": "在设置中更改"
       }
     },
     "i18n": {
@@ -18256,6 +18283,7 @@
         "couldNotStart": "{{agent}} 无法启动。",
         "editSavedArguments": "请在设置 > 智能体 > 参数中编辑。",
         "couldNotRestart": "{{agent}} 无法重新启动。",
+        "codexCliTooOld": "Codex {{installedVersion}} 版本过旧，无法用于聊天。请更新到 {{minimumVersion}} 或更高版本。",
         "notSignedIn": "{{agent}} 尚未登录。",
         "claudeSystemNotSignedIn": "Claude 尚未登录。请运行 `{{loginCommand}}`，或在 Claude 账户设置中选择账户。",
         "claudeManagedNotSignedIn": "此 Claude 账户尚未登录。请在 Claude 账户设置中重新登录。",
@@ -18279,8 +18307,8 @@
         "chooseClaudeAccountThenSend": "请在 Claude 账户设置中选择或添加一个，然后重新发送您的消息。",
         "providerExitedRow": "{{agent}} 在生成此回复时停止了。您可以在此对话中继续。",
         "providerExitedRejection": "{{agent}} 在发送此消息前已停止。",
-        "providerRejected": "提供商未接受此消息。",
-        "providerRejectedQuoted": "提供商未接受此消息：{{detail}}。",
+        "providerRejected": "{{agent}} 未接受此消息。",
+        "providerRejectedQuoted": "{{agent}} 未接受此消息：{{detail}}。",
         "attachmentEmpty": "此消息中的一张图片为空，因此消息未发送。",
         "attachmentTooLarge": "此消息中的一张图片过大，因此消息未发送。",
         "attachmentLargerThan": "此消息中的一张图片超过 {{size}} MB，因此消息未发送。",
@@ -18404,6 +18432,215 @@
         "clearAfterSending": "您之前的消息仍在发送中。发送完成后再运行 /clear。",
         "compactAfterSending": "您之前的消息仍在发送中。发送完成后再运行 /compact。"
       },
+      "composer": {
+        "imageUnsupported": "此智能体不支持粘贴图片。",
+        "send": "发送",
+        "noPty": "没有实时终端，请切回终端以重新连接。",
+        "locked": "输入正被另一台设备占用。",
+        "placeholder": "随便问，@ 提及文件，/ 使用命令",
+        "loadingFiles": "正在加载文件...",
+        "noFiles": "没有匹配的文件",
+        "filesLoadFailed": "无法加载文件",
+        "attach": "附加文件",
+        "startDictation": "开始听写",
+        "stopDictation": "停止听写",
+        "noSkills": "没有匹配的技能",
+        "localAttachmentUnsupported": "远程会话不支持本地附件。",
+        "attachFailed": "无法附加 {{files}}。",
+        "attachFailedBecause": "无法附加 {{files}}。{{reason}}",
+        "uploadingFile": "正在上传 {{name}}…",
+        "removeAttachment": "移除附件",
+        "pastedImageLabel": "粘贴的图片",
+        "draftNotSaved": "此草稿尚未保存成功。Orca 会继续尝试。",
+        "imageNotBroughtBack": "无法随此草稿恢复 {{name}}。请重新附加或将其移除。",
+        "pastedImageNotBroughtBack": "无法随此草稿恢复这张粘贴的图片。请将其移除，如仍需要请重新粘贴。",
+        "removeImageToSend": "有一张图片无法恢复。请将其移除后再发送。",
+        "removeImagesToSend": "有些图片无法恢复。请将其移除后再发送。",
+        "imageAttachAgainLabel": "重新附加",
+        "pastedImageNotKeptLabel": "未保留",
+        "imagePasteFailed": "图片粘贴失败。",
+        "worktreeNotReady": "工作树未就绪 — 请稍后重试。",
+        "pasteUnavailable": "无法粘贴 — 此聊天当前不接受输入。",
+        "model": "模型",
+        "effort": "推理强度",
+        "fastMode": "快速模式",
+        "speed": "速度",
+        "thinking": "思考",
+        "options": "选项",
+        "sessionOptions": "会话选项",
+        "chooseInAgentPicker": "在智能体选择器中选择…",
+        "searchModels": "搜索模型…",
+        "noModelsMatch": "没有符合搜索条件的模型。",
+        "toggleOption": "切换{{value0}}",
+        "pillAccessibleName": "{{value0}} {{value1}}",
+        "sentNotConfirmed": "已发送给智能体 — 尚未确认",
+        "setWhenSessionStarts": "请在会话开始时设置。",
+        "availableAfterSessionStarts": "会话开始后可用。",
+        "optionUpdateFailed": "无法更新选项",
+        "optionValue": {
+          "fast": "快速",
+          "minimal": "最小",
+          "low": "低",
+          "medium": "中",
+          "high": "高",
+          "xhigh": "极高",
+          "max": "最大",
+          "ultra": "极致",
+          "standard": "标准"
+        },
+        "noCommandsOrSkills": "没有匹配的命令或技能",
+        "commands": "命令",
+        "skills": "技能",
+        "loadingSkills": "正在加载技能…",
+        "clearDescription": "清除对话上下文",
+        "skillsUnavailableHost": "SSH 聊天中无法列出技能",
+        "skillsLoadFailed": "无法加载技能",
+        "retrySkills": "重试",
+        "skillCommandCollision": "也是技能名称 — 由智能体决定",
+        "skillMultipleSources": "{{sourceCount}} 个来源 — 由智能体处理",
+        "skillScopeProject": "项目",
+        "skillScopePersonal": "个人",
+        "skillScopeBuiltIn": "内置",
+        "skillScopePlugin": "插件",
+        "skillsLoaded": "技能已加载",
+        "noCommands": "没有匹配的命令",
+        "imageSaving": "保存粘贴的图像...",
+        "pendingAttachmentLimit": "太多附件正在等待。在附加更多内容之前先完成创作。",
+        "viewAttachment": "查看图片",
+        "imagePreview": "全尺寸图像预览",
+        "imagePreviewUnavailable": "预览不可用",
+        "copyImage": "复制图片",
+        "copyImageFailed": "无法复制图片",
+        "copyImageTooLarge": "图片太大，无法复制。",
+        "imageCopied": "已复制图片",
+        "workspaceAttachmentMismatch": "文件只能附加到其源工作区。",
+        "attachmentOwnerChanged": "此工作区在附加时更改了主机 - 再次删除文件。",
+        "attachmentUnreadable": "无法读取删除的文件。",
+        "tooManyAttachments": "每次最多附加 {{value0}} 个文件。",
+        "permissions": "权限",
+        "permissionAsk": "请求批准",
+        "permissionAskDescription": "在设置未允许的编辑和命令前询问",
+        "permissionAskCodexDescription": "在此工作区中编辑文件并运行命令；其他操作前会询问",
+        "permissionAskSharedDescription": "在执行尚未获准的编辑或命令前询问",
+        "permissionAcceptEdits": "接受编辑",
+        "permissionAcceptEditsDescription": "批准文件编辑和文件命令；其余操作会询问",
+        "permissionAuto": "替我批准",
+        "permissionAutoDescription": "代你审核批准请求",
+        "permissionFullAccess": "完全访问",
+        "permissionFullAccessDescription": "编辑或运行命令前从不询问",
+        "permissionFullAccessCodexDescription": "从不询问；可以编辑任何文件并使用网络",
+        "permissionFullAccessSharedDescription": "编辑或运行命令前从不询问",
+        "pasteFailed": "粘贴失败。",
+        "commandAttachmentsUnsupported": "使用聊天会话命令前，请先移除附件。"
+      },
+      "tool": {
+        "running": "正在运行…",
+        "result": "结果",
+        "exitCode": "退出{{value0}}",
+        "milliseconds": "{{value0}}毫秒",
+        "countOne": "1 个工具调用",
+        "countN": "{{value0}} 工具调用",
+        "moreCalls": "+{{value0}} 更多",
+        "failedCount": "{{value0}} 失败",
+        "failedCallsLabel": "失败的工具调用：{{value0}}",
+        "interruptedCount": "{{value0}} 已中断",
+        "interruptedCallsLabel": "已中断的工具调用：{{value0}}",
+        "runningPreview": "正在运行 {{preview}}",
+        "runningCommand": "运行命令",
+        "runningNamedPreview": "运行 {{toolName}} {{preview}}",
+        "runningNamed": "正在运行 {{toolName}}",
+        "ranCommandOneToolSummary": "运行 {{commandCount}} 命令并使用 {{toolCount}} 工具",
+        "ranCommandManyToolsSummary": "运行 {{commandCount}} 命令并使用 {{toolCount}} 工具",
+        "ranCommandsOneToolSummary": "运行 {{commandCount}} 命令并使用 {{toolCount}} 工具",
+        "ranCommandsManyToolsSummary": "运行 {{commandCount}} 命令并使用 {{toolCount}} 工具",
+        "usedOneSummary": "使用 1 个工具",
+        "usedManySummary": "使用过的 {{toolCount}} 工具",
+        "copyDiff": "复制差异",
+        "diffGap": "未显示线路",
+        "diffTruncated": "差异被截断",
+        "row": {
+          "running": "正在运行",
+          "reading": "正在读取",
+          "editing": "正在编辑",
+          "searching": "正在搜索",
+          "searchingWeb": "正在搜索网页",
+          "fetching": "正在获取",
+          "listed": "列出了",
+          "listing": "正在列出",
+          "ran": "运行了",
+          "read": "读取了",
+          "edited": "编辑了",
+          "searched": "搜索了",
+          "searchedWeb": "搜索了网页",
+          "fetched": "获取了",
+          "added": "添加了",
+          "deleted": "删除了",
+          "renamed": "重命名了",
+          "subagent": "子智能体",
+          "triedRead": "尝试读取",
+          "triedEdit": "尝试编辑",
+          "triedSearch": "尝试搜索",
+          "triedList": "尝试列出",
+          "triedFetch": "尝试获取",
+          "triedSearchWeb": "尝试搜索网页"
+        },
+        "runReadOne": "读取 1 个文件",
+        "runReadMany": "读取 {{value0}} 文件",
+        "runSearchOne": "已搜索 1 次",
+        "runSearchMany": "搜索 {{value0}} 次",
+        "runListFilesOne": "列出1个目录",
+        "runListFilesMany": "列出 {{value0}} 目录",
+        "runCommandOne": "运行 1 个命令",
+        "runCommandMany": "运行 {{value0}} 命令",
+        "runFileChangeOne": "已编辑 1 个文件",
+        "runFileChangeMany": "编辑 {{value0}} 文件",
+        "runWebSearchOne": "网上搜索了1次",
+        "runWebSearchMany": "网络搜索 {{value0}} 次",
+        "runIntegrationOne": "使用 1 集成",
+        "runIntegrationMany": "使用 {{value0}} 集成",
+        "runAgentOne": "然 1 智能体",
+        "runAgentMany": "然 {{value0}} 智能体",
+        "runPlanOne": "更新了计划",
+        "runPlanMany": "更新计划 {{value0}} 次",
+        "runToolOne": "使用 1 个工具",
+        "runToolMany": "使用过的 {{value0}} 工具",
+        "runPair": "{{value0}} 和 {{value1}}",
+        "runList": "{{value0}} 和 {{value1}}",
+        "runLiveReadOne": "读取1个文件",
+        "runLiveReadMany": "读取 {{value0}} 文件",
+        "runLiveSearchOne": "搜索1次",
+        "runLiveSearchMany": "搜索 {{value0}} 次",
+        "runLiveListFilesOne": "清单1 目录",
+        "runLiveListFilesMany": "列出 {{value0}} 目录",
+        "runLiveCommandOne": "运行 1 个命令",
+        "runLiveCommandMany": "运行 {{value0}} 命令",
+        "runLiveFileChangeOne": "编辑 1 个文件",
+        "runLiveFileChangeMany": "编辑 {{value0}} 文件",
+        "runLiveWebSearchOne": "网上搜索1次",
+        "runLiveWebSearchMany": "搜索网络 {{value0}} 次",
+        "runLiveIntegrationOne": "使用 1 集成",
+        "runLiveIntegrationMany": "使用 {{value0}} 集成",
+        "runLiveAgentOne": "运行 1 个智能体",
+        "runLiveAgentMany": "运行 {{value0}} 智能体",
+        "runLivePlanOne": "更新计划",
+        "runLivePlanMany": "更新计划 {{value0}} 次",
+        "runLiveToolOne": "使用 1 个工具",
+        "runLiveToolMany": "使用 {{value0}} 工具"
+      },
+      "status": {
+        "responding": "智能体正在回复",
+        "working": "处理中…",
+        "stopping": "正在停止…",
+        "queueAfterStop": "将消息加入队列，在停止后运行",
+        "sendAfterStop": "发送消息，在停止后运行",
+        "thinking": "思维",
+        "workingFor": "已工作 {{value0}}",
+        "workedFor": "工作了 {{value0}}",
+        "interruptedAfter": "{{value0}} 后中断",
+        "failedAfter": "{{value0}} 后失败",
+        "toggleDetails": "切换回合详情"
+      },
+      "jumpToLatest": "跳到最新消息",
       "find": {
         "label": "在聊天中查找",
         "noResults": "没有结果",
@@ -18412,6 +18649,41 @@
         "close": "关闭"
       },
       "transcriptLabel": "对话",
+      "toggle": {
+        "showTerminal": "显示终端"
+      },
+      "resumeInNewChat": {
+        "notSavedYet": "{{agent}} 尚未保存此对话。请在它回复后重试。",
+        "cannotResume": "此 {{agent}} 对话无法在本机聊天中恢复。"
+      },
+      "state": {
+        "loading": {
+          "label": "正在加载聊天",
+          "title": "正在加载对话…",
+          "subtitle": "正在读取智能体记录。"
+        },
+        "error": {
+          "title": "无法加载对话",
+          "subtitle": "无法读取记录。请切回终端继续工作。"
+        },
+        "pairHost": "配对主机以查看智能体聊天记录。",
+        "notAgent": {
+          "title": "这里没有对话",
+          "subtitle": "此终端未运行可识别的编码智能体。"
+        },
+        "empty": {
+          "title": "开始与 {{value0}} 聊天",
+          "subtitle": "让 {{value0}} 检查代码、解释输出或进行修改。"
+        }
+      },
+      "stop": "停止智能体",
+      "copyMessage": {
+        "copied": "已复制",
+        "copy": "复制消息"
+      },
+      "scrollMessageToTop": "将此消息滚动到顶部",
+      "loadingEarlier": "正在加载…",
+      "loadEarlier": "加载更早的消息",
       "loadingEarlierMessages": "正在加载更早的消息…",
       "prompt": {
         "collapse": "收起",
@@ -18437,7 +18709,8 @@
         "one": "1 个已更改的文件",
         "many": "{{count}} 更改了文件",
         "partial": "部分差异",
-        "recorded": "本轮记录编辑的总计。"
+        "showDiff": "显示差异",
+        "hideDiff": "隐藏差异"
       },
       "receipt": {
         "unavailable": "所选答案不可用",
@@ -18551,6 +18824,8 @@
         "subtitle": "文件将作为智能体可以读取的路径添加到您的消息中。"
       },
       "copyCode": "复制代码",
+      "wrapLines": "自动换行",
+      "disableLineWrap": "关闭自动换行",
       "context": {
         "unavailable": "上下文用量暂时未知，将在智能体下次响应后提供。",
         "summary": "上下文：{{used}}/{{window}} token（{{percent}}%），根据上一次响应的估算值。",
@@ -19337,8 +19612,6 @@
       "eyebrow": "新功能",
       "title": "本机聊天已升级",
       "chatModeNote": "新的智能体标签页仍像以前一样在终端中打开。",
-      "chatModeLabel": "开启聊天模式",
-      "chatModeHint": "新的智能体标签页改为以聊天方式打开。",
       "intro": "受支持智能体的新聊天现在会在升级后的聊天视图中打开。要在聊天和 CLI 之间切换，请打开右侧边栏中的{{panel}}：",
       "resumeInNativeChat": "{{action}}：在本机聊天中打开受支持的 CLI 对话。",
       "resumeInCli": "{{action}}：将 Claude 或 Codex 聊天复制到新的 CLI 会话中。原始聊天保持不变。",
@@ -19775,5 +20048,16 @@
   },
   "projectField": {
     "updateFailed": "无法更新项目字段"
-  }
+  },
+  "settings.agents.environmentName": "环境变量名称",
+  "settings.agents.environmentValue": "{{name}} 的值",
+  "settings.agents.savedEnvironment": "已保存的值 · 输入以替换",
+  "settings.agents.newEnvironment": "值",
+  "settings.agents.removeEnvironment": "删除",
+  "settings.agents.loadingHost": "正在加载代理设置…",
+  "settings.agents.updateHost": "请更新此服务器以编辑其代理启动设置。",
+  "settings.agents.readFailed": "无法读取代理设置。请检查主机连接并重试。",
+  "settings.agents.saveFailed": "无法保存代理设置。请检查主机连接并重试。",
+  "settings.agents.hostDefaults": "所选主机上新代理的默认设置。",
+  "settings.agents.save": "保存"
 }

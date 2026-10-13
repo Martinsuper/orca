@@ -147,6 +147,28 @@
     "retrying": "Retrying…"
   },
   "settings": {
+    "chat": {
+      "description": "Choose how chats look and behave.",
+      "names": {
+        "title": "Chat names",
+        "description": "Use an agent to name new chats from their first message. Without a generated name, chats stay Claude Chat or Codex Chat.",
+        "enable": "Name chats automatically",
+        "recipe": "Chat name",
+        "recipeDescription": "Generate a short name from the first message in a new chat.",
+        "customCommandDescription": "Command line shared by recipes that select Custom command. Use {prompt} to pass the input as an argument; otherwise it is piped to stdin.",
+        "saveFailed": "Could not save chat name settings.",
+        "searchAgent": "agent",
+        "searchTemplate": "command template"
+      },
+      "permissionsTitle": "Permissions for new chats",
+      "permissionsDescription": "Applies to new chats only. Agents you open in a terminal use Settings → Agents → Agent Permissions."
+    },
+    "terminal": {
+      "optionLayoutAlt": "ABC or U.S. — Option sends Alt/Esc sequences",
+      "optionLayoutCompose": "layout uses Option to compose characters like @, €, [, ]",
+      "optionLayoutUnknown": "unknown layout — Option composes characters (safe default)",
+      "optionShortcutHint": "Choose Both for Option shortcuts, Off for accents and symbols, or Left/Right to use one Option key for each."
+    },
     "appearance": {
       "language": {
         "title": "Language",
@@ -252,26 +274,6 @@
         "restartRequired": "Restart required",
         "unavailable": "Browser identity is unavailable."
       }
-    },
-    "chat": {
-      "description": "Choose how chats look and behave.",
-      "names": {
-        "title": "Chat names",
-        "description": "Use an agent to name new chats from their first message. Without a generated name, chats stay Claude Chat or Codex Chat.",
-        "enable": "Name chats automatically",
-        "recipe": "Chat name",
-        "recipeDescription": "Generate a short name from the first message in a new chat.",
-        "customCommandDescription": "Command line shared by recipes that select Custom command. Use {prompt} to pass the input as an argument; otherwise it is piped to stdin.",
-        "saveFailed": "Could not save chat name settings.",
-        "searchAgent": "agent",
-        "searchTemplate": "command template"
-      }
-    },
-    "terminal": {
-      "optionLayoutAlt": "ABC or U.S. — Option sends Alt/Esc sequences",
-      "optionLayoutCompose": "layout uses Option to compose characters like @, €, [, ]",
-      "optionLayoutUnknown": "unknown layout — Option composes characters (safe default)",
-      "optionShortcutHint": "Choose Both for Option shortcuts, Off for accents and symbols, or Left/Right to use one Option key for each."
     },
     "agents": {
       "codexTerminalServerIsolation": {
@@ -2184,7 +2186,8 @@
         "expandNode": "Expand {{value0}}",
         "selectMachine": "Select all chats on {{value0}}",
         "sshHost": "SSH",
-        "done": "Done"
+        "done": "Done",
+        "resultListLabel": "Chats in this resume"
       },
       "StarNagCard": {
         "92b0f9d921": "is authenticated and try again.",
@@ -3272,7 +3275,8 @@
           }
         },
         "dialog": {
-          "f26c4baeda": "Close"
+          "f26c4baeda": "Close",
+          "minimize": "Minimize"
         },
         "repo": {
           "multi": {
@@ -4389,7 +4393,12 @@
             "checkTooltip": "Chats Orca couldn’t resume, or couldn’t confirm it resumed, after the restart. Click for details.",
             "resumingTooltip": "Restoring interrupted chats and asking them to carry on…",
             "resumingProgressLabel": "Resuming chats {{value0}}/{{value1}}",
-            "resumingProgressAria": "Resuming chats, {{value0}} of {{value1}} done. Click to open details."
+            "resumingProgressAria": "Resuming chats, {{value0}} of {{value1}} done. Click to open details.",
+            "resumedLabelOne": "1 chat resumed",
+            "resumedLabel": "{{value0}} chats resumed",
+            "resumedAriaOne": "1 chat resumed. Click to see it.",
+            "resumedAria": "{{value0}} chats resumed. Click to see them.",
+            "resumedTooltip": "Chats Orca resumed after the restart. Click to see them."
           },
           "StatusBarUsageChangeNotices": {
             "compactTitle": "Usage display is now compact",
@@ -11467,7 +11476,7 @@
           "sourceControlAiDefaults": "Recipes, prompts, and hosted-review defaults are shared by this client; model choices and discovery stay scoped to the host where the agent runs.",
           "projectOnThisHost": "Project on this host",
           "repositorySourceControlAi": "These overrides apply to this project setup and inherit the client Source Control AI defaults until customized.",
-          "agentLaunchDefaults": "Default agent, command overrides, CLI arguments, and launch environment are client preferences. SSH and remote server launches still validate host availability at run time.",
+          "agentLaunchDefaults": "Default agent, command overrides, CLI arguments, and launch environment are saved on the selected host.",
           "clientDefaultProjectScopes": "Client default + project scopes",
           "terminalQuickCommands": "Commands are saved on this client, then scoped globally or to a project setup so they run from the selected terminal context.",
           "hostOverride": "Host override",
@@ -12764,18 +12773,7 @@
           "olderTerminalsUnverifiable": "Orca couldn’t confirm that terminals started by an older version of Orca have exited. Reconnect to try again.",
           "olderTerminals_one": "{{count}} terminal started by an older version of Orca is still running on this host, and it doesn’t stop on its own. Close it in that version of Orca or end it on the host, then reconnect.",
           "olderTerminals_other": "{{count}} terminals started by an older version of Orca are still running on this host, and they don’t stop on their own. Close them in that version of Orca or end them on the host, then reconnect.",
-          "olderTerminals": "{{count}} terminals started by an older version of Orca are still running on this host, and they don’t stop on their own. Close them in that version of Orca or end them on the host, then reconnect.",
-          "oldTerminalsStopLead": "To end them on the host, run:",
-          "oldTerminalsStopLeadPids": "To end them on the host (process IDs {{pids}}), run:",
-          "endOldTerminals": {
-            "action": "End old terminals on this host",
-            "title": "End old terminals on this host?",
-            "description": "This ends every terminal an older version of Orca left running on this host for this account, including ones opened from other computers. The shells and agents running in them stop. Agents that support resume can be resumed afterwards; plain shells can’t be brought back.",
-            "confirm": "End terminals",
-            "running": "Ending old terminals…",
-            "connected": "Old terminals ended. The host is connected.",
-            "failed": "Orca couldn’t end the old terminals."
-          }
+          "olderTerminals": "{{count}} terminals started by an older version of Orca are still running on this host, and they don’t stop on their own. Close them in that version of Orca or end them on the host, then reconnect."
         },
         "ZcodeCliSetupSection": {
           "title": "Use GLM with ZCode",
@@ -18215,7 +18213,11 @@
         "resumingTitleOne": "Resuming 1 chat",
         "resumingTitle": "Resuming {{value0}} chats",
         "description": "Each chat is restored with its full context and asked to check where it stopped. You can close this; the status bar keeps track.",
-        "resumedTitleOne": "Resumed {{value0}} of 1 chat"
+        "resumedTitleOne": "Resumed {{value0}} of 1 chat",
+        "finished": "These chats were working when Orca closed. Orca restored each one where it stopped, with its full context, and asked the agent to check what it was doing before carrying on. Your own prompts weren’t re-sent.",
+        "finishedUpdate": "These chats were working when Orca installed an update. Orca restored each one where it stopped, with its full context, and asked the agent to check what it was doing before carrying on. Your own prompts weren’t re-sent.",
+        "finishedPartial": "These chats were working when Orca closed. The ones Orca resumed were restored where they stopped, with their full context, and asked to check what they were doing before carrying on. Your own prompts weren’t re-sent. Check the list for chats that still need attention or can be resumed.",
+        "finishedPartialUpdate": "These chats were working when Orca installed an update. The ones Orca resumed were restored where they stopped, with their full context, and asked to check what they were doing before carrying on. Your own prompts weren’t re-sent. Check the list for chats that still need attention or can be resumed."
       },
       "NativeChatResumeRunStatusIcon": {
         "waitingForReply": "Waiting for a reply",
@@ -18235,6 +18237,11 @@
         "attention": "Need you",
         "running": "Running {{value0}}",
         "filter": "Show chats"
+      },
+      "NativeChatResumeAutoNote": {
+        "resuming": "Resuming automatically after the restart.",
+        "resumed": "Resumed automatically after the restart.",
+        "changeInSettings": "Change in Settings"
       }
     },
     "i18n": {
@@ -18367,21 +18374,22 @@
         "one": "1 changed file",
         "many": "{{count}} changed files",
         "partial": "Partial diff",
-        "recorded": "Totals from recorded edits in this turn."
+        "showDiff": "Show diff",
+        "hideDiff": "Hide diff"
       },
       "receipt": {
         "unavailable": "Selected answer unavailable",
+        "emptyAnswer": "Empty answer",
         "cancelled": "Cancelled",
         "resolved": "Resolved",
         "resolver": "Answered on {{device}}",
-        "cancelledBy": "Cancelled on {{device}}",
-        "emptyAnswer": "Empty answer"
+        "cancelledBy": "Cancelled on {{device}}"
       },
       "notices": {
+        "contextCleared": "Context cleared",
         "compaction": "Context compacted",
         "details": "Details",
         "plan": "Plan",
-        "contextCleared": "Context cleared",
         "historyRepaired": "Part of this chat's history couldn't be loaded.",
         "historyItemTooLarge": "This part of the chat was too large to show.",
         "stoppedBeforeStart": "Stopped manually",
@@ -18400,7 +18408,9 @@
         "noPty": "No live terminal — toggle back to reconnect.",
         "locked": "Input is held by another device.",
         "placeholder": "Ask anything, @ to mention files, / for commands",
-        "mentionHint": "Referencing file:",
+        "loadingFiles": "Loading files...",
+        "noFiles": "No matching files",
+        "filesLoadFailed": "Couldn't load files",
         "attach": "Attach file",
         "startDictation": "Start dictation",
         "stopDictation": "Stop dictation",
@@ -18411,6 +18421,7 @@
         "skills": "Skills",
         "loadingSkills": "Loading skills...",
         "skillsLoaded": "Skills loaded",
+        "clearDescription": "Clear conversation context",
         "skillsUnavailableHost": "Skills can't be listed in SSH chats",
         "skillsLoadFailed": "Couldn't load skills",
         "retrySkills": "Retry",
@@ -18421,23 +18432,34 @@
         "skillScopeBuiltIn": "Built-in",
         "skillScopePlugin": "Plugin",
         "localAttachmentUnsupported": "Local attachments are not available for remote sessions.",
+        "attachFailed": "Couldn't attach {{files}}.",
+        "attachFailedBecause": "Couldn't attach {{files}}. {{reason}}",
+        "uploadingFile": "Uploading {{name}}…",
         "removeAttachment": "Remove attachment",
         "pastedImageLabel": "Pasted image",
+        "draftNotSaved": "This draft couldn't be saved yet. Orca keeps trying.",
+        "imageNotBroughtBack": "{{name}} couldn't be brought back with this draft. Attach it again or remove it.",
+        "pastedImageNotBroughtBack": "This pasted image couldn't be brought back with this draft. Remove it, and paste it again if you still need it.",
+        "removeImageToSend": "An image couldn't be brought back. Remove it to send.",
+        "removeImagesToSend": "Some images couldn't be brought back. Remove them to send.",
+        "imageAttachAgainLabel": "Attach again",
+        "pastedImageNotKeptLabel": "Not kept",
         "imagePasteFailed": "Image paste failed.",
         "imageSaving": "Saving pasted image…",
         "worktreeNotReady": "Worktree not ready — try again in a moment.",
-        "uploadingAttachments": "Uploading {{value0}} file(s) to remote…",
+        "pasteUnavailable": "Can't paste — this chat isn't accepting input right now.",
         "model": "Model",
         "effort": "Effort",
         "fastMode": "Fast mode",
+        "speed": "Speed",
         "thinking": "Thinking",
         "options": "Options",
         "sessionOptions": "Session options",
         "chooseInAgentPicker": "Choose in agent picker…",
+        "searchModels": "Search models…",
+        "noModelsMatch": "No models match your search.",
         "toggleOption": "Toggle {{value0}}",
         "pillAccessibleName": "{{value0}} {{value1}}",
-        "valueIsDefault": "Default",
-        "valueNotReported": "Not reported",
         "sentNotConfirmed": "Sent to the agent — not confirmed",
         "setWhenSessionStarts": "Set when the session starts.",
         "availableAfterSessionStarts": "Available after the session starts.",
@@ -18457,32 +18479,27 @@
         "viewAttachment": "View image",
         "imagePreview": "Full-size image preview",
         "imagePreviewUnavailable": "Preview unavailable",
-        "workspaceAttachmentMismatch": "Files can only be attached to their source workspace.",
-        "attachmentOwnerChanged": "This workspace changed hosts while attaching — drop the files again.",
-        "attachmentUnreadable": "Couldn't read the dropped files.",
-        "loadingFiles": "Loading files...",
-        "noFiles": "No matching files",
-        "filesLoadFailed": "Couldn't load files",
-        "clearDescription": "Clear conversation context",
-        "attachFailed": "Couldn't attach {{files}}.",
-        "attachFailedBecause": "Couldn't attach {{files}}. {{reason}}",
-        "uploadingFile": "Uploading {{name}}…",
-        "draftNotSaved": "This draft couldn't be saved yet. Orca keeps trying.",
-        "imageNotBroughtBack": "{{name}} couldn't be brought back with this draft. Attach it again or remove it.",
-        "pastedImageNotBroughtBack": "This pasted image couldn't be brought back with this draft. Remove it, and paste it again if you still need it.",
-        "removeImageToSend": "An image couldn't be brought back. Remove it to send.",
-        "removeImagesToSend": "Some images couldn't be brought back. Remove them to send.",
-        "imageAttachAgainLabel": "Attach again",
-        "pastedImageNotKeptLabel": "Not kept",
-        "pasteUnavailable": "Can't paste — this chat isn't accepting input right now.",
-        "speed": "Speed",
-        "searchModels": "Search models…",
-        "noModelsMatch": "No models match your search.",
         "copyImage": "Copy image",
         "copyImageFailed": "Couldn't copy image",
         "copyImageTooLarge": "The image is too large to copy.",
         "imageCopied": "Image copied",
+        "workspaceAttachmentMismatch": "Files can only be attached to their source workspace.",
+        "attachmentOwnerChanged": "This workspace changed hosts while attaching — drop the files again.",
+        "attachmentUnreadable": "Couldn't read the dropped files.",
         "tooManyAttachments": "Attach {{value0}} or fewer files at a time.",
+        "permissions": "Permissions",
+        "permissionAsk": "Ask for approval",
+        "permissionAskDescription": "Asks before edits and commands your settings don't allow",
+        "permissionAskCodexDescription": "Edits files and runs commands in this workspace; asks before anything else",
+        "permissionAskSharedDescription": "Asks before edits or commands it isn't already allowed to make",
+        "permissionAcceptEdits": "Accept edits",
+        "permissionAcceptEditsDescription": "Approves file edits and file commands; asks for the rest",
+        "permissionAuto": "Approve for me",
+        "permissionAutoDescription": "Reviews approval requests for you",
+        "permissionFullAccess": "Full access",
+        "permissionFullAccessDescription": "Never asks before edits or commands",
+        "permissionFullAccessCodexDescription": "Never asks; can edit any file and use the network",
+        "permissionFullAccessSharedDescription": "Never asks before edits or commands",
         "pasteFailed": "Paste failed.",
         "commandAttachmentsUnsupported": "Remove attachments before using a chat-session command."
       },
@@ -18496,6 +18513,8 @@
         "moreCalls": "+{{value0}} more",
         "failedCount": "{{value0}} failed",
         "failedCallsLabel": "Failed tool calls: {{value0}}",
+        "interruptedCount": "{{value0}} interrupted",
+        "interruptedCallsLabel": "Interrupted tool calls: {{value0}}",
         "runningPreview": "Running {{preview}}",
         "runningCommand": "Running command",
         "runningNamedPreview": "Running {{toolName}} {{preview}}",
@@ -18506,15 +18525,9 @@
         "ranCommandsManyToolsSummary": "Ran {{commandCount}} commands and used {{toolCount}} tools",
         "usedOneSummary": "Used 1 tool",
         "usedManySummary": "Used {{toolCount}} tools",
-        "editedFile": "Edited file",
-        "addedFile": "Added file",
-        "deletedFile": "Deleted file",
-        "renamedFile": "Renamed file",
         "copyDiff": "Copy diff",
         "diffGap": "Lines not shown",
         "diffTruncated": "Diff truncated",
-        "interruptedCount": "{{value0}} interrupted",
-        "interruptedCallsLabel": "Interrupted tool calls: {{value0}}",
         "row": {
           "running": "Running",
           "reading": "Reading",
@@ -18590,15 +18603,15 @@
       "status": {
         "responding": "Agent is responding",
         "working": "Working…",
-        "thinking": "Thinking",
-        "workingFor": "Working for {{value0}}",
-        "workedFor": "Worked for {{value0}}",
-        "toggleDetails": "Toggle turn details",
         "stopping": "Stopping…",
         "queueAfterStop": "Queue a message to run after the stop",
         "sendAfterStop": "Send a message to run after the stop",
+        "thinking": "Thinking",
+        "workingFor": "Working for {{value0}}",
+        "workedFor": "Worked for {{value0}}",
         "interruptedAfter": "Interrupted after {{value0}}",
-        "failedAfter": "Failed after {{value0}}"
+        "failedAfter": "Failed after {{value0}}",
+        "toggleDetails": "Toggle turn details"
       },
       "backgroundTasks": {
         "monitoring": "Monitoring background tasks",
@@ -18625,38 +18638,36 @@
         "countTasksMany": "{{value0}} tasks",
         "headerTotal": "{{value0}} background tasks",
         "stateWorking": "working",
+        "stateWorkingCount": "{{value0}} working",
         "stateMonitoring": "monitoring",
+        "stateMonitoringCount": "{{value0}} monitoring",
         "stateWaiting": "waiting",
+        "stateWaitingCount": "{{value0}} waiting",
         "stateBlocked": "blocked",
+        "stateBlockedCount": "{{value0}} blocked",
         "stateDone": "done",
+        "stateDoneCount": "{{value0}} done",
         "stateIdle": "stopped",
+        "stateIdleCount": "{{value0}} stopped",
         "stateUnverifiable": "status unavailable",
+        "stateUnverifiableCount": "{{value0}} with status unavailable",
         "reasonWaiting": "needs approval",
-        "reasonUnverifiable": "no contact",
         "reasonBlocked": "failed",
         "groupAgents": "Agents",
         "groupShell": "Shell",
         "groupMonitors": "Monitors",
         "groupWorkflows": "Workflows",
-        "groupTasks": "Tasks",
-        "stateWorkingCount": "{{value0}} working",
-        "stateMonitoringCount": "{{value0}} monitoring",
-        "stateWaitingCount": "{{value0}} waiting",
-        "stateBlockedCount": "{{value0}} blocked",
-        "stateDoneCount": "{{value0}} done",
-        "stateIdleCount": "{{value0}} stopped",
-        "stateUnverifiableCount": "{{value0}} with status unavailable"
+        "groupTasks": "Tasks"
       },
       "jumpToLatest": "Jump to latest",
       "toggle": {
-        "showTerminal": "Show terminal",
-        "showChat": "Show chat view"
+        "showTerminal": "Show terminal"
       },
       "state": {
         "loading": {
+          "label": "Loading chat",
           "title": "Loading conversation…",
-          "subtitle": "Reading the agent transcript.",
-          "label": "Loading chat"
+          "subtitle": "Reading the agent transcript."
         },
         "error": {
           "title": "Could not load conversation",
@@ -18789,6 +18800,7 @@
         "sendAgainToTryOnceMore": "Send your message again to try once more.",
         "couldNotStart": "{{agent}} couldn't start.",
         "couldNotRestart": "{{agent}} couldn't restart.",
+        "codexCliTooOld": "Codex {{installedVersion}} is too old for chats. Update to {{minimumVersion}} or newer.",
         "notSignedIn": "{{agent}} is not signed in.",
         "claudeSystemNotSignedIn": "Claude isn't signed in. Run `{{loginCommand}}`, or choose an account in Claude Accounts settings.",
         "claudeManagedNotSignedIn": "This Claude account isn't signed in. Sign in again in Claude Accounts settings.",
@@ -18812,8 +18824,8 @@
         "chooseClaudeAccountThenSend": "Choose or add one in Claude Accounts settings, then send your message again.",
         "providerExitedRow": "{{agent}} stopped while this response was in progress. You can continue in this conversation.",
         "providerExitedRejection": "{{agent}} stopped before this message was sent.",
-        "providerRejected": "The provider did not accept this message.",
-        "providerRejectedQuoted": "The provider did not accept this message: {{detail}}.",
+        "providerRejected": "{{agent}} didn't accept this message.",
+        "providerRejectedQuoted": "{{agent}} didn't accept this message: {{detail}}.",
         "attachmentEmpty": "An image on this message is empty, so the message was not sent.",
         "attachmentTooLarge": "An image on this message is too large, so the message was not sent.",
         "attachmentLargerThan": "An image on this message is larger than {{size}} MB, so the message was not sent.",
@@ -18946,6 +18958,10 @@
         "close": "Close"
       },
       "transcriptLabel": "Conversation",
+      "resumeInNewChat": {
+        "notSavedYet": "{{agent}} hasn't saved this conversation yet. Try again after it replies.",
+        "cannotResume": "This {{agent}} conversation can't be resumed in a native chat."
+      },
       "loadingEarlierMessages": "Loading earlier messages…",
       "prompt": {
         "collapse": "Collapse",
@@ -18972,6 +18988,8 @@
         "cancel": "Cancel",
         "action": "Rewind to here"
       },
+      "wrapLines": "Wrap lines",
+      "disableLineWrap": "Disable line wrap",
       "context": {
         "unavailable": "Context usage is not known yet. It becomes available after the agent next responds.",
         "summary": "Context: {{used}} / {{window}} tokens ({{percent}}%), estimated from the last response.",
@@ -19432,7 +19450,15 @@
         "inlineVisualsCopy": "Let the agent show charts, diagrams and mockups inside its replies. Applies to newly started chats.",
         "inlineVisualsToggleLabel": "Toggle inline visuals",
         "queueFollowUpsCopy": "Messages you send while the agent is working wait as cards you can steer, edit, or delete. Messages with images send right away.",
-        "queueFollowUpsToggleLabel": "Toggle queue follow-ups"
+        "queueFollowUpsToggleLabel": "Toggle queue follow-ups",
+        "behaviorTitle": "Behavior",
+        "resumeSearchUpdate": "update",
+        "resumeSearchRelaunch": "relaunch",
+        "queueSearchQueue": "queue",
+        "queueSearchSteer": "steer",
+        "shellEnvSearchVariables": "environment variables",
+        "shellEnvSearchPath": "PATH",
+        "shellEnvSearchProxy": "proxy"
       }
     },
     "jiraIssueAssigneeField": {
@@ -19576,14 +19602,15 @@
       "eyebrow": "New",
       "title": "Native chat got an upgrade",
       "chatModeNote": "New agent tabs still open in the terminal, as before.",
-      "chatModeLabel": "Turn on chat mode",
-      "chatModeHint": "New agent tabs open as chat instead.",
+      "okay": "Okay",
+      "enableNow": "Enable Now",
+      "enableError": "Could not enable chat mode.",
       "intro": "New chats with supported agents now open in the upgraded chat view. To move between chat and CLI, open {{panel}} in the right sidebar:",
       "resumeInNativeChat": "{{action}} opens a supported CLI conversation in native chat.",
       "resumeInCli": "{{action}} copies a Claude or Codex chat into a new CLI session. The original chat stays as it is.",
       "settingsInstruction": "Manage Chat UI in",
       "settingsLink": "Settings → Experimental",
-      "gotIt": "Got it"
+      "gotIt": "Got It"
     },
     "sessionSearch": {
       "enableFailed": "Could not turn on session search. Try again.",
@@ -19901,6 +19928,22 @@
       "resumed": "{{count}} agent sessions resumed.",
       "resumed_one": "{{count}} agent session resumed.",
       "resumed_other": "{{count}} agent sessions resumed."
+    },
+    "severedDaemonBanner": {
+      "unknownCount": "its running terminals",
+      "count": "{{count}} running terminals",
+      "unverifiable": "Orca could not verify the terminal service process, so nothing was stopped.",
+      "alreadyReplaced": "The terminal service was already replaced; nothing was stopped.",
+      "restarted": "Terminal service restarted.",
+      "failed": "Restart failed.",
+      "title": "Terminal service is running without its program files",
+      "body": "The terminal service on this computer started from an AppImage that is no longer mounted. It still runs {{sessions}}, but it can crash at any moment. Until you restart it, new terminals are not kept when Orca quits.",
+      "restart": "Restart terminal daemon",
+      "dismiss": "Dismiss",
+      "confirmTitle": "Restart the terminal daemon?",
+      "confirmBody": "Restarting ends every process running in {{sessions}}. Agents that support resume can be resumed afterwards; shells and other jobs cannot and must be started again. Do this when your agents are idle.",
+      "cancel": "Cancel",
+      "confirm": "Restart and end processes"
     }
   },
   "fileExplorer": {
@@ -20149,6 +20192,17 @@
       "updateRuntimeSafely": "Update the remote runtime to safely change workspace links"
     }
   },
+  "settings.agents.environmentName": "Environment variable name",
+  "settings.agents.environmentValue": "Value for {{name}}",
+  "settings.agents.savedEnvironment": "Saved value · enter to replace",
+  "settings.agents.newEnvironment": "Value",
+  "settings.agents.removeEnvironment": "Remove",
+  "settings.agents.loadingHost": "Loading agent settings…",
+  "settings.agents.updateHost": "Update this server to edit its agent launch settings.",
+  "settings.agents.readFailed": "Couldn’t read agent settings. Check the host connection and try again.",
+  "settings.agents.saveFailed": "Couldn’t save agent settings. Check the host connection and try again.",
+  "settings.agents.hostDefaults": "Defaults for new agents on the selected host.",
+  "settings.agents.save": "Save",
   "tabHoverCard": {
     "browser": "Browser",
     "editor": "Editor",
