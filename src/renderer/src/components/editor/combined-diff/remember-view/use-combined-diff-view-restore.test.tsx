@@ -7,10 +7,16 @@ import type { GitStatusEntry } from '../../../../../../shared/git-status-types'
 import type { DiffSection } from '../../diff-section-types'
 import { useCombinedDiffSectionLoadRegistry } from '../load-sections/combined-diff-section-load-registry'
 import type { CombinedDiffEntrySet } from '../resolve-changes/use-combined-diff-entry-set'
-import { combinedDiffViewStateCache } from './combined-diff-view-memory'
+import {
+  claimCombinedDiffView,
+  clearCombinedDiffViewMemory,
+  releaseCombinedDiffView,
+  rememberCombinedDiffView
+} from './combined-diff-view-cache'
 import { useCombinedDiffViewRestore } from './use-combined-diff-view-restore'
-import { disposeClosedEditorTabs } from '../../closed-editor-tab-disposal'
-import type { MonacoModelRegistry } from '../../diff-monaco-model-disposal'
+import { createStore } from 'zustand/vanilla'
+import { createEditorModelRegistry } from '@/lib/editor-model-registry'
+import { attachClosedEditorTabCleanup } from '../../closed-editor-tab-controller'
 import type { OpenFile } from '@/store/slices/editor'
 
 function buildAllModeEntrySet(
@@ -50,7 +56,8 @@ function restoreSections(entrySet: CombinedDiffEntrySet, viewStateKey: string): 
         sections = typeof value === 'function' ? value(sections) : value
       },
       setSideBySide: () => {},
-      viewStateKey
+      viewStateKey,
+      worktreeId: 'wt-1'
     })
   })
   return sections
@@ -59,7 +66,7 @@ function restoreSections(entrySet: CombinedDiffEntrySet, viewStateKey: string): 
 describe('useCombinedDiffViewRestore deferral', () => {
   afterEach(() => {
     cleanup()
-    combinedDiffViewStateCache.clear()
+    clearCombinedDiffViewMemory()
   })
 
   it('keeps uncommitted rows deferred when only the branch pass counted', () => {
@@ -78,7 +85,7 @@ describe('useCombinedDiffViewRestore deferral', () => {
     expect(sections.map((section) => section.loadOnDemand)).toEqual([true, true, false])
   })
 
-  it('restores a closed combined-diff tab from the view-state cache when it is reopened', () => {
+  it('restores a closed combined-diff tab with a cold model registry when reopened', async () => {
     // Why this test exists: combined-diff tab ids are deterministic
     // (`<worktreeId>::all-diffs::uncommitted`), so closing and reopening the review hits the same
     // viewStateKey and restores loaded bodies + scroll with no refetch. Sweeping the combined-diff
@@ -104,33 +111,40 @@ describe('useCombinedDiffViewRestore deferral', () => {
         largeDiffRenderLimit: null
       }
     ]
-    combinedDiffViewStateCache.set(viewStateKey, {
-      entrySignature: entrySet.entrySignature,
-      gitStatusSignature: '',
-      sections: loadedSections,
-      sectionHeights: {},
-      loadedIndices: [0],
-      scrollTop: 0,
-      sideBySide: false
+    const lease = claimCombinedDiffView(viewStateKey, 'wt-1')
+    rememberCombinedDiffView(lease, {
+      view: {
+        entrySignature: entrySet.entrySignature,
+        gitStatusSignature: '',
+        sections: loadedSections,
+        sectionHeights: {},
+        loadedIndices: [0],
+        sideBySide: false
+      }
     })
+    releaseCombinedDiffView(lease)
     cleanup()
 
-    const closedTab = {
+    const closedTab: OpenFile = {
       id: viewStateKey,
       mode: 'diff',
       diffSource: 'combined-uncommitted',
       filePath: '/repo',
-      worktreeId: 'wt-1'
-    } as unknown as OpenFile
-    disposeClosedEditorTabs(
-      {
-        editor: { getModel: () => null, getModels: () => [] },
-        Uri: { parse: (v: string) => v }
-      } as unknown as MonacoModelRegistry,
-      [closedTab]
-    )
-
-    expect(restoreSections(entrySet, viewStateKey)).toEqual(loadedSections)
+      worktreeId: 'wt-1',
+      relativePath: '',
+      language: 'plaintext',
+      isDirty: false
+    }
+    const store = createStore(() => ({ openFiles: [closedTab] }))
+    const detach = attachClosedEditorTabCleanup(store, createEditorModelRegistry())
+    try {
+      store.setState({ openFiles: [] })
+      await Promise.resolve()
+      store.setState({ openFiles: [closedTab] })
+      expect(restoreSections(entrySet, viewStateKey)).toEqual(loadedSections)
+    } finally {
+      detach()
+    }
   })
 
   it('auto-loads an uncounted tracked row once its own pass counted something', () => {

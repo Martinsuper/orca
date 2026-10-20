@@ -20,7 +20,11 @@ import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import * as esbuild from 'esbuild'
 import { chromium, webkit } from 'playwright-core'
-import { MOBILE_WEB_APP_ROOT_RESET, lucideBarrelPlugin } from './build-mobile-web-app-bundle.mjs'
+import {
+  MOBILE_WEB_APP_NATIVE_PARITY_STYLE,
+  MOBILE_WEB_APP_ROOT_RESET,
+  lucideBarrelPlugin
+} from './build-mobile-web-app-bundle.mjs'
 import { mobileWebAppDependenciesPresent } from './mobile-web-app-bundle-dependencies.mjs'
 import { textInputFontSizeFloor } from './mobile-web-app-text-input-font-size-seam.mjs'
 import {
@@ -270,7 +274,8 @@ beforeAll(async () => {
     join(outDir, 'index.html'),
     // The root reset the shipped document carries: every box below the mount is `flex: 1`, so
     // without a definite height on all three the editor measures 0 and paints nothing.
-    `<!doctype html><html><head><meta charset="utf-8">${MOBILE_WEB_APP_ROOT_RESET}</head>` +
+    `<!doctype html><html><head><meta charset="utf-8">${MOBILE_WEB_APP_ROOT_RESET}` +
+      `${MOBILE_WEB_APP_NATIVE_PARITY_STYLE}</head>` +
       '<body><div id="root"></div>' +
       '<script type="module" src="/rich-markdown-check.js"></script></body></html>'
   )
@@ -356,10 +361,11 @@ async function setContentWithin(page, markdown, selector) {
  * The plain paragraph a command case starts from, numbered so no two are the same.
  *
  * The content prop is what resets the document, and the controller only pushes when it differs
- * from what the editor last reported. One command breaks that: WebKit's `insertUnorderedList`
- * nests the `<ul>` inside the `<p>` it was given, and the serializer walks back out with the same
- * text — so re-setting the same string after it is a no-op, and the next command ran against the
- * list rather than against a paragraph.
+ * from what the editor last reported. Re-setting the same string is therefore a no-op, and the
+ * next command would run against the document the one before it left. Both list commands used to
+ * make that worse rather than better: `insertUnorderedList` nests the `<ul>` inside the `<p>` it
+ * was given on both engines, and the serializer read the paragraph inline, so pressing it reported
+ * the paragraph's own text back unchanged.
  */
 const bodyFor = (index) => `body text ${String(index)}`
 
@@ -503,6 +509,82 @@ describeEditor(
           }
         }, 600_000)
 
+        /**
+         * A list typed on the surface, read back as markdown, and rendered from that markdown.
+         *
+         * `insertUnorderedList` puts the `<ul>` inside the `<p>` it was given rather than replacing
+         * it — measured here on WebKit 26.4 and Chromium 147 both — and a serializer that read such
+         * a paragraph inline reported its own text with no marker, so the bullet the user pressed
+         * was gone the moment the host saved what the document reported.
+         */
+        it('edits and selects under the shipped document style, which makes other text unselectable', async () => {
+          const { page, consoleErrors } = await openPage(browser)
+          try {
+            await setContent(page, 'alpha', '<p>alpha</p>')
+            const word = page.locator('#first-surface #editor p')
+            await word.click()
+            await page.keyboard.press('End')
+            await page.keyboard.type(' bravo')
+            await page.waitForFunction(
+              () =>
+                document.querySelector('#first-surface #editor p')?.textContent === 'alpha bravo'
+            )
+            // The browser's own gesture, not a Range: `body` is `user-select: none` on the page.
+            await page.evaluate(() => window.getSelection()?.removeAllRanges())
+            await word.dblclick()
+            expect(await page.evaluate(() => window.getSelection()?.toString().trim())).not.toBe('')
+            expect(consoleErrors).toEqual([])
+          } finally {
+            await page.close()
+          }
+        }, 600_000)
+
+        it('reports a typed bullet list as a list, and renders that markdown back as one', async () => {
+          const { page, consoleErrors } = await openPage(browser)
+          try {
+            const body = 'bullet round trip'
+            await setContent(page, body, `<p>${body}</p>`)
+            await select(page, 'all')
+            await page.evaluate(() => {
+              globalThis.__orcaEditor.changes.length = 0
+            })
+            await press(page, 'Bullet list')
+            await page.waitForFunction(
+              () => document.querySelector('#first-surface #editor')?.querySelector('ul') !== null,
+              null,
+              { timeout: 15_000 }
+            )
+            await page.waitForFunction(() => globalThis.__orcaEditor.changes.length > 0, null, {
+              timeout: 15_000
+            })
+            // The precondition: the engine really did nest the list inside the paragraph. An engine
+            // that replaced the paragraph would leave this case measuring the flat shape, which the
+            // serializer never got wrong.
+            expect(
+              await page.evaluate(
+                () =>
+                  document.querySelector('#first-surface #editor ul')?.parentElement?.tagName ??
+                  null
+              )
+            ).toBe('P')
+            // What the host would save.
+            expect(await page.evaluate(() => globalThis.__orcaEditor.changes.at(-1))).toBe(
+              `- ${body}`
+            )
+
+            // And the trip closes: that markdown comes back in as a list rather than a paragraph.
+            // Through a different document first, because the prop already holds this string and
+            // re-setting the same one is a no-op.
+            await setContent(page, 'plain again', '<p>plain again</p>')
+            await setContent(page, `- ${body}`, `<ul><li><p>${body}</p></li></ul>`)
+
+            expect(await page.evaluate(() => globalThis.__orcaCspViolations)).toEqual([])
+            expect(consoleErrors).toEqual([])
+          } finally {
+            await page.close()
+          }
+        }, 600_000)
+
         it('answers Link and Image from a modal rather than from a prompt that returns null', async () => {
           const { page, consoleErrors } = await openPage(browser)
           try {
@@ -528,13 +610,16 @@ describeEditor(
                 { timeout: 15_000 }
               )
             }
-            // The inserted image painted: `naturalWidth` is 0 for an element the browser refused
-            // or never fetched, which is what a policy that did not admit it would leave.
-            expect(
-              await page.evaluate(
-                () => document.querySelector('#first-surface #editor img')?.naturalWidth ?? 0
+            // Insertion precedes image loading; a refused image must still fail this paint check.
+            await expect
+              .poll(
+                () =>
+                  page.evaluate(
+                    () => document.querySelector('#first-surface #editor img')?.naturalWidth ?? 0
+                  ),
+                { timeout: 15_000 }
               )
-            ).toBeGreaterThan(0)
+              .toBeGreaterThan(0)
             expect(await page.evaluate(() => globalThis.__orcaCspViolations)).toEqual([])
             expect(consoleErrors).toEqual([])
           } finally {

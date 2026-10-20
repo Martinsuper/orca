@@ -188,7 +188,6 @@ export function stubAgentBackgroundSessionWindow(mocks: {
   spawn: TestMock
   write: TestMock
   kill: TestMock
-  markTrusted: TestMock
   runtimeEnvironmentCall: TestMock
   runtimeEnvironmentSubscribe: TestMock
 }): void {
@@ -196,11 +195,11 @@ export function stubAgentBackgroundSessionWindow(mocks: {
     dispatchEvent: mocks.dispatchEvent,
     api: {
       pty: { spawn: mocks.spawn, write: mocks.write, kill: mocks.kill },
-      agentTrust: { markTrusted: mocks.markTrusted },
       runtime: { call: vi.fn() },
       runtimeEnvironments: {
         call: mocks.runtimeEnvironmentCall,
-        subscribe: mocks.runtimeEnvironmentSubscribe
+        subscribe: mocks.runtimeEnvironmentSubscribe,
+        cancelSubscription: vi.fn(async () => undefined)
       }
     }
   })
@@ -215,7 +214,6 @@ export function resetAgentBackgroundSessionTestHarness(args: {
   spawn: TestMock
   write: TestMock
   kill: TestMock
-  markTrusted: TestMock
   dispatchEvent: TestMock
   getLaunchPlatform: TestMock
   runtimeCall: TestMock
@@ -267,7 +265,6 @@ export function resetAgentBackgroundSessionTestHarness(args: {
     spawn: args.spawn,
     write: args.write,
     kill: args.kill,
-    markTrusted: args.markTrusted,
     runtimeEnvironmentCall: args.runtimeTransportCall,
     runtimeEnvironmentSubscribe: args.runtimeSubscribe
   })

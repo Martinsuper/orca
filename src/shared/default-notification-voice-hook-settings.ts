@@ -1,20 +1,8 @@
-import type { NotificationSettings } from './notification-settings-types'
 import type { RepoHookSettings } from './orca-yaml-hook-types'
 import type { VoiceSettings } from './speech-types'
 import { DEFAULT_SETUP_AGENT_STARTUP_POLICY } from './setup-agent-startup-policy'
 
-export function getDefaultNotificationSettings(): NotificationSettings {
-  return {
-    enabled: true,
-    agentTaskComplete: true,
-    terminalBell: false,
-    todoReminder: true,
-    suppressWhenFocused: true,
-    customSoundId: 'system',
-    customSoundPath: null,
-    customSoundVolume: 100
-  }
-}
+export { getDefaultNotificationSettings } from './notification-settings-defaults'
 
 export function getDefaultVoiceSettings(): VoiceSettings {
   return {

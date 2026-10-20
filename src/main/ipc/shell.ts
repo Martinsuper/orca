@@ -1,7 +1,7 @@
 import { validatePathExistenceBatch } from '../../shared/path-existence-batch'
 import { ipcMain, shell, dialog } from 'electron'
 import { constants, copyFile, readFile, stat } from 'node:fs/promises'
-import { basename, extname, isAbsolute, normalize } from 'node:path'
+import { basename, extname, isAbsolute, normalize, posix, win32 } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type {
   ShellOpenExternalEditorRequest,
@@ -10,13 +10,25 @@ import type {
 } from '../../shared/shell-open-types'
 import { MAX_REPO_ICON_UPLOAD_BYTES } from '../../shared/repo-icon'
 import type { Store } from '../persistence'
-import { EXTERNAL_EDITOR_CLI_COMMAND } from '../external-editor-launch'
 import {
-  hasActiveRuntime,
-  pathExistsAsync,
+  EXTERNAL_EDITOR_CLI_COMMAND,
+  launchExternalEditor,
+  resolveExternalEditorLaunchSpec,
+  resolveVsCodeRemoteSshLaunchSpec
+} from '../external-editor-launch'
+import { resolveVsCodeSshAuthority } from '../ssh/config/vscode-ssh-authority'
+import { toSshExecutionHostId } from '../../shared/execution-host'
+import {
+  isEditorSshHostForOwner,
+  listAppRuntimeEnvironments,
+  type ListRuntimeEnvironments
+} from './shell-editor-ssh-host'
+import {
+  isLocallyOwned,
+  pathExists,
+  resolveOwnedPathTarget,
   validateLocalPathTarget
-} from './shell-local-path-guard'
-import { openInExternalEditor } from './shell-external-editor'
+} from './shell-owned-path-target'
 
 export { EXTERNAL_EDITOR_CLI_COMMAND }
 
@@ -25,13 +37,10 @@ const REPO_ICON_IMAGE_MIME_TYPES: Record<string, string> = {
 }
 
 async function openInFileManager(
-  store: Store,
-  pathValue: string
+  pathValue: string,
+  ownerHostId: unknown
 ): Promise<ShellOpenLocalPathResult> {
-  if (hasActiveRuntime(store)) {
-    return { ok: false, reason: 'remote-runtime-unsupported' }
-  }
-  const target = await validateLocalPathTarget(pathValue)
+  const target = await resolveOwnedPathTarget(pathValue, ownerHostId)
   if (!target.ok) {
     return target
   }
@@ -45,7 +54,65 @@ async function openInFileManager(
   }
 }
 
-async function openWithSystemDefault(pathValue: string): Promise<boolean> {
+async function openInExternalEditor(
+  store: Pick<Store, 'getSshTarget'>,
+  request: ShellOpenExternalEditorRequest,
+  listRuntimeEnvironments: ListRuntimeEnvironments
+): Promise<ShellOpenExternalEditorResult> {
+  const connectionId = request.connectionId?.trim()
+  if (connectionId) {
+    const sshTarget = store.getSshTarget(connectionId)
+    if (!sshTarget) {
+      return request.ownerHostId === toSshExecutionHostId(connectionId)
+        ? { ok: false, reason: 'ssh-target-not-found' }
+        : { ok: false, reason: 'remote-runtime-unsupported' }
+    }
+    if (!isEditorSshHostForOwner(sshTarget, request.ownerHostId, listRuntimeEnvironments)) {
+      return { ok: false, reason: 'remote-runtime-unsupported' }
+    }
+    if (sshTarget.owner?.type === 'on-demand-runtime') {
+      return { ok: false, reason: 'remote-runtime-unsupported' }
+    }
+    if (!posix.isAbsolute(request.path) && !win32.isAbsolute(request.path)) {
+      return { ok: false, reason: 'not-absolute' }
+    }
+    const authority = resolveVsCodeSshAuthority(sshTarget)
+    if (!authority.ok) {
+      return authority
+    }
+    const launchSpec = resolveVsCodeRemoteSshLaunchSpec(
+      request.command,
+      request.path,
+      authority.authority
+    )
+    if (!launchSpec) {
+      return { ok: false, reason: 'remote-editor-unsupported' }
+    }
+    try {
+      await launchExternalEditor(launchSpec)
+      return { ok: true }
+    } catch {
+      return { ok: false, reason: 'launch-failed' }
+    }
+  }
+
+  const target = await resolveOwnedPathTarget(request.path, request.ownerHostId)
+  if (!target.ok) {
+    return target
+  }
+  try {
+    // Why the UNC path for a WSL owner: VS Code and Cursor turn it into `--remote wsl+<distro>`.
+    await launchExternalEditor(resolveExternalEditorLaunchSpec(request.command, target.path))
+    return { ok: true }
+  } catch {
+    return { ok: false, reason: 'launch-failed' }
+  }
+}
+
+async function openWithSystemDefault(pathValue: string, ownerHostId: unknown): Promise<boolean> {
+  if (!isLocallyOwned(ownerHostId)) {
+    return false
+  }
   const target = await validateLocalPathTarget(pathValue)
   if (!target.ok) {
     return false
@@ -58,22 +125,29 @@ async function openWithSystemDefault(pathValue: string): Promise<boolean> {
   }
 }
 
-export function registerShellHandlers(store: Store): void {
-  ipcMain.handle('shell:openPath', async (_event, path: string): Promise<void> => {
-    // Why: keep the legacy fire-and-forget renderer contract while reusing the
-    // same absolute/existing path validation as the explicit file-manager API.
-    void (await openInFileManager(store, path))
-  })
+export function registerShellHandlers(
+  store: Pick<Store, 'getSshTarget'>,
+  listRuntimeEnvironments: ListRuntimeEnvironments = listAppRuntimeEnvironments
+): void {
+  ipcMain.handle(
+    'shell:openPath',
+    async (_event, path: string, ownerHostId: unknown): Promise<void> => {
+      // Why: keep the legacy fire-and-forget renderer contract while reusing the
+      // same absolute/existing path validation as the explicit file-manager API.
+      void (await openInFileManager(path, ownerHostId))
+    }
+  )
 
   ipcMain.handle(
     'shell:openInFileManager',
-    (_event, path: string): Promise<ShellOpenLocalPathResult> => openInFileManager(store, path)
+    (_event, path: string, ownerHostId: unknown): Promise<ShellOpenLocalPathResult> =>
+      openInFileManager(path, ownerHostId)
   )
 
   ipcMain.handle(
     'shell:openInExternalEditor',
     (_event, request: ShellOpenExternalEditorRequest): Promise<ShellOpenExternalEditorResult> =>
-      openInExternalEditor(store, request)
+      openInExternalEditor(store, request, listRuntimeEnvironments)
   )
 
   ipcMain.handle('shell:openUrl', (_event, rawUrl: string) => {
@@ -91,11 +165,16 @@ export function registerShellHandlers(store: Store): void {
     return shell.openExternal(parsed.toString())
   })
 
-  ipcMain.handle('shell:openFilePath', async (_event, filePath: string): Promise<boolean> => {
-    return openWithSystemDefault(filePath)
-  })
+  ipcMain.handle(
+    'shell:openFilePath',
+    async (_event, filePath: string, ownerHostId: unknown): Promise<boolean> =>
+      openWithSystemDefault(filePath, ownerHostId)
+  )
 
-  ipcMain.handle('shell:openFileUri', async (_event, rawUri: string) => {
+  ipcMain.handle('shell:openFileUri', async (_event, rawUri: string, ownerHostId: unknown) => {
+    if (!isLocallyOwned(ownerHostId)) {
+      return
+    }
     let parsed: URL
     try {
       parsed = new URL(rawUri)
@@ -124,16 +203,16 @@ export function registerShellHandlers(store: Store): void {
       return
     }
 
-    await openWithSystemDefault(target.path)
+    await openWithSystemDefault(target.path, ownerHostId)
   })
 
   ipcMain.handle('shell:pathsExist', async (_event, paths: string[]): Promise<boolean[]> => {
     validatePathExistenceBatch(paths)
-    return Promise.all(paths.map(pathExistsAsync))
+    return Promise.all(paths.map(pathExists))
   })
 
   ipcMain.handle('shell:pathExists', async (_event, filePath: string): Promise<boolean> => {
-    return pathExistsAsync(filePath)
+    return pathExists(filePath)
   })
 
   ipcMain.handle(
@@ -164,17 +243,13 @@ export function registerShellHandlers(store: Store): void {
     return result.filePaths[0]
   })
 
-  // Why: lets the user pick a local plantuml.jar for markdown PlantUML rendering;
-  // filtering to .jar keeps the picker focused on the expected artifact.
-  ipcMain.handle('shell:pickJarFile', async (): Promise<string | null> => {
+  // Why: a separate plural handler, like repos:pickFolder/pickFolders — callers that
+  // must take exactly one file (the notebook interpreter picker) keep pickAttachment.
+  ipcMain.handle('shell:pickAttachments', async (): Promise<string[]> => {
     const result = await dialog.showOpenDialog({
-      properties: ['openFile'],
-      filters: [{ name: 'JAR', extensions: ['jar'] }]
+      properties: ['openFile', 'multiSelections']
     })
-    if (result.canceled || result.filePaths.length === 0) {
-      return null
-    }
-    return result.filePaths[0]
+    return result.canceled ? [] : result.filePaths
   })
 
   // Why: window.prompt() and <input type="file"> are unreliable in Electron,
@@ -222,6 +297,17 @@ export function registerShellHandlers(store: Store): void {
       }
     }
   )
+
+  ipcMain.handle('shell:pickJarFile', async (): Promise<string | null> => {
+    const result = await dialog.showOpenDialog({
+      properties: ['openFile'],
+      filters: [{ name: 'JAR', extensions: ['jar'] }]
+    })
+    if (result.canceled || result.filePaths.length === 0) {
+      return null
+    }
+    return result.filePaths[0]
+  })
 
   ipcMain.handle('shell:pickAudio', async (): Promise<string | null> => {
     const result = await dialog.showOpenDialog({
