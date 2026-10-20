@@ -107,6 +107,12 @@ jobs:
           retry_wait_seconds: 30
           command: pnpm install --frozen-lockfile
 
+      # Why: mobile is its own pnpm project, so the root install leaves
+      # mobile/node_modules empty and build:mobile-web cannot resolve
+      # react-native-web / expo imports.
+      - name: Install mobile dependencies
+        uses: ./.github/actions/install-mobile-dependencies
+
       # Why: build:release is the exact recipe upstream ships (relay + native
       # helpers + cli + electron-vite + web). Without ORCA_BUILD_IDENTITY the
       # telemetry gate marks this a non-official build — correct for a fork.
