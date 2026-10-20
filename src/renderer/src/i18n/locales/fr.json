@@ -14318,6 +14318,22 @@
             "scanning": "Analyse de {{value0}}",
             "reading": "Lecture de {{value0}} fichiers",
             "scanned": "{{value0}} analysés"
+          },
+          "TodoNavigation": {
+            "all": "Tout",
+            "completed": "Terminé",
+            "important": "Important",
+            "myDay": "Ma journée",
+            "planned": "Prévu"
+          },
+          "TodosPanel": {
+            "all": "Tout",
+            "completed": "Terminé",
+            "global": "Global",
+            "important": "Important",
+            "myDay": "Ma journée",
+            "planned": "Prévu",
+            "thisProject": "Ce projet"
           }
         }
       },

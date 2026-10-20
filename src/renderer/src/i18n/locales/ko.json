@@ -14281,6 +14281,22 @@
             "scanning": "{{value0}} 스캔 중",
             "reading": "파일 {{value0}}개 읽는 중",
             "scanned": "{{value0}} 스캔함"
+          },
+          "TodoNavigation": {
+            "all": "전체",
+            "completed": "완료",
+            "important": "중요",
+            "myDay": "나의 하루",
+            "planned": "계획"
+          },
+          "TodosPanel": {
+            "all": "전체",
+            "completed": "완료",
+            "global": "전역",
+            "important": "중요",
+            "myDay": "나의 하루",
+            "planned": "계획",
+            "thisProject": "이 프로젝트"
           }
         }
       },

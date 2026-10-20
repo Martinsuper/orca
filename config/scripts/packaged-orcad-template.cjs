@@ -23,6 +23,7 @@ const {
   ORCAD_TEMPLATE_TARGETS_DIR
 } = require('../../src/shared/orcad-artifacts.ts')
 const { verifyPackagedOrcadTemplate } = require('./verify-packaged-orcad-template.cjs')
+const { ORCAD_TEMPLATE_TARGETS } = require('../../src/shared/node-runtime-pin.ts')
 
 const ORCAD_TEMPLATE_RESOURCE_DIR = 'orcad-template'
 const orcadTemplateExtraResource = { from: 'out/orcad-template', to: ORCAD_TEMPLATE_RESOURCE_DIR }
@@ -135,7 +136,14 @@ async function finalizePackagedOrcadTemplate(resourcesDir, options) {
     }
     resealOrcadTemplateManifest(templateDir, machO)
   }
-  verifyPackagedOrcadTemplate(resourcesDir)
+  const localTargets =
+    env.ORCA_LOCAL_BUILD_VERSION && env.ORCA_LOCAL_ORCAD_TARGETS
+      ? env.ORCA_LOCAL_ORCAD_TARGETS.split(',')
+      : undefined
+  if (localTargets && localTargets.some((target) => !ORCAD_TEMPLATE_TARGETS.includes(target))) {
+    throw new Error('ORCA_LOCAL_ORCAD_TARGETS must name supported orcad template targets')
+  }
+  verifyPackagedOrcadTemplate(resourcesDir, localTargets)
 }
 
 /** `inner-signing-list.txt` lines are app-relative Windows paths; keep the template's. */

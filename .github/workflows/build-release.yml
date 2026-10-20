@@ -85,9 +85,21 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y build-essential python3 python3-gi gir1.2-atspi-2.0 at-spi2-core xclip xdotool
 
+      # Why: the mac slice ships both arm64 and x64, so the host-only default
+      # install leaves the foreign arch's natives missing and beforePack fails.
+      - name: Install dependencies (macOS, both architectures)
+        if: runner.os == 'macOS'
+        uses: nick-fields/retry@v4
+        with:
+          timeout_minutes: 10
+          max_attempts: 3
+          retry_wait_seconds: 30
+          command: pnpm install --frozen-lockfile --cpu=current,x64,arm64
+
       # Why: Electron's postinstall downloads its binary from GitHub's CDN,
       # which occasionally 504s. Retry so a transient error is not a failed run.
       - name: Install dependencies
+        if: runner.os != 'macOS'
         uses: nick-fields/retry@v4
         with:
           timeout_minutes: 10

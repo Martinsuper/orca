@@ -14594,7 +14594,9 @@
             "removeStep": "Remove step",
             "addStep": "Add a step…",
             "cancel": "Cancel",
-            "save": "Save"
+            "save": "Save",
+            "newTask": "New Task",
+            "add": "Add"
           },
           "TodoItemRow": {
             "markUndone": "Mark as not done",
@@ -14611,7 +14613,13 @@
             "confirmDelete": "Confirm delete",
             "deleteList": "Delete list",
             "listName": "List name",
-            "newList": "New list"
+            "newList": "New list",
+            "defaultList": "Tasks",
+            "all": "All",
+            "completed": "Completed",
+            "important": "Important",
+            "myDay": "My Day",
+            "planned": "Planned"
           },
           "TodosPanel": {
             "globalSource": "Global",
@@ -14620,7 +14628,14 @@
             "noCompleted": "No completed tasks.",
             "empty": "No todos yet. Add your first one above.",
             "addTodo": "Add a todo…",
-            "loadError": "Could not load todos: {{error}}"
+            "loadError": "Could not load todos: {{error}}",
+            "all": "All",
+            "completed": "Completed",
+            "global": "Global",
+            "important": "Important",
+            "myDay": "My Day",
+            "planned": "Planned",
+            "thisProject": "This project"
           },
           "todos": {
             "tabTitle": "Todo"

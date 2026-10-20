@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto'
-import { appendFile, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { appendFile, mkdtemp, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -87,6 +87,33 @@ describe('packaged orcad template', () => {
         signMacBinary: async () => {}
       })
     ).rejects.toThrow('orcad.js checksum mismatch')
+  })
+
+  it('allows an explicitly scoped local template while releases require every target', async () => {
+    quietly()
+    const { resourcesDir, templateDir, manifestPath } = await createResources()
+    const manifest = JSON.parse(await readFile(manifestPath, 'utf8'))
+    const targetsDir = join(templateDir, ORCAD_TEMPLATE_TARGETS_DIR)
+    for (const target of await readdir(targetsDir)) {
+      if (target !== 'darwin-arm64') {
+        delete manifest.targets[target]
+        await rm(join(targetsDir, target), { recursive: true })
+      }
+    }
+    await writeFile(manifestPath, JSON.stringify(manifest))
+    const env = {
+      ORCA_LOCAL_BUILD_VERSION: '1.0.0-local.1',
+      ORCA_LOCAL_ORCAD_TARGETS: 'darwin-arm64'
+    }
+    await expect(
+      finalizePackagedOrcadTemplate(resourcesDir, { platform: 'linux', env })
+    ).resolves.toBeUndefined()
+    await expect(
+      finalizePackagedOrcadTemplate(resourcesDir, {
+        platform: 'linux',
+        env: { ORCA_LOCAL_ORCAD_TARGETS: 'darwin-arm64' }
+      })
+    ).rejects.toThrow('target manifest inventory')
   })
 
   it('refuses to reseal a path the manifest never listed', async () => {

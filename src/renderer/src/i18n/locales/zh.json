@@ -14281,6 +14281,22 @@
             "scanning": "正在扫描 {{value0}}",
             "reading": "正在读取 {{value0}} 个文件",
             "scanned": "已扫描 {{value0}}"
+          },
+          "TodoNavigation": {
+            "all": "全部",
+            "completed": "已完成",
+            "important": "重要",
+            "myDay": "我的一天",
+            "planned": "计划"
+          },
+          "TodosPanel": {
+            "all": "全部",
+            "completed": "已完成",
+            "global": "全局",
+            "important": "重要",
+            "myDay": "我的一天",
+            "planned": "计划",
+            "thisProject": "本项目"
           }
         }
       },

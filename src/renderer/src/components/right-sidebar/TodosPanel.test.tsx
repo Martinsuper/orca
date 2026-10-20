@@ -37,17 +37,24 @@ vi.mock('@/i18n/i18n', () => ({
 vi.mock('./TodoNavigation', () => ({
   TodoNavigation: ({
     activeNav,
-    onNavChange
+    onNavChange,
+    onCreateList,
+    canCreateList
   }: {
     activeNav: { kind: string; view?: string; listId?: string } | undefined
     onNavChange: (
       target: { kind: 'smart-view'; view: 'all' | 'my-day' } | { kind: 'list'; listId: string }
     ) => void
+    onCreateList: (title: string) => Promise<boolean>
+    canCreateList: boolean
   }) => (
     <>
       <div data-testid="active-nav">{activeNav?.view ?? activeNav?.listId}</div>
       <button onClick={() => onNavChange({ kind: 'smart-view', view: 'my-day' })}>My Day</button>
       <button onClick={() => onNavChange({ kind: 'list', listId: 'list-1' })}>List 1</button>
+      <button disabled={!canCreateList} onClick={() => void onCreateList('New project list')}>
+        New list
+      </button>
     </>
   )
 }))
@@ -76,6 +83,54 @@ vi.mock('./TodoItemRow', () => ({
       <button onClick={() => onRemove(todo)}>delete {todo.title}</button>
     </div>
   )
+}))
+
+vi.mock('./TodoEditDialog', () => ({
+  TodoEditDialog: ({
+    open,
+    mode,
+    initial,
+    onSave,
+    onClose
+  }: {
+    open: boolean
+    mode?: string
+    initial: { title: string; listId?: string }
+    onSave: (result: {
+      title: string
+      note: string
+      listId: string
+      important: boolean
+      dueDate: string | null
+      reminderAt: number | null
+      myDayDate: string | null
+      steps: never[]
+    }) => void
+    onClose: () => void
+  }) =>
+    open ? (
+      <div>
+        <div data-testid="create-dialog-mode">{mode}</div>
+        <div data-testid="create-initial-list">{initial?.listId ?? ''}</div>
+        <button
+          onClick={() =>
+            onSave({
+              title: 'Created task',
+              note: 'Created note',
+              listId: initial?.listId ?? '',
+              important: true,
+              dueDate: '2026-10-20',
+              reminderAt: null,
+              myDayDate: null,
+              steps: []
+            })
+          }
+        >
+          save created
+        </button>
+        <button onClick={onClose}>close create</button>
+      </div>
+    ) : null
 }))
 
 import TodosPanel from './TodosPanel'
@@ -154,6 +209,49 @@ afterEach(() => {
 })
 
 describe('TodosPanel', () => {
+  it.each(['project', 'global'])('creates and selects a list in the %s scope', async (scope) => {
+    resetStore()
+    const savedList = { ...defaultList, id: 'new-list', title: 'New project list' }
+    const saveTodoList = vi.fn(async () => savedList)
+    const saveGlobalTodoList = vi.fn(async () => savedList)
+    storeState.todoScope = scope
+    storeState.saveTodoList = saveTodoList
+    storeState.saveGlobalTodoList = saveGlobalTodoList
+    render(<TodosPanel />)
+
+    await act(async () => fireEvent.click(screen.getByText('New list')))
+
+    if (scope === 'project') {
+      expect(saveTodoList).toHaveBeenCalledWith({ repoId: 'repo-a', title: savedList.title })
+      expect(saveGlobalTodoList).not.toHaveBeenCalled()
+    } else {
+      expect(saveGlobalTodoList).toHaveBeenCalledWith({ title: savedList.title })
+      expect(saveTodoList).not.toHaveBeenCalled()
+    }
+    expect(storeState.setTodoNavigation).toHaveBeenCalledWith(
+      scope === 'project' ? 'project:repo-a' : 'global',
+      { kind: 'list', listId: 'new-list' }
+    )
+  })
+
+  it('disables project list creation without an active project', () => {
+    resetStore()
+    activeRepo = undefined
+    render(<TodosPanel />)
+    fireEvent.click(screen.getByText('New list'))
+    expect(screen.getByText('New list').hasAttribute('disabled')).toBe(true)
+    expect(storeState.saveTodoList).not.toHaveBeenCalled()
+    expect(storeState.saveGlobalTodoList).not.toHaveBeenCalled()
+  })
+
+  it('does not select a list when saving fails', async () => {
+    resetStore()
+    storeState.saveTodoList = vi.fn(async () => null)
+    render(<TodosPanel />)
+    await act(async () => fireEvent.click(screen.getByText('New list')))
+    expect(storeState.setTodoNavigation).not.toHaveBeenCalled()
+  })
+
   it('retains stored navigation across an unmount and remount', () => {
     resetStore()
     storeState.todoNavigationByScope = { 'project:repo-a': { kind: 'list', listId: 'list-1' } }
@@ -294,5 +392,81 @@ describe('TodosPanel', () => {
     )
     expect(storeState.removeGlobalTodo).toHaveBeenCalledWith({ todoId: 'same-id' })
     expect(storeState.removeTodo).toHaveBeenCalledWith({ repoId: 'repo-a', todoId: 'same-id' })
+  })
+
+  it('opens a create dialog from the Add button and saves a full todo in project scope', () => {
+    resetStore()
+    storeState.todoNavigationByScope = { 'project:repo-a': { kind: 'list', listId: 'list-1' } }
+    storeState.todoListsByRepo = {
+      'repo-a': [{ id: 'list-1', repoId: 'repo-a', title: 'List 1', createdAt: 1, updatedAt: 1 }]
+    }
+    render(<TodosPanel />)
+
+    expect(screen.queryByTestId('create-dialog-mode')).toBeNull()
+    fireEvent.click(screen.getByText('Add a todo'))
+    expect(screen.getByTestId('create-dialog-mode').textContent).toBe('create')
+    expect(screen.getByTestId('create-initial-list').textContent).toBe('list-1')
+    fireEvent.click(screen.getByText('save created'))
+
+    expect(storeState.saveTodo).toHaveBeenCalledWith(
+      expect.objectContaining({
+        repoId: 'repo-a',
+        title: 'Created task',
+        note: 'Created note',
+        listId: 'list-1',
+        important: true,
+        dueDate: '2026-10-20'
+      })
+    )
+    expect(storeState.saveGlobalTodo).not.toHaveBeenCalled()
+  })
+
+  it('targets the first list and saves via the global store in global scope', () => {
+    resetStore()
+    storeState.todoScope = 'global'
+    storeState.todoNavigationByScope = { global: { kind: 'smart-view', view: 'all' } }
+    render(<TodosPanel />)
+
+    fireEvent.click(screen.getByText('Add a todo'))
+    expect(screen.getByTestId('create-initial-list').textContent).toBe('default')
+    fireEvent.click(screen.getByText('save created'))
+
+    expect(storeState.saveGlobalTodo).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Created task', listId: 'default' })
+    )
+    expect(storeState.saveTodo).not.toHaveBeenCalled()
+  })
+
+  it('hides the Add button in Completed and My Day views', () => {
+    resetStore()
+    storeState.todoNavigationByScope = {
+      'project:repo-a': { kind: 'smart-view', view: 'completed' }
+    }
+    const view = render(<TodosPanel />)
+    expect(screen.queryByText('Add a todo')).toBeNull()
+    view.unmount()
+
+    resetStore()
+    storeState.todoNavigationByScope = { 'project:repo-a': { kind: 'smart-view', view: 'my-day' } }
+    render(<TodosPanel />)
+    expect(screen.queryByText('Add a todo')).toBeNull()
+  })
+
+  it('keeps the create dialog open when saving fails and closes it on success', async () => {
+    resetStore()
+    const savedTodo = makeTodo({ id: 'todo-9', title: 'Created task' })
+    const saveTodo = vi.fn(async (): Promise<Todo | null> => null)
+    storeState.saveTodo = saveTodo
+    render(<TodosPanel />)
+
+    fireEvent.click(screen.getByText('Add a todo'))
+    await act(async () => fireEvent.click(screen.getByText('save created')))
+    expect(saveTodo).toHaveBeenCalledTimes(1)
+    expect(screen.getByTestId('create-dialog-mode')).toBeTruthy()
+
+    saveTodo.mockResolvedValueOnce(savedTodo)
+    await act(async () => fireEvent.click(screen.getByText('save created')))
+    expect(saveTodo).toHaveBeenCalledTimes(2)
+    expect(screen.queryByTestId('create-dialog-mode')).toBeNull()
   })
 })

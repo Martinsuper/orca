@@ -53,7 +53,7 @@ export function TodoItemRow({
 
   return (
     <>
-      <div className="group flex items-start gap-2 px-2 py-1.5 hover:bg-muted/50">
+      <div className="group flex min-w-0 items-start gap-2 px-2 py-1.5 hover:bg-muted/50">
         <button
           className="mt-0.5 shrink-0"
           onClick={() => onToggle(todo, !todo.done)}
@@ -78,9 +78,9 @@ export function TodoItemRow({
         </button>
 
         <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-1">
+          <div className="flex min-w-0 items-center gap-1">
             <p
-              className={`text-sm leading-snug ${
+              className={`min-w-0 break-all text-sm leading-snug ${
                 todo.done ? 'text-muted-foreground line-through' : ''
               }`}
             >
@@ -92,7 +92,9 @@ export function TodoItemRow({
           </div>
 
           {todo.note && (
-            <p className="mt-0.5 text-xs leading-snug text-muted-foreground">{todo.note}</p>
+            <p className="mt-0.5 break-all text-xs leading-snug text-muted-foreground">
+              {todo.note}
+            </p>
           )}
 
           <div className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-0.5">
@@ -121,7 +123,7 @@ export function TodoItemRow({
               </span>
             )}
             {projectLabel && (
-              <span className="text-xs text-muted-foreground truncate">{projectLabel}</span>
+              <span className="min-w-0 truncate text-xs text-muted-foreground">{projectLabel}</span>
             )}
           </div>
         </div>

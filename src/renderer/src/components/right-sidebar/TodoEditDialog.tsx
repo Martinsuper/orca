@@ -8,6 +8,7 @@ import { Label } from '../ui/label'
 import { Switch } from '../ui/switch'
 import { translate } from '@/i18n/i18n'
 import type { TodoList, TodoStep } from '../../../../shared/types'
+import { displayTodoListTitle } from './todo-list-display'
 
 export type TodoEditDialogResult = {
   title: string
@@ -22,6 +23,7 @@ export type TodoEditDialogResult = {
 
 type TodoEditDialogProps = {
   open: boolean
+  mode?: 'create' | 'edit'
   initial: Partial<TodoEditDialogResult> & { title: string }
   lists: TodoList[]
   canChangeList: boolean
@@ -64,8 +66,16 @@ function newStepId(): string {
   return `step-${Date.now()}-${stepIdCounter}`
 }
 
+// Why: the todo's list may have been deleted (its rows stay visible in smart
+// views) or lists may still be loading, so fall back to the first available
+// list instead of saving an unknown id the backend would reject.
+function resolveInitialListId(listId: string | undefined, lists: TodoList[]): string {
+  return listId && lists.some((l) => l.id === listId) ? listId : (lists[0]?.id ?? '')
+}
+
 export function TodoEditDialog({
   open,
+  mode = 'edit',
   initial,
   lists,
   canChangeList,
@@ -74,7 +84,7 @@ export function TodoEditDialog({
 }: TodoEditDialogProps): React.JSX.Element | null {
   const [title, setTitle] = useState(initial.title ?? '')
   const [note, setNote] = useState(initial.note ?? '')
-  const [listId, setListId] = useState(initial.listId ?? lists[0]?.id ?? '')
+  const [listId, setListId] = useState(resolveInitialListId(initial.listId, lists))
   const [important, setImportant] = useState(initial.important ?? false)
   const [dueDate, setDueDate] = useState(initial.dueDate ?? '')
   const [reminderLocal, setReminderLocal] = useState(epochToDatetimeLocal(initial.reminderAt))
@@ -92,7 +102,7 @@ export function TodoEditDialog({
       const currentInitial = initialRef.current
       setTitle(currentInitial.title ?? '')
       setNote(currentInitial.note ?? '')
-      setListId(currentInitial.listId ?? listsRef.current[0]?.id ?? '')
+      setListId(resolveInitialListId(currentInitial.listId, listsRef.current))
       setImportant(currentInitial.important ?? false)
       setDueDate(currentInitial.dueDate ?? '')
       setReminderLocal(epochToDatetimeLocal(currentInitial.reminderAt))
@@ -150,7 +160,9 @@ export function TodoEditDialog({
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>
-            {translate('auto.components.right.sidebar.TodoEditDialog.editTask', 'Edit Task')}
+            {mode === 'create'
+              ? translate('auto.components.right.sidebar.TodoEditDialog.newTask', 'New Task')
+              : translate('auto.components.right.sidebar.TodoEditDialog.editTask', 'Edit Task')}
           </DialogTitle>
         </DialogHeader>
 
@@ -165,6 +177,9 @@ export function TodoEditDialog({
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               onKeyDown={(e) => {
+                if (e.nativeEvent.isComposing) {
+                  return
+                }
                 if (e.key === 'Enter') {
                   handleSave()
                 }
@@ -197,7 +212,7 @@ export function TodoEditDialog({
               >
                 {lists.map((l) => (
                   <option key={l.id} value={l.id}>
-                    {l.title}
+                    {displayTodoListTitle(l)}
                   </option>
                 ))}
               </select>
@@ -315,6 +330,9 @@ export function TodoEditDialog({
                   value={newStepTitle}
                   onChange={(e) => setNewStepTitle(e.target.value)}
                   onKeyDown={(e) => {
+                    if (e.nativeEvent.isComposing) {
+                      return
+                    }
                     if (e.key === 'Enter') {
                       e.preventDefault()
                       addStep()
@@ -331,7 +349,9 @@ export function TodoEditDialog({
             {translate('auto.components.right.sidebar.TodoEditDialog.cancel', 'Cancel')}
           </Button>
           <Button size="sm" onClick={handleSave} disabled={title.trim().length === 0}>
-            {translate('auto.components.right.sidebar.TodoEditDialog.save', 'Save')}
+            {mode === 'create'
+              ? translate('auto.components.right.sidebar.TodoEditDialog.add', 'Add')
+              : translate('auto.components.right.sidebar.TodoEditDialog.save', 'Save')}
           </Button>
         </DialogFooter>
       </DialogContent>

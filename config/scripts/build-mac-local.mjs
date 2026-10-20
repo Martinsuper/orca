@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { assertOrcadTemplateBuilt } from './packaged-orcad-template.cjs'
 
 export function createLocalBuildVersion(baseVersion, timestamp, commit) {
   if (!/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?$/.test(baseVersion)) {
@@ -29,14 +30,23 @@ export function getLocalBuildIdentity() {
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === resolve(import.meta.filename)) {
+  assertOrcadTemplateBuilt(resolve('.'), { ORCA_REQUIRE_ORCAD_TEMPLATE: '1' })
   const identity = getLocalBuildIdentity()
   console.log(`[build:mac] local update version ${identity.version}`)
   execFileSync(
     process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm',
-    ['exec', 'electron-builder', '--config', 'config/electron-builder.config.cjs', '--mac'],
+    [
+      'exec',
+      'electron-builder',
+      '--config',
+      'config/electron-builder.config.cjs',
+      '--mac',
+      ...process.argv.slice(2)
+    ],
     {
       env: {
         ...process.env,
+        ORCA_REQUIRE_ORCAD_TEMPLATE: '1',
         ORCA_BUILD_COMMIT: identity.commit,
         ORCA_LOCAL_BUILD_VERSION: identity.version
       },

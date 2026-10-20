@@ -14281,6 +14281,22 @@
             "scanning": "{{value0}}をスキャン中",
             "reading": "{{value0}} ファイルを読み込み中",
             "scanned": "{{value0}}をスキャン済み"
+          },
+          "TodoNavigation": {
+            "all": "すべて",
+            "completed": "完了",
+            "important": "重要",
+            "myDay": "マイデイ",
+            "planned": "予定"
+          },
+          "TodosPanel": {
+            "all": "すべて",
+            "completed": "完了",
+            "global": "グローバル",
+            "important": "重要",
+            "myDay": "マイデイ",
+            "planned": "予定",
+            "thisProject": "このプロジェクト"
           }
         }
       },

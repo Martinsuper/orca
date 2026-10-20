@@ -61,4 +61,70 @@ describe('TodoEditDialog', () => {
       })
     )
   })
+
+  it('falls back to the first list when the initial list is gone', () => {
+    const onSave = vi.fn()
+    render(
+      <TodoEditDialog
+        open
+        initial={{ title: 'Orphaned', listId: 'deleted-list' }}
+        lists={lists}
+        canChangeList
+        onClose={vi.fn()}
+        onSave={onSave}
+      />
+    )
+    expect(screen.getByLabelText('List')).toHaveProperty('value', 'default')
+    fireEvent.click(screen.getByText('Save'))
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({ listId: 'default' }))
+  })
+
+  it('does not add a step while confirming IME composition', () => {
+    render(
+      <TodoEditDialog
+        open
+        mode="create"
+        initial={{ title: '' }}
+        lists={lists}
+        canChangeList
+        onClose={vi.fn()}
+        onSave={vi.fn()}
+      />
+    )
+    const stepInput = screen.getByPlaceholderText('Add a step…')
+    fireEvent.change(stepInput, { target: { value: '步骤一' } })
+    fireEvent.keyDown(stepInput, { key: 'Enter', isComposing: true })
+    expect(screen.queryByText('Remove step')).toBeNull()
+    expect(stepInput).toHaveProperty('value', '步骤一')
+  })
+
+  it('renders create copy in create mode and keeps edit copy by default', () => {
+    const view = render(
+      <TodoEditDialog
+        open
+        mode="create"
+        initial={{ title: '' }}
+        lists={lists}
+        canChangeList
+        onClose={vi.fn()}
+        onSave={vi.fn()}
+      />
+    )
+    expect(screen.getByText('New Task')).toBeTruthy()
+    expect(screen.getByText('Add')).toBeTruthy()
+    view.unmount()
+
+    render(
+      <TodoEditDialog
+        open
+        initial={{ title: 'Existing' }}
+        lists={lists}
+        canChangeList
+        onClose={vi.fn()}
+        onSave={vi.fn()}
+      />
+    )
+    expect(screen.getByText('Edit Task')).toBeTruthy()
+    expect(screen.getByText('Save')).toBeTruthy()
+  })
 })

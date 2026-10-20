@@ -14276,6 +14276,22 @@
             "scanning": "Analizando {{value0}}",
             "reading": "Leyendo {{value0}} archivos",
             "scanned": "Analizados {{value0}}"
+          },
+          "TodoNavigation": {
+            "all": "Todo",
+            "completed": "Completado",
+            "important": "Importante",
+            "myDay": "Mi día",
+            "planned": "Previsto"
+          },
+          "TodosPanel": {
+            "all": "Todo",
+            "completed": "Completado",
+            "global": "Global",
+            "important": "Importante",
+            "myDay": "Mi día",
+            "planned": "Previsto",
+            "thisProject": "Este proyecto"
           }
         }
       },

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import {
   CalendarDays,
   CheckCircle2,
@@ -8,11 +8,15 @@ import {
   Sun,
   Plus,
   Trash2,
-  Pencil
+  Pencil,
+  Check
 } from 'lucide-react'
 import type { TodoList } from '../../../../shared/types'
 import { translate } from '@/i18n/i18n'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import type { TodoNavItem, TodoSmartView } from './todo-nav-types'
+import { displayTodoListTitle } from './todo-list-display'
 
 type SmartViewDef = {
   view: TodoSmartView
@@ -58,7 +62,8 @@ type TodoNavigationProps = {
   lists: TodoList[]
   activeNav: TodoNavItem | undefined
   onNavChange: (nav: TodoNavItem) => void
-  onCreateList: (title: string) => void
+  onCreateList: (title: string) => Promise<boolean>
+  canCreateList?: boolean
   onRenameList: (listId: string, title: string) => void
   onDeleteList: (listId: string) => void
 }
@@ -68,21 +73,33 @@ export function TodoNavigation({
   activeNav,
   onNavChange,
   onCreateList,
+  canCreateList = true,
   onRenameList,
   onDeleteList
 }: TodoNavigationProps): React.JSX.Element {
   const [creating, setCreating] = useState(false)
   const [newTitle, setNewTitle] = useState('')
+  const [saving, setSaving] = useState(false)
+  const submitting = useRef(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editTitle, setEditTitle] = useState('')
   const [armedDelete, setArmedDelete] = useState<string | null>(null)
 
-  const submitCreate = () => {
+  const submitCreate = async () => {
     const trimmed = newTitle.trim()
-    if (trimmed) {
-      onCreateList(trimmed)
-      setNewTitle('')
-      setCreating(false)
+    if (!trimmed || !canCreateList || submitting.current) {
+      return
+    }
+    submitting.current = true
+    setSaving(true)
+    try {
+      if (await onCreateList(trimmed)) {
+        setNewTitle('')
+        setCreating(false)
+      }
+    } finally {
+      submitting.current = false
+      setSaving(false)
     }
   }
 
@@ -93,6 +110,11 @@ export function TodoNavigation({
       setEditingId(null)
       setEditTitle('')
     }
+  }
+
+  const cancelRename = () => {
+    setEditingId(null)
+    setEditTitle('')
   }
 
   const handleDelete = (listId: string) => {
@@ -151,15 +173,23 @@ export function TodoNavigation({
                 value={editTitle}
                 onChange={(e) => setEditTitle(e.target.value)}
                 onKeyDown={(e) => {
+                  if (e.nativeEvent.isComposing) {
+                    return
+                  }
                   if (e.key === 'Enter') {
                     submitRename()
                   }
                   if (e.key === 'Escape') {
-                    setEditingId(null)
-                    setEditTitle('')
+                    cancelRename()
                   }
                 }}
-                onBlur={submitRename}
+                onBlur={() => {
+                  if (editTitle.trim()) {
+                    submitRename()
+                  } else {
+                    cancelRename()
+                  }
+                }}
               />
             ) : (
               <>
@@ -168,7 +198,7 @@ export function TodoNavigation({
                   onClick={() => onNavChange({ kind: 'list', listId: list.id })}
                 >
                   <ListTodo size={14} className="shrink-0" />
-                  <span className="truncate">{list.title}</span>
+                  <span className="truncate">{displayTodoListTitle(list)}</span>
                 </button>
                 <div className="flex shrink-0 items-center gap-0.5 opacity-0 group-hover:opacity-100">
                   <button
@@ -214,9 +244,10 @@ export function TodoNavigation({
 
       {creating ? (
         <div className="flex items-center gap-2 px-2 py-1">
-          <input
+          <Input
             autoFocus
-            className="min-w-0 flex-1 rounded border border-input bg-transparent px-2 py-1 text-sm focus:outline-none"
+            className="min-w-0 flex-1"
+            disabled={saving}
             placeholder={translate(
               'auto.components.right.sidebar.TodoNavigation.listName',
               'List name'
@@ -224,25 +255,53 @@ export function TodoNavigation({
             value={newTitle}
             onChange={(e) => setNewTitle(e.target.value)}
             onKeyDown={(e) => {
+              if (e.nativeEvent.isComposing) {
+                return
+              }
               if (e.key === 'Enter') {
-                submitCreate()
+                e.preventDefault()
+                void submitCreate()
               }
               if (e.key === 'Escape') {
                 setCreating(false)
                 setNewTitle('')
               }
             }}
-            onBlur={submitCreate}
+            onBlur={(e) => {
+              if (!e.currentTarget.parentElement?.contains(e.relatedTarget)) {
+                if (!newTitle.trim()) {
+                  setCreating(false)
+                  setNewTitle('')
+                } else {
+                  void submitCreate()
+                }
+              }
+            }}
           />
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            disabled={saving || !newTitle.trim() || !canCreateList}
+            onClick={() => void submitCreate()}
+            aria-label={translate(
+              'auto.components.right.sidebar.TodoNavigation.newList',
+              'New list'
+            )}
+          >
+            <Check />
+          </Button>
         </div>
       ) : (
-        <button
-          className="flex items-center gap-2 rounded-md px-2 py-1.5 text-sm text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+        <Button
+          variant="ghost"
+          size="sm"
+          className="justify-start"
+          disabled={!canCreateList}
           onClick={() => setCreating(true)}
         >
           <Plus size={14} className="shrink-0" />
           {translate('auto.components.right.sidebar.TodoNavigation.newList', 'New list')}
-        </button>
+        </Button>
       )}
     </div>
   )
