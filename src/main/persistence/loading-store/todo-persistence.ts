@@ -269,9 +269,3 @@ export class TodoPersistence {
     }
   }
 }
-
-export function installTodoPersistenceContext(target: object, source: TodoPersistence): void {
-  Object.defineProperty(target, todoPersistenceContext, {
-    value: source[todoPersistenceContext]
-  })
-}

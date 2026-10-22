@@ -7,10 +7,11 @@ import {
   type NativeChatTaskList
 } from './native-chat-task-list'
 
-const task = (content: string, status: NativeChatTask['status'] = 'pending'): NativeChatTask => ({
-  content,
-  status
-})
+const task = (
+  content: string,
+  status: NativeChatTask['status'] = 'pending',
+  id?: string
+): NativeChatTask => ({ content, status, ...(id ? { id } : {}) })
 const list = (...tasks: NativeChatTask[]): NativeChatTaskList => ({ tasks })
 
 describe('normalizeNativeChatTaskList', () => {
@@ -39,7 +40,10 @@ describe('normalizeNativeChatTaskList', () => {
           plan: [{ step: 'Test', status: 'in_progress' }]
         })
       )
-    ).toEqual({ explanation: 'Proceed with verification', tasks: [task('Test', 'in_progress')] })
+    ).toEqual({
+      explanation: 'Proceed with verification',
+      tasks: [task('Test', 'in_progress', 'update_plan:Test:0')]
+    })
   })
 
   it('defaults unknown/missing statuses and ignores invalid entries', () => {
@@ -56,7 +60,7 @@ describe('normalizeNativeChatTaskList', () => {
           { content: 'Two' }
         ]
       })
-    ).toEqual(list(task('One'), task('Two')))
+    ).toEqual(list(task('One', 'pending', 'todowrite:One:0'), task('Two', 'pending', 'todowrite:Two:0')))
   })
 
   it.each([undefined, null, 42, [], '{', '{}', { todos: null }, { todos: [{}] }])(

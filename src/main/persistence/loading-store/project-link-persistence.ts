@@ -141,12 +141,3 @@ export class ProjectLinkPersistence {
     scheduleSave(scheduling)
   }
 }
-
-export function installProjectLinkPersistenceContext(
-  target: object,
-  source: ProjectLinkPersistence
-): void {
-  Object.defineProperty(target, projectLinkPersistenceContext, {
-    value: source[projectLinkPersistenceContext]
-  })
-}

@@ -1,7 +1,7 @@
 import { validatePathExistenceBatch } from '../../shared/path-existence-batch'
 import { ipcMain, shell, dialog } from 'electron'
 import { constants, copyFile, readFile, stat } from 'node:fs/promises'
-import { basename, extname, isAbsolute, normalize } from 'node:path'
+import { basename, extname, isAbsolute, normalize, posix, win32 } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type {
   ShellOpenExternalEditorRequest,
@@ -10,13 +10,25 @@ import type {
 } from '../../shared/shell-open-types'
 import { MAX_REPO_ICON_UPLOAD_BYTES } from '../../shared/repo-icon'
 import type { Store } from '../persistence'
-import { EXTERNAL_EDITOR_CLI_COMMAND } from '../external-editor-launch'
+import {
+  EXTERNAL_EDITOR_CLI_COMMAND,
+  launchExternalEditor,
+  resolveExternalEditorLaunchSpec,
+  resolveVsCodeRemoteSshLaunchSpec
+} from '../external-editor-launch'
+import { resolveVsCodeSshAuthority } from '../ssh/config/vscode-ssh-authority'
+import { toSshExecutionHostId } from '../../shared/execution-host'
+import {
+  isEditorSshHostForOwner,
+  listAppRuntimeEnvironments,
+  type ListRuntimeEnvironments
+} from './shell-editor-ssh-host'
 import {
   isLocallyOwned,
-  pathExistsAsync,
+  pathExists,
+  resolveOwnedPathTarget,
   validateLocalPathTarget
-} from './shell-local-path-guard'
-import { openInExternalEditor } from './shell-external-editor'
+} from './shell-owned-path-target'
 
 export { EXTERNAL_EDITOR_CLI_COMMAND }
 
@@ -28,10 +40,7 @@ async function openInFileManager(
   pathValue: string,
   ownerHostId: unknown
 ): Promise<ShellOpenLocalPathResult> {
-  if (!isLocallyOwned(ownerHostId)) {
-    return { ok: false, reason: 'remote-runtime-unsupported' }
-  }
-  const target = await validateLocalPathTarget(pathValue)
+  const target = await resolveOwnedPathTarget(pathValue, ownerHostId)
   if (!target.ok) {
     return target
   }
@@ -39,6 +48,61 @@ async function openInFileManager(
     // Why: the file-manager action uses reveal semantics, matching the
     // previous sidebar behavior while still validating the path per click.
     shell.showItemInFolder(target.path)
+    return { ok: true }
+  } catch {
+    return { ok: false, reason: 'launch-failed' }
+  }
+}
+
+async function openInExternalEditor(
+  store: Pick<Store, 'getSshTarget'>,
+  request: ShellOpenExternalEditorRequest,
+  listRuntimeEnvironments: ListRuntimeEnvironments
+): Promise<ShellOpenExternalEditorResult> {
+  const connectionId = request.connectionId?.trim()
+  if (connectionId) {
+    const sshTarget = store.getSshTarget(connectionId)
+    if (!sshTarget) {
+      return request.ownerHostId === toSshExecutionHostId(connectionId)
+        ? { ok: false, reason: 'ssh-target-not-found' }
+        : { ok: false, reason: 'remote-runtime-unsupported' }
+    }
+    if (!isEditorSshHostForOwner(sshTarget, request.ownerHostId, listRuntimeEnvironments)) {
+      return { ok: false, reason: 'remote-runtime-unsupported' }
+    }
+    if (sshTarget.owner?.type === 'on-demand-runtime') {
+      return { ok: false, reason: 'remote-runtime-unsupported' }
+    }
+    if (!posix.isAbsolute(request.path) && !win32.isAbsolute(request.path)) {
+      return { ok: false, reason: 'not-absolute' }
+    }
+    const authority = resolveVsCodeSshAuthority(sshTarget)
+    if (!authority.ok) {
+      return authority
+    }
+    const launchSpec = resolveVsCodeRemoteSshLaunchSpec(
+      request.command,
+      request.path,
+      authority.authority
+    )
+    if (!launchSpec) {
+      return { ok: false, reason: 'remote-editor-unsupported' }
+    }
+    try {
+      await launchExternalEditor(launchSpec)
+      return { ok: true }
+    } catch {
+      return { ok: false, reason: 'launch-failed' }
+    }
+  }
+
+  const target = await resolveOwnedPathTarget(request.path, request.ownerHostId)
+  if (!target.ok) {
+    return target
+  }
+  try {
+    // Why the UNC path for a WSL owner: VS Code and Cursor turn it into `--remote wsl+<distro>`.
+    await launchExternalEditor(resolveExternalEditorLaunchSpec(request.command, target.path))
     return { ok: true }
   } catch {
     return { ok: false, reason: 'launch-failed' }
@@ -61,7 +125,10 @@ async function openWithSystemDefault(pathValue: string, ownerHostId: unknown): P
   }
 }
 
-export function registerShellHandlers(store: Store): void {
+export function registerShellHandlers(
+  store: Pick<Store, 'getSshTarget'>,
+  listRuntimeEnvironments: ListRuntimeEnvironments = listAppRuntimeEnvironments
+): void {
   ipcMain.handle(
     'shell:openPath',
     async (_event, path: string, ownerHostId: unknown): Promise<void> => {
@@ -80,7 +147,7 @@ export function registerShellHandlers(store: Store): void {
   ipcMain.handle(
     'shell:openInExternalEditor',
     (_event, request: ShellOpenExternalEditorRequest): Promise<ShellOpenExternalEditorResult> =>
-      openInExternalEditor(store, request)
+      openInExternalEditor(store, request, listRuntimeEnvironments)
   )
 
   ipcMain.handle('shell:openUrl', (_event, rawUrl: string) => {
@@ -141,11 +208,11 @@ export function registerShellHandlers(store: Store): void {
 
   ipcMain.handle('shell:pathsExist', async (_event, paths: string[]): Promise<boolean[]> => {
     validatePathExistenceBatch(paths)
-    return Promise.all(paths.map(pathExistsAsync))
+    return Promise.all(paths.map(pathExists))
   })
 
   ipcMain.handle('shell:pathExists', async (_event, filePath: string): Promise<boolean> => {
-    return pathExistsAsync(filePath)
+    return pathExists(filePath)
   })
 
   ipcMain.handle(

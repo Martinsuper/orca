@@ -25,6 +25,8 @@ export type NotificationSettings = {
   customSoundVolume: number
   /** Desktop opt-outs stored only on this client, per configured source and work reached through it; new sources notify. */
   mutedNotificationSourceIds: NotificationSourceId[]
+  /** Off silences every notification from a workspace the sidebar's Filters switches hide. Local only. */
+  notifyHiddenWorkspaces: boolean
 }
 
 export type NotificationEventSource =
@@ -45,6 +47,8 @@ export type NotificationDispatchRequest = {
   worktreeId?: string
   /** Configured notification source; independent of physical execution location. */
   notificationSourceId?: NotificationSourceId
+  /** The server the workspace runs on, so a paired phone opens it there; absent for this desktop's own work. */
+  executionHost?: `runtime:${string}`
   /** Stable `${tabId}:${leafId}` terminal pane key for click-to-focus routing. */
   paneKey?: string
   repoLabel?: string

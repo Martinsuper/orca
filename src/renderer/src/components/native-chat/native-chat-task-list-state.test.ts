@@ -19,7 +19,9 @@ describe('nativeChatTaskListState', () => {
       { type: 'tool-result', output: 'Updated todos' }
     ])
     const result = nativeChatTaskListState([first, last])
-    expect(result.list?.tasks).toEqual([{ content: 'Read', status: 'completed' }])
+    expect(result.list?.tasks).toEqual([
+      { id: 'todowrite:Read:0', content: 'Read', status: 'completed' }
+    ])
     expect(result.messages[0]).toBe(first)
     expect(result.messages[1]).toBe(last)
     expect(first.blocks).toHaveLength(1)
@@ -86,11 +88,11 @@ describe('nativeChatTaskListState', () => {
     }
     const folded = foldToolMessages([source, outputs])
     expect(nativeChatTaskListState(folded).list?.tasks).toEqual([
-      { content: 'Accepted', status: 'pending' }
+      { id: 'todowrite:Accepted:0', content: 'Accepted', status: 'pending' }
     ])
     expect(folded[1]).toMatchObject({ id: 'outputs', role: 'tool', blocks: [outputs.blocks[0]] })
     expect(nativeChatTaskListState(foldToolMessages(folded)).list?.tasks).toEqual([
-      { content: 'Accepted', status: 'pending' }
+      { id: 'todowrite:Accepted:0', content: 'Accepted', status: 'pending' }
     ])
   })
 })

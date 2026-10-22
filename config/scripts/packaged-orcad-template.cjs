@@ -24,6 +24,10 @@ const {
 } = require('../../src/shared/orcad-artifacts.ts')
 const { verifyPackagedOrcadTemplate } = require('./verify-packaged-orcad-template.cjs')
 const { ORCAD_TEMPLATE_TARGETS } = require('../../src/shared/node-runtime-pin.ts')
+const {
+  compactPackagedOrcadRipgrep,
+  resealSignedPackagedRipgrep
+} = require('./compact-packaged-orcad-ripgrep.cjs')
 
 const ORCAD_TEMPLATE_RESOURCE_DIR = 'orcad-template'
 const orcadTemplateExtraResource = { from: 'out/orcad-template', to: ORCAD_TEMPLATE_RESOURCE_DIR }
@@ -143,15 +147,16 @@ async function finalizePackagedOrcadTemplate(resourcesDir, options) {
   if (localTargets && localTargets.some((target) => !ORCAD_TEMPLATE_TARGETS.includes(target))) {
     throw new Error('ORCA_LOCAL_ORCAD_TARGETS must name supported orcad template targets')
   }
-  verifyPackagedOrcadTemplate(resourcesDir, localTargets)
+  compactPackagedOrcadRipgrep(resourcesDir, localTargets)
 }
 
 /** `inner-signing-list.txt` lines are app-relative Windows paths; keep the template's. */
 function resealSignedWindowsApp(appDir, signedListFile) {
   const prefix = `resources/${ORCAD_TEMPLATE_RESOURCE_DIR}/`
-  const signed = readFileSync(signedListFile, 'utf8')
+  const signedAppPaths = readFileSync(signedListFile, 'utf8')
     .split(/\r?\n/)
     .map((line) => line.trim().replaceAll('\\', '/'))
+  const signed = signedAppPaths
     .filter((line) => line.startsWith(prefix))
     .map((line) => line.slice(prefix.length))
   const resourcesDir = join(appDir, 'resources')
@@ -163,6 +168,10 @@ function resealSignedWindowsApp(appDir, signedListFile) {
     return
   }
   resealOrcadTemplateManifest(join(resourcesDir, ORCAD_TEMPLATE_RESOURCE_DIR), signed)
+  resealSignedPackagedRipgrep(
+    resourcesDir,
+    signedAppPaths.filter((path) => path.startsWith('resources/')).map((path) => path.slice(10))
+  )
   verifyPackagedOrcadTemplate(resourcesDir)
   console.log(`[packaged-orcad-template] resealed ${signed.length} signed template file(s)`)
 }

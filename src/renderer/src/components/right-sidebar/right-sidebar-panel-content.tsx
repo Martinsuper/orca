@@ -7,7 +7,7 @@ const FileExplorer = lazy(() => import('./FileExplorer'))
 const SourceControl = lazy(() => import('./SourceControl'))
 const ChecksPanel = lazy(() => import('./ChecksPanel'))
 const PortsPanel = lazy(() => import('./PortsPanel'))
-const AiVaultPanel = lazy(() => import('./AiVaultPanel'))
+const AiVaultSidebarPanel = lazy(() => import('./AiVaultSidebarPanel'))
 const LinksPanel = lazy(() => import('./LinksPanel'))
 const TodosPanel = lazy(() => import('./TodosPanel'))
 const FolderWorkspaceWorktreesPanel = lazy(() => import('./FolderWorkspaceWorktreesPanel'))
@@ -37,7 +37,7 @@ export function RightSidebarPanelContent({
         {effectiveTab === 'ports' && (
           <PortsPanel isVisible={rightSidebarOpen && effectiveTab === 'ports'} />
         )}
-        {effectiveTab === 'vault' && <AiVaultPanel />}
+        {effectiveTab === 'vault' && <AiVaultSidebarPanel />}
         {effectiveTab === 'workspaces' && <FolderWorkspaceWorktreesPanel />}
         {effectiveTab === 'pr-checks' && (
           <FolderWorkspacePrChecksPanel

@@ -85,7 +85,7 @@ test.describe('Todos', () => {
       if (!store) {
         throw new Error('window.__store is not available')
       }
-      await store.getState().fetchRepos()
+      await store.getState().fetchRepos({ runtimeEnvironmentId: null })
       const repo = store.getState().repos.find((entry) => entry.path === repoPath)
       if (!repo) {
         throw new Error(`Seeded E2E repo was not registered: ${repoPath}`)
@@ -142,7 +142,7 @@ test.describe('Todos', () => {
       if (!store) {
         throw new Error('window.__store is not available')
       }
-      await store.getState().fetchRepos()
+      await store.getState().fetchRepos({ runtimeEnvironmentId: null })
       const repo = store.getState().repos.find((entry) => entry.path === repoPath)
       if (!repo) {
         throw new Error(`Seeded E2E repo was not registered: ${repoPath}`)

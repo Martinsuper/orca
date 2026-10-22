@@ -86,13 +86,16 @@ function attentionPath(directory: string) {
       enabled: true,
       agentTaskComplete: true,
       terminalBell: true,
+      todoReminder: true,
       suppressWhenFocused: false,
       customSoundId: 'system',
       customSoundPath: null,
       customSoundVolume: 1,
-      mutedNotificationSourceIds: []
+      mutedNotificationSourceIds: [],
+      notifyHiddenWorkspaces: false
     }),
     readWorkspaceLabels: () => ({}),
+    isWorkspaceMuted: () => false,
     dispatch: (event) => controller.dispatch(event),
     reconcile: (state) => controller.reconcileStructuredPromptAttention(state),
     now: () => 42

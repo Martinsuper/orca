@@ -10,6 +10,7 @@ export function getDefaultNotificationSettings(): NotificationSettings {
     customSoundId: 'system',
     customSoundPath: null,
     customSoundVolume: 100,
-    mutedNotificationSourceIds: []
+    mutedNotificationSourceIds: [],
+    notifyHiddenWorkspaces: false
   }
 }
