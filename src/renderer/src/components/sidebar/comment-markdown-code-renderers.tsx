@@ -11,8 +11,9 @@ import {
 const diagramClassName =
   'my-3 min-w-0 max-w-full overflow-x-auto rounded-md border border-border/60 p-3 [&_.mermaid-block]:min-w-0 [&_.mermaid-block_pre]:my-0 [&_.mermaid-block_pre]:max-h-80 [&_.mermaid-block_pre]:max-w-full [&_.mermaid-block_pre]:overflow-x-auto [&_.mermaid-block_pre]:rounded-md [&_.mermaid-block_pre]:bg-accent [&_.mermaid-block_pre]:p-3 [&_.mermaid-block_pre]:font-mono [&_.mermaid-block_pre]:text-[12px]'
 
-const plantumlClassName =
+const plantumlDiagramClassName =
   'my-3 min-w-0 max-w-full overflow-x-auto rounded-md border border-border/60 p-3 [&_.plantuml-block]:min-w-0 [&_.plantuml-block_pre]:my-0 [&_.plantuml-block_pre]:max-h-80 [&_.plantuml-block_pre]:max-w-full [&_.plantuml-block_pre]:overflow-x-auto [&_.plantuml-block_pre]:rounded-md [&_.plantuml-block_pre]:bg-accent [&_.plantuml-block_pre]:p-3 [&_.plantuml-block_pre]:font-mono [&_.plantuml-block_pre]:text-[12px]'
+
 /** The line the rendered top-level block starts on in the whole document; its nodes' lines are local. */
 export const CommentMarkdownBlockLineContext = createContext(1)
 
@@ -25,11 +26,11 @@ export function CommentMarkdownDocumentCode({
 }): React.JSX.Element {
   const renderMermaid = useContext(CommentMarkdownMermaidContext)
   const keepSource = useContext(CommentMarkdownMermaidSourceContext)
+  if (isPlantumlFence(className)) {
+    return renderPlantumlFence(children, plantumlDiagramClassName)
+  }
   if (renderMermaid && !keepSource && isMermaidFence(className)) {
     return renderMermaidFence(children, diagramClassName)
-  }
-  if (isPlantumlFence(className)) {
-    return renderPlantumlFence(children, plantumlClassName)
   }
   return (
     <code className="rounded bg-accent px-1.5 py-0.5 font-mono text-[0.92em] [overflow-wrap:anywhere]">
@@ -51,8 +52,11 @@ export function CommentMarkdownDocumentPre({
   const renderMermaid = useContext(CommentMarkdownMermaidContext)
   const keepSource = useContext(CommentMarkdownMermaidSourceContext)
   const blockStartLine = useContext(CommentMarkdownBlockLineContext)
-  const unwrapDiagram = isMermaidPre(children) || isPlantumlPre(children)
-  if (renderMermaid && !keepSource && unwrapDiagram) {
+  // PlantUML fences render a <div>, which is invalid inside <pre>, so unwrap them.
+  if (isPlantumlPre(children)) {
+    return <>{children}</>
+  }
+  if (renderMermaid && !keepSource && isMermaidPre(children)) {
     return <>{children}</>
   }
   const child = React.Children.toArray(children)[0]
