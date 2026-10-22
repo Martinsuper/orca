@@ -505,8 +505,6 @@ describe('agent prompt submission runtime', () => {
       prompt: { stages: ['input_accepted'] }
     })
   })
-
-
 })
 
 const PTY = 'pty-input-dispatch'

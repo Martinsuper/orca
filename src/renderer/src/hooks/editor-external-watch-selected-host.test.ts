@@ -1,7 +1,7 @@
 import { expect, it } from 'vitest'
 import type { AppState } from '@/store/types'
 import { makeFolderWorkspace, makeWorktree } from '@/store/slices/worktrees-slice-test-fixtures'
-import { getDefaultSettings } from '../../../shared/constants'
+import { FLOATING_TERMINAL_WORKTREE_ID, getDefaultSettings } from '../../../shared/constants'
 import {
   selectEditorExternalWatchTargets,
   type EditorExternalWatchTargetState
@@ -162,3 +162,54 @@ it('keeps an open local editor watched locally when a same-id direct-SSH folder 
     ['/remote/notes', 'ssh-a']
   ])
 })
+
+it.each(['edit', 'markdown-preview'] as const)(
+  'watches a floating Markdown %s tab and follows changes to its resolved directory',
+  (mode) => {
+    const state: SelectedHostState = {
+      ...makeState('worktree'),
+      rightSidebarOpen: false,
+      floatingWorkspacePath: '/scratch',
+      openFiles: [
+        {
+          id: 'floating-notes',
+          worktreeId: FLOATING_TERMINAL_WORKTREE_ID,
+          filePath: '/scratch/notes.md',
+          relativePath: 'notes.md',
+          language: 'markdown',
+          mode,
+          isDirty: false,
+          runtimeEnvironmentId: null
+        }
+      ]
+    }
+    const first = selectEditorExternalWatchTargets(state)
+    expect(first.targets).toEqual([
+      {
+        worktreeId: FLOATING_TERMINAL_WORKTREE_ID,
+        worktreePath: '/scratch',
+        connectionId: undefined,
+        runtimeEnvironmentId: null
+      }
+    ])
+    expect(selectEditorExternalWatchTargets({ ...state })).toBe(first)
+    expect(
+      selectEditorExternalWatchTargets({
+        ...state,
+        floatingWorkspacePath: '/new-scratch'
+      }).targets[0]?.worktreePath
+    ).toBe('/new-scratch')
+    expect(
+      selectEditorExternalWatchTargets({
+        ...state,
+        floatingWorkspacePath: null
+      }).targets
+    ).toEqual([])
+    expect(
+      selectEditorExternalWatchTargets({
+        ...state,
+        openFiles: state.openFiles.map((file) => ({ ...file, runtimeEnvironmentId: 'host-a' }))
+      }).targets
+    ).toEqual([])
+  }
+)

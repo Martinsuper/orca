@@ -60,7 +60,9 @@ describe('normalizeNativeChatTaskList', () => {
           { content: 'Two' }
         ]
       })
-    ).toEqual(list(task('One', 'pending', 'todowrite:One:0'), task('Two', 'pending', 'todowrite:Two:0')))
+    ).toEqual(
+      list(task('One', 'pending', 'todowrite:One:0'), task('Two', 'pending', 'todowrite:Two:0'))
+    )
   })
 
   it.each([undefined, null, 42, [], '{', '{}', { todos: null }, { todos: [{}] }])(

@@ -53,14 +53,21 @@ export const PERSISTED_STATE_DISPOSITIONS = {
     note: 'Rides in folderWorkspaces[].diffComments, its in-memory home (verified).'
   }),
   sparsePresetsByRepo: moveDisposition(8),
-  projectLinksByRepo: moveDisposition(8, { note: 'Repo-scoped, so it rides the repo like its presets.' }),
+  projectLinksByRepo: moveDisposition(8, {
+    note: 'Repo-scoped, so it rides the repo like its presets.'
+  }),
   projectLinkFoldersByRepo: moveDisposition(8, {
     note: 'Repo-scoped, so it rides the repo like its presets.'
   }),
   todosByRepo: moveDisposition(8, { note: 'Repo-scoped, so it rides the repo like its presets.' }),
-  todoListsByRepo: moveDisposition(8, { note: 'Repo-scoped, so it rides the repo like its presets.' }),
+  todoListsByRepo: moveDisposition(8, {
+    note: 'Repo-scoped, so it rides the repo like its presets.'
+  }),
   globalProjectLinks: notApplicableDisposition(62, 'Cross-repo; not tied to the moved project.'),
-  globalProjectLinkFolders: notApplicableDisposition(62, 'Cross-repo; not tied to the moved project.'),
+  globalProjectLinkFolders: notApplicableDisposition(
+    62,
+    'Cross-repo; not tied to the moved project.'
+  ),
   globalTodos: notApplicableDisposition(62, 'Cross-repo; not tied to the moved project.'),
   globalTodoLists: notApplicableDisposition(62, 'Cross-repo; not tied to the moved project.'),
   todoScope: notApplicableDisposition(62, 'Desktop-global; a panel scope selection.'),

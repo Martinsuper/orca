@@ -187,9 +187,8 @@ export function projectWslMoveState(
     ),
     sparsePresetsByRepo: pickKeys(state.sparsePresetsByRepo, (key) => scope.repoIds.has(key)),
     projectLinksByRepo: pickKeys(state.projectLinksByRepo, (key) => scope.repoIds.has(key)),
-    projectLinkFoldersByRepo: pickKeys(
-      state.projectLinkFoldersByRepo,
-      (key) => scope.repoIds.has(key)
+    projectLinkFoldersByRepo: pickKeys(state.projectLinkFoldersByRepo, (key) =>
+      scope.repoIds.has(key)
     ),
     todosByRepo: pickKeys(state.todosByRepo, (key) => scope.repoIds.has(key)),
     todoListsByRepo: pickKeys(state.todoListsByRepo ?? {}, (key) => scope.repoIds.has(key)),
