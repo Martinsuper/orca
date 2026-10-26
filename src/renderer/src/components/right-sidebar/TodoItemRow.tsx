@@ -1,9 +1,8 @@
 import { useState } from 'react'
 import { Check, Pencil, Trash2, Star, CalendarDays, Sun, ListChecks } from 'lucide-react'
-import type { Todo } from '../../../../shared/types'
+import type { Todo, TodoList } from '../../../../shared/types'
 import { translate } from '@/i18n/i18n'
 import { TodoEditDialog, type TodoEditDialogResult } from './TodoEditDialog'
-import type { TodoList } from '../../../../shared/types'
 
 type TodoItemRowProps = {
   todo: Todo

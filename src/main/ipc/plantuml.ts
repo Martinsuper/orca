@@ -1,8 +1,7 @@
-import { execFile, type ChildProcess } from 'node:child_process'
 import { access } from 'node:fs/promises'
 import { constants as fsConstants } from 'node:fs'
 import { ipcMain } from 'electron'
-import { endSubprocessStdin } from '../../shared/subprocess-stdin-write'
+import { runProcess } from '@orca/process-host'
 import type { PlantumlRenderArgs, PlantumlRenderResult } from '../../shared/types'
 import { getCachedRender, renderCacheKey, setCachedRender } from './plantuml-render-cache'
 
@@ -10,10 +9,13 @@ import { getCachedRender, renderCacheKey, setCachedRender } from './plantuml-ren
 // runaway java process must not hang the render forever — kill and surface a
 // timeout error the preview can fall back on.
 const PLANTUML_TIMEOUT_MS = 20_000
-// Why: SVG output for a large diagram can exceed the default 1MB execFile
+// Why: SVG output for a large diagram can exceed the default 1MB output
 // buffer; cap generously so real diagrams render but a pathological output
 // cannot exhaust memory.
 const PLANTUML_MAX_BUFFER = 16 * 1024 * 1024
+
+const JAVA_MISSING_ERROR =
+  'Java runtime not found. Install a JRE/JDK and make sure `java` is on your PATH.'
 
 /**
  * Renders PlantUML source to SVG by piping it through the user's local
@@ -41,78 +43,43 @@ async function renderPlantuml(args: PlantumlRenderArgs): Promise<PlantumlRenderR
     return { error: `PlantUML jar not found or unreadable: ${jarPath}` }
   }
 
-  return new Promise<PlantumlRenderResult>((resolve) => {
-    let settled = false
-    let timer: NodeJS.Timeout | null = null
-    let child: ChildProcess | null = null
-
-    const finish = (result: PlantumlRenderResult): void => {
-      if (settled) {
-        return
-      }
-      settled = true
-      if (timer) {
-        clearTimeout(timer)
-        timer = null
-      }
-      resolve(result)
-    }
-
-    try {
-      // Why: -tsvg emits SVG; -pipe reads source from stdin and writes the
-      // diagram to stdout, so no temp files touch disk. On a syntax error
-      // PlantUML still emits an SVG that visualizes the error (with line marker),
-      // which is more useful to the user than a bare message — so we prefer any
-      // <svg> in stdout over the non-zero exit code, and only fall back to the
-      // stderr text when no diagram was produced at all (missing java, crash).
-      //
-      // -Djava.awt.headless=true MUST come before -jar (it is a JVM option, not a
-      // PlantUML arg): PlantUML uses AWT to lay out diagrams, and without headless
-      // mode macOS pops a Java GUI app in the Dock on every render.
-      child = execFile(
-        'java',
-        ['-Djava.awt.headless=true', '-jar', jarPath, '-tsvg', '-pipe', '-charset', 'UTF-8'],
-        { encoding: 'utf8', maxBuffer: PLANTUML_MAX_BUFFER },
-        (error, stdout, stderr) => {
-          const svg = String(stdout).trim()
-          if (svg.includes('<svg')) {
-            setCachedRender(cacheKey, svg)
-            finish({ svg })
-            return
-          }
-          if (error && (error as NodeJS.ErrnoException).code === 'ENOENT') {
-            finish({
-              error:
-                'Java runtime not found. Install a JRE/JDK and make sure `java` is on your PATH.'
-            })
-            return
-          }
-          const detail = String(stderr || error?.message || '').trim()
-          finish({ error: detail || 'PlantUML produced no diagram output.' })
-        }
-      )
-    } catch (error) {
-      finish({ error: error instanceof Error ? error.message : 'PlantUML rendering failed.' })
-      return
-    }
-
-    child.once('error', (error) => {
-      const code = (error as NodeJS.ErrnoException).code
-      finish({
-        error:
-          code === 'ENOENT'
-            ? 'Java runtime not found. Install a JRE/JDK and make sure `java` is on your PATH.'
-            : error.message
-      })
+  try {
+    // Why: -tsvg emits SVG; -pipe reads source from stdin and writes the
+    // diagram to stdout, so no temp files touch disk. On a syntax error
+    // PlantUML still emits an SVG that visualizes the error (with line marker),
+    // which is more useful to the user than a bare message — so we prefer any
+    // <svg> in stdout over the non-zero exit code, and only fall back to the
+    // stderr text when no diagram was produced at all (missing java, crash).
+    //
+    // -Djava.awt.headless=true MUST come before -jar (it is a JVM option, not a
+    // PlantUML arg): PlantUML uses AWT to lay out diagrams, and without headless
+    // mode macOS pops a Java GUI app in the Dock on every render.
+    const result = await runProcess({
+      program: 'java',
+      args: ['-Djava.awt.headless=true', '-jar', jarPath, '-tsvg', '-pipe', '-charset', 'UTF-8'],
+      input: args.source,
+      timeoutMs: PLANTUML_TIMEOUT_MS,
+      maxOutputBytes: PLANTUML_MAX_BUFFER
     })
-
-    endSubprocessStdin(child.stdin, args.source)
-
-    timer = setTimeout(() => {
-      child?.kill()
-      finish({ error: `PlantUML rendering timed out after ${PLANTUML_TIMEOUT_MS / 1000}s.` })
-    }, PLANTUML_TIMEOUT_MS)
-  })
+    if (result.timedOut) {
+      return { error: `PlantUML rendering timed out after ${PLANTUML_TIMEOUT_MS / 1000}s.` }
+    }
+    const svg = result.stdout.trim()
+    if (svg.includes('<svg')) {
+      setCachedRender(cacheKey, svg)
+      return { svg }
+    }
+    return { error: result.stderr.trim() || 'PlantUML produced no diagram output.' }
+  } catch (error) {
+    return {
+      error:
+        (error as NodeJS.ErrnoException).code === 'ENOENT'
+          ? JAVA_MISSING_ERROR
+          : error instanceof Error
+            ? error.message
+            : 'PlantUML rendering failed.'
+    }
+  }
 }
 
 export function registerPlantumlHandlers(): void {

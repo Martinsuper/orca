@@ -13,7 +13,6 @@ import { registerProjectLinkHandlers } from './repos/project-link-handlers'
 import { registerTodoHandlers } from './repos/todo-handlers'
 import { registerRepoFolderPickerHandlers } from './repos/repo-folder-picker-handlers'
 import { registerRepoCloneHandlers } from './repos/repo-clone-lifecycle'
-import { registerRepoGitUsernameHandler } from './repos/repo-git-username-handler'
 import { registerBaseRefQueryHandlers } from './repos/base-ref-query-handlers'
 import type { TodoReminderScheduler } from '../persistence/loading-store/todo-reminder-scheduler'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
@@ -24,7 +23,7 @@ export function registerRepoHandlers(
   runtime: OrcaRuntimeService,
   reminderScheduler?: TodoReminderScheduler
 ): void {
-  // Remove previously registered handlers so we can re-register on macOS app re-activation (new window).
+  // macOS window recreation re-registers these handlers.
   ipcMain.removeHandler('repos:list')
   ipcMain.removeHandler('repos:add')
   ipcMain.removeHandler('repos:removeForHost')
@@ -58,7 +57,6 @@ export function registerRepoHandlers(
   ipcMain.removeHandler('repos:cloneAbort')
   ipcMain.removeHandler('repos:isGitAvailable')
   ipcMain.removeHandler('repos:getDefaultCreateProjectParent')
-  ipcMain.removeHandler('repos:getGitUsername')
   ipcMain.removeHandler('repos:getBaseRefDefault')
   ipcMain.removeHandler('repos:searchBaseRefs')
   ipcMain.removeHandler('repos:searchBaseRefDetails')
@@ -79,6 +77,5 @@ export function registerRepoHandlers(
   registerTodoHandlers(mainWindow, store, reminderScheduler)
   registerRepoFolderPickerHandlers(mainWindow)
   registerRepoCloneHandlers(mainWindow, store)
-  registerRepoGitUsernameHandler(store)
   registerBaseRefQueryHandlers(store)
 }

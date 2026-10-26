@@ -172,7 +172,7 @@ export type {
   JiraTransition,
   JiraUser,
   JiraViewer
-} from './jira-types'
+} from './jira/jira-types'
 export type { LinearComment, LinearIssue } from './linear/issue-types'
 export type {
   LinearCustomViewModel,

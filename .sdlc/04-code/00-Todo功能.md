@@ -12,30 +12,30 @@
 
 ## 2. 代码链路
 
-| 能力 | 实现位置 | 当前行为 |
-| --- | --- | --- |
-| Tab 注册与加载 | `src/renderer/src/components/right-sidebar/right-sidebar-panel-content.tsx:12-33` | 以 lazy 面板渲染 Todo；切离 Tab 时卸载。 |
-| 任务面板与 scope | `src/renderer/src/components/right-sidebar/TodosPanel.tsx:48-380` | Project/Global 切换、加载、智能视图、CRUD 动作分发。 |
-| 列表导航 | `src/renderer/src/components/right-sidebar/TodoNavigation.tsx:66-249` | 智能视图、创建、行内重命名、3 秒二次点击删除。 |
-| 任务行与编辑 | `src/renderer/src/components/right-sidebar/TodoItemRow.tsx:29-178`、`src/renderer/src/components/right-sidebar/TodoEditDialog.tsx:67-335` | 完成、编辑、删除、日期、提醒、我的一天、步骤。 |
-| Renderer store | `src/renderer/src/store/slices/todos/create-todos-slice.ts:9-28` | 项目/全局缓存、actions、invalidation；初始 scope=project。 |
-| bridge/类型 | `src/preload/api/todo-bridge.ts:18-72`、`src/preload/api/project-links-todos-api.ts:49-89` | todo IPC 方法及变更订阅类型。 |
-| 主进程 handler | `src/main/ipc/repos/todo-handlers.ts:85-309` | 规范化输入，保存/删除/完成，向 mainWindow 通知，提醒重算。 |
-| 存储和迁移 | `src/main/persistence/loading-store/todo-persistence.ts:49-230`、`src/main/persistence/loading-store/todo-normalization.ts:62-94` | 分 scope 持久化，默认列表，旧数据标准化，repo 清理。 |
-| 启动/提醒/通知 | `src/main/startup/main-process-ready-runtime.ts:157-166`、`src/main/persistence/loading-store/todo-reminder-scheduler.ts:66-199` | 启动 hydrate、单 timer、resume 重排、通知派发、退出释放。 |
+| 能力             | 实现位置                                                                                                                                  | 当前行为                                                   |
+| ---------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------- |
+| Tab 注册与加载   | `src/renderer/src/components/right-sidebar/right-sidebar-panel-content.tsx:12-33`                                                         | 以 lazy 面板渲染 Todo；切离 Tab 时卸载。                   |
+| 任务面板与 scope | `src/renderer/src/components/right-sidebar/TodosPanel.tsx:48-380`                                                                         | Project/Global 切换、加载、智能视图、CRUD 动作分发。       |
+| 列表导航         | `src/renderer/src/components/right-sidebar/TodoNavigation.tsx:66-249`                                                                     | 智能视图、创建、行内重命名、3 秒二次点击删除。             |
+| 任务行与编辑     | `src/renderer/src/components/right-sidebar/TodoItemRow.tsx:29-178`、`src/renderer/src/components/right-sidebar/TodoEditDialog.tsx:67-335` | 完成、编辑、删除、日期、提醒、我的一天、步骤。             |
+| Renderer store   | `src/renderer/src/store/slices/todos/create-todos-slice.ts:9-28`                                                                          | 项目/全局缓存、actions、invalidation；初始 scope=project。 |
+| bridge/类型      | `src/preload/api/todo-bridge.ts:18-72`、`src/preload/api/project-links-todos-api.ts:49-89`                                                | todo IPC 方法及变更订阅类型。                              |
+| 主进程 handler   | `src/main/ipc/repos/todo-handlers.ts:85-309`                                                                                              | 规范化输入，保存/删除/完成，向 mainWindow 通知，提醒重算。 |
+| 存储和迁移       | `src/main/persistence/loading-store/todo-persistence.ts:49-230`、`src/main/persistence/loading-store/todo-normalization.ts:62-94`         | 分 scope 持久化，默认列表，旧数据标准化，repo 清理。       |
+| 启动/提醒/通知   | `src/main/startup/main-process-ready-runtime.ts:157-166`、`src/main/persistence/loading-store/todo-reminder-scheduler.ts:66-199`          | 启动 hydrate、单 timer、resume 重排、通知派发、退出释放。  |
 
 ## 3. 需求覆盖映射
 
-| 需求 | 现有实现 | 状态 |
-| --- | --- | --- |
-| 任务/列表全局与项目隔离 | `repoId=''` 处理全局，其余按 repo bucket 存储 | 已实现，待运行验证。 |
-| 旧数据兼容 | `normalizeTodoState` 增补 Tasks、listId、important、steps、note、done | 已实现，存在单测。 |
-| 完成/恢复 | `src/main/persistence/loading-store/todo-persistence.ts:80-100,127-147` 设置 `completedAt`、`updatedAt`，UI 过滤完成项 | 已实现，待运行验证。 |
-| 单条任务删除确认 | `src/renderer/src/components/right-sidebar/TodoItemRow.tsx:45-51` 的 3 秒二次点击确认 | 未确认或超时不会调用删除；待 UI 验证。 |
-| 一级步骤独立状态 | `src/renderer/src/components/right-sidebar/TodoEditDialog.tsx:122-139,253-300` | 步骤独立完成/恢复且完成后仍显示；待 UI 验证。 |
-| 智能视图 | 当前 scope 过滤；My Day 汇总 global + 当前 repo | 已实现的行为，与宽泛“所有范围”需确认。 |
-| 提醒 | scheduler 查找最近资格任务，投递后写 `reminderDeliveredAt` | 已实现，待重设行为验证。 |
-| 删除项目 | `deleteRepoScopedState` 删除 todos/list buckets | 已实现，存在 renderer pruning 单测。 |
+| 需求                    | 现有实现                                                                                                               | 状态                                          |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| 任务/列表全局与项目隔离 | `repoId=''` 处理全局，其余按 repo bucket 存储                                                                          | 已实现，待运行验证。                          |
+| 旧数据兼容              | `normalizeTodoState` 增补 Tasks、listId、important、steps、note、done                                                  | 已实现，存在单测。                            |
+| 完成/恢复               | `src/main/persistence/loading-store/todo-persistence.ts:80-100,127-147` 设置 `completedAt`、`updatedAt`，UI 过滤完成项 | 已实现，待运行验证。                          |
+| 单条任务删除确认        | `src/renderer/src/components/right-sidebar/TodoItemRow.tsx:45-51` 的 3 秒二次点击确认                                  | 未确认或超时不会调用删除；待 UI 验证。        |
+| 一级步骤独立状态        | `src/renderer/src/components/right-sidebar/TodoEditDialog.tsx:122-139,253-300`                                         | 步骤独立完成/恢复且完成后仍显示；待 UI 验证。 |
+| 智能视图                | 当前 scope 过滤；My Day 汇总 global + 当前 repo                                                                        | 已实现的行为，与宽泛“所有范围”需确认。        |
+| 提醒                    | scheduler 查找最近资格任务，投递后写 `reminderDeliveredAt`                                                             | 已实现，待重设行为验证。                      |
+| 删除项目                | `deleteRepoScopedState` 删除 todos/list buckets                                                                        | 已实现，存在 renderer pruning 单测。          |
 
 ## 4. 已确认实现差异/缺口
 
@@ -65,12 +65,12 @@
 
 第 1–7 节保留实施前静态盘点和历史交接；以下为已落地事实。
 
-| 范围 | 已实现结果 |
-| --- | --- |
-| 状态与刷新 | Todo scope/navigation 按 bucket 保留；应用生命周期统一订阅四事件。每个 bucket 有 generation、后台行保留、受保护 rollback 和 prune tombstone，旧请求不能覆盖新状态。 |
-| 广播范围 | `createMainWindow` 注册可投递 renderer，`todo-event-renderers` 维护有效 window id；只向工厂创建的 Orca main renderer 广播，不扩散到 dashboard 或其他 trusted UI。 |
-| 列表与数据校验 | 删除列表迁移同 scope `Tasks` 并强制刷新；保存拒绝失效/跨 scope list id；日期形状和 finite reminder 校验；nullable 字段 clear 与 undefined 兼容均已实现。 |
-| 提醒与通知 | reminder 改值清 delivered，完成清 `reminderAt`/delivered；scheduler 到期重查、忽略无效值并钳制长 timeout。Todo 仅本机通知，不 mobile fanout，且绕过 workspace cooldown。 |
-| My Day 与清理 | 行级 CRUD/edit 按 Todo `repoId` 路由；全局/项目按需新鲜加载，本地日期变化重派生。启动清理覆盖单 todo/list 孤儿 bucket，paired-host 不清理。 |
+| 范围           | 已实现结果                                                                                                                                                               |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| 状态与刷新     | Todo scope/navigation 按 bucket 保留；应用生命周期统一订阅四事件。每个 bucket 有 generation、后台行保留、受保护 rollback 和 prune tombstone，旧请求不能覆盖新状态。      |
+| 广播范围       | `createMainWindow` 注册可投递 renderer，`todo-event-renderers` 维护有效 window id；只向工厂创建的 Orca main renderer 广播，不扩散到 dashboard 或其他 trusted UI。        |
+| 列表与数据校验 | 删除列表迁移同 scope `Tasks` 并强制刷新；保存拒绝失效/跨 scope list id；日期形状和 finite reminder 校验；nullable 字段 clear 与 undefined 兼容均已实现。                 |
+| 提醒与通知     | reminder 改值清 delivered，完成清 `reminderAt`/delivered；scheduler 到期重查、忽略无效值并钳制长 timeout。Todo 仅本机通知，不 mobile fanout，且绕过 workspace cooldown。 |
+| My Day 与清理  | 行级 CRUD/edit 按 Todo `repoId` 路由；全局/项目按需新鲜加载，本地日期变化重派生。启动清理覆盖单 todo/list 孤儿 bucket，paired-host 不清理。                              |
 
 实现已由目标单元测试和后台 E2E 验证；真实双 Todo 窗口 E2E、SSH/folder E2E、非当前 macOS 平台、完整字段重启矩阵、性能与真实通知权限仍未验证。

@@ -17,54 +17,54 @@
 
 提醒流：`initializeReadyRuntimeServices` → `TodoReminderScheduler.hydrate()` → 最近提醒 timer → 通知 dispatcher → 原生通知/既有通知分发。
 
-| 层 | 文件 | 当前职责 |
-| --- | --- | --- |
-| 右侧栏 | `src/renderer/src/components/right-sidebar/right-sidebar-panel-content.tsx:12-33` | 懒加载并仅在 `effectiveTab==='todos'` 时挂载面板。 |
-| Todo UI | `src/renderer/src/components/right-sidebar/TodosPanel.tsx:48-380` | scope、加载、导航、智能视图、CRUD 动作路由。 |
-| 编辑 UI | `src/renderer/src/components/right-sidebar/TodoEditDialog.tsx:67-335` | 标题、备注、列表、重要、日期、提醒、我的一天、一级步骤。 |
-| Renderer state | `src/renderer/src/store/slices/todos/create-todos-slice.ts:9-28` | 项目/全局 bucket、加载状态、保存、乐观删除/完成、失效 API。 |
-| 预加载 | `src/preload/api/todo-bridge.ts:18-72` | 强类型 IPC bridge 与变更事件订阅 API。 |
-| IPC | `src/main/ipc/repos/todo-handlers.ts:85-309` | 输入规范化、项目存在校验、持久化调用、scheduler 重算、窗口通知。 |
-| 持久化 | `src/main/persistence/loading-store/todo-persistence.ts:58-230` | scope 分桶、排序、默认列表、任务/列表 CRUD、repo 数据清理。 |
-| 迁移 | `src/main/persistence/loading-store/todo-normalization.ts:18-94` | 旧数据补字段与默认列表。 |
-| 提醒 | `src/main/persistence/loading-store/todo-reminder-scheduler.ts:31-199` | 收集全局+已注册 repo 任务、单 timer、恢复重排、去重标记。 |
+| 层             | 文件                                                                              | 当前职责                                                         |
+| -------------- | --------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| 右侧栏         | `src/renderer/src/components/right-sidebar/right-sidebar-panel-content.tsx:12-33` | 懒加载并仅在 `effectiveTab==='todos'` 时挂载面板。               |
+| Todo UI        | `src/renderer/src/components/right-sidebar/TodosPanel.tsx:48-380`                 | scope、加载、导航、智能视图、CRUD 动作路由。                     |
+| 编辑 UI        | `src/renderer/src/components/right-sidebar/TodoEditDialog.tsx:67-335`             | 标题、备注、列表、重要、日期、提醒、我的一天、一级步骤。         |
+| Renderer state | `src/renderer/src/store/slices/todos/create-todos-slice.ts:9-28`                  | 项目/全局 bucket、加载状态、保存、乐观删除/完成、失效 API。      |
+| 预加载         | `src/preload/api/todo-bridge.ts:18-72`                                            | 强类型 IPC bridge 与变更事件订阅 API。                           |
+| IPC            | `src/main/ipc/repos/todo-handlers.ts:85-309`                                      | 输入规范化、项目存在校验、持久化调用、scheduler 重算、窗口通知。 |
+| 持久化         | `src/main/persistence/loading-store/todo-persistence.ts:58-230`                   | scope 分桶、排序、默认列表、任务/列表 CRUD、repo 数据清理。      |
+| 迁移           | `src/main/persistence/loading-store/todo-normalization.ts:18-94`                  | 旧数据补字段与默认列表。                                         |
+| 提醒           | `src/main/persistence/loading-store/todo-reminder-scheduler.ts:31-199`            | 收集全局+已注册 repo 任务、单 timer、恢复重排、去重标记。        |
 
 ## 3. 数据模型与持久化
 
-| 对象 | 字段/规则 | 代码证据 |
-| --- | --- | --- |
-| `Todo` | `id`、`repoId`、标题、备注、完成/完成时间、创建/更新时间、可选列表、重要、截止日期、提醒/投递时间、我的一天日期、步骤 | `src/shared/types.ts:26-48` |
-| `TodoList` | `id`、`repoId`、标题、创建/更新时间 | `src/shared/types.ts:51-58` |
-| 项目数据 | `todosByRepo[repoId]` 与 `todoListsByRepo[repoId]` | `src/shared/persisted-state-types.ts:80-87` |
-| 全局数据 | `globalTodos` 与 `globalTodoLists`，任务 `repoId=''` | 同上 |
-| 默认列表 | id=`default`、标题 `Tasks`；每个 scope 自动确保存在 | `src/main/persistence/loading-store/todo-normalization.ts:4-15` |
+| 对象       | 字段/规则                                                                                                             | 代码证据                                                        |
+| ---------- | --------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| `Todo`     | `id`、`repoId`、标题、备注、完成/完成时间、创建/更新时间、可选列表、重要、截止日期、提醒/投递时间、我的一天日期、步骤 | `src/shared/types.ts:26-48`                                     |
+| `TodoList` | `id`、`repoId`、标题、创建/更新时间                                                                                   | `src/shared/types.ts:51-58`                                     |
+| 项目数据   | `todosByRepo[repoId]` 与 `todoListsByRepo[repoId]`                                                                    | `src/shared/persisted-state-types.ts:80-87`                     |
+| 全局数据   | `globalTodos` 与 `globalTodoLists`，任务 `repoId=''`                                                                  | 同上                                                            |
+| 默认列表   | id=`default`、标题 `Tasks`；每个 scope 自动确保存在                                                                   | `src/main/persistence/loading-store/todo-normalization.ts:4-15` |
 
 加载时，`normalizeTodoState` 为所有已有项目 bucket 和全局 scope 补默认列表与旧字段；`src/main/persistence/loading-store/loaded-state-parsing.ts:271-273` 将其标记为待保存。排序层按创建时间返回任务；智能视图再按逾期、截止日期和更新时间排序，见 `src/renderer/src/components/right-sidebar/todo-view-filters.ts:18-49`。任务删除在 `src/renderer/src/components/right-sidebar/TodoItemRow.tsx:45-51` 采用 3 秒二次点击确认，未二次确认即保留；一级步骤在 `src/renderer/src/components/right-sidebar/TodoEditDialog.tsx:122-139` 独立切换/移除，完成步骤仍显示且可恢复。
 
 ## 4. 范围与视图规则
 
-| 场景 | 实际规则 | 代码证据 |
-| --- | --- | --- |
-| Project | 仅当前 active repo 的 bucket；无 active repo 时不可快速新增 | `src/renderer/src/components/right-sidebar/TodosPanel.tsx:83-85,264-265` |
-| Global | 使用独立 global IPC 与缓存 | `src/renderer/src/components/right-sidebar/TodosPanel.tsx:119-126` |
-| My Day | 聚合 global + 当前 repo 中 `myDayDate===本地今天`、未完成任务 | `src/renderer/src/components/right-sidebar/TodosPanel.tsx:134-145`、`src/renderer/src/store/slices/todos/todos-slice-contract.ts:67-89` |
-| 重要/计划内/全部/已完成 | 只对当前 scope 的任务过滤 | `src/renderer/src/components/right-sidebar/TodosPanel.tsx:152-167` |
-| 列表 | 只显示未完成且 `listId` 相同的当前 scope 任务 | `src/renderer/src/components/right-sidebar/todo-view-filters.ts:52-54` |
-| 逾期 | 未完成、截止日期早于本地今天 | `src/renderer/src/components/right-sidebar/TodoItemRow.tsx:18-27` |
+| 场景                    | 实际规则                                                      | 代码证据                                                                                                                                |
+| ----------------------- | ------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Project                 | 仅当前 active repo 的 bucket；无 active repo 时不可快速新增   | `src/renderer/src/components/right-sidebar/TodosPanel.tsx:83-85,264-265`                                                                |
+| Global                  | 使用独立 global IPC 与缓存                                    | `src/renderer/src/components/right-sidebar/TodosPanel.tsx:119-126`                                                                      |
+| My Day                  | 聚合 global + 当前 repo 中 `myDayDate===本地今天`、未完成任务 | `src/renderer/src/components/right-sidebar/TodosPanel.tsx:134-145`、`src/renderer/src/store/slices/todos/todos-slice-contract.ts:67-89` |
+| 重要/计划内/全部/已完成 | 只对当前 scope 的任务过滤                                     | `src/renderer/src/components/right-sidebar/TodosPanel.tsx:152-167`                                                                      |
+| 列表                    | 只显示未完成且 `listId` 相同的当前 scope 任务                 | `src/renderer/src/components/right-sidebar/todo-view-filters.ts:52-54`                                                                  |
+| 逾期                    | 未完成、截止日期早于本地今天                                  | `src/renderer/src/components/right-sidebar/TodoItemRow.tsx:18-27`                                                                       |
 
 当前 scope 只存 renderer Zustand 内存；虽有持久化类型字段 `todoScope`，并无读取或写入接线。Todo Tab 切换导致面板卸载，`activeNav` 初始化为 All，因此不能宣称状态可跨 Tab 保留。
 
 ## 5. IPC 契约与异常处理
 
-| Channel | 输入 | 行为/异常 |
-| --- | --- | --- |
-| `todos:list` / `listGlobal` | `repoId` 或无参数 | 获取项目/全局任务。 |
-| `todos:save` / `saveGlobal` | 标题、可选 id/list/备注/元数据/步骤 | 标题 trim 且不能为空，标题≤500、备注≤2000；项目 repo 必须存在。 |
-| `todos:toggle` / `toggleGlobal` | todo id、done | 找不到任务抛错；持久层更新 `completedAt` / `updatedAt`。 |
-| `todos:remove` / `removeGlobal` | todo id | 移除后重算提醒。 |
-| `todos:listLists` / `listGlobalLists` | repoId 或无参数 | 获取并确保默认列表。 |
-| `todos:saveList` / `saveGlobalList` | 标题、可选 id | 标题不能为空、≤500。 |
-| `todos:removeList` / `removeGlobalList` | list id、`confirmed=true` | 未确认抛错；默认列表抛错。实际将任务迁移至默认列表，而非删除。 |
+| Channel                                 | 输入                                | 行为/异常                                                       |
+| --------------------------------------- | ----------------------------------- | --------------------------------------------------------------- |
+| `todos:list` / `listGlobal`             | `repoId` 或无参数                   | 获取项目/全局任务。                                             |
+| `todos:save` / `saveGlobal`             | 标题、可选 id/list/备注/元数据/步骤 | 标题 trim 且不能为空，标题≤500、备注≤2000；项目 repo 必须存在。 |
+| `todos:toggle` / `toggleGlobal`         | todo id、done                       | 找不到任务抛错；持久层更新 `completedAt` / `updatedAt`。        |
+| `todos:remove` / `removeGlobal`         | todo id                             | 移除后重算提醒。                                                |
+| `todos:listLists` / `listGlobalLists`   | repoId 或无参数                     | 获取并确保默认列表。                                            |
+| `todos:saveList` / `saveGlobalList`     | 标题、可选 id                       | 标题不能为空、≤500。                                            |
+| `todos:removeList` / `removeGlobalList` | list id、`confirmed=true`           | 未确认抛错；默认列表抛错。实际将任务迁移至默认列表，而非删除。  |
 
 截止日期仅验证 `YYYY-MM-DD` 形状，提醒值未做 finite/future 校验。保存更新会保留既有 `reminderDeliveredAt`，是待复审风险。
 
@@ -84,25 +84,25 @@ macOS/Linux/Windows 均使用 Electron 与原生日期输入；`datetime-local` 
 
 ## 8. 已知差异、风险与取舍
 
-| ID | 类型 | 事实 | 影响/待处理 |
-| --- | --- | --- | --- |
-| RISK-01 | 需求差异 | 原目标为删除列表及任务；实现重分配到默认列表 | 等待 D1 产品决策后再定验收。 |
-| RISK-02 | 需求差异 | Tab 切换不保留 active navigation；scope 不持久化 | 不能满足原状态保留表述。 |
-| RISK-03 | 一致性 | bridge 有变更订阅但 renderer 未消费；IPC 通知单一窗口 | 多窗口缓存可陈旧。 |
-| RISK-04 | 提醒 | 修改提醒可能保留已投递标记 | 可能错过重新设置后的提醒。 |
-| RISK-05 | 删除刷新 | 删除列表 action 后调用已加载 bucket 的 fetch，可能不刷新迁移后的任务 | UI 与持久层可能短暂不一致。 |
-| TRADE-01 | 取舍 | 只保留一个最近提醒 timer | 低资源；依赖每次 mutation/recovery 重排。 |
-| TRADE-02 | 取舍 | My Day 仅全局+当前项目，不扫描全部项目 | 控制加载范围；不是全工作区汇总。 |
+| ID       | 类型     | 事实                                                                 | 影响/待处理                               |
+| -------- | -------- | -------------------------------------------------------------------- | ----------------------------------------- |
+| RISK-01  | 需求差异 | 原目标为删除列表及任务；实现重分配到默认列表                         | 等待 D1 产品决策后再定验收。              |
+| RISK-02  | 需求差异 | Tab 切换不保留 active navigation；scope 不持久化                     | 不能满足原状态保留表述。                  |
+| RISK-03  | 一致性   | bridge 有变更订阅但 renderer 未消费；IPC 通知单一窗口                | 多窗口缓存可陈旧。                        |
+| RISK-04  | 提醒     | 修改提醒可能保留已投递标记                                           | 可能错过重新设置后的提醒。                |
+| RISK-05  | 删除刷新 | 删除列表 action 后调用已加载 bucket 的 fetch，可能不刷新迁移后的任务 | UI 与持久层可能短暂不一致。               |
+| TRADE-01 | 取舍     | 只保留一个最近提醒 timer                                             | 低资源；依赖每次 mutation/recovery 重排。 |
+| TRADE-02 | 取舍     | My Day 仅全局+当前项目，不扫描全部项目                               | 控制加载范围；不是全工作区汇总。          |
 
 ## 9. 需求回链
 
-| PRD | 设计承接 | 当前结论 |
-| --- | --- | --- |
-| R1/R2 | 第 2、4、7 节 | 部分：Tab 状态保留差异。 |
-| R3 | 第 3、5 节 | 部分：删除语义差异。 |
-| R4/R5 | 第 3、4、5 节 | 实现存在，待执行验证。 |
-| R6 | 第 6 节 | 部分：提醒重设和通知边界待确认。 |
-| R7 | 第 3、7 节 | 实现存在，重启/多窗口仍待补验。 |
+| PRD   | 设计承接      | 当前结论                         |
+| ----- | ------------- | -------------------------------- |
+| R1/R2 | 第 2、4、7 节 | 部分：Tab 状态保留差异。         |
+| R3    | 第 3、5 节    | 部分：删除语义差异。             |
+| R4/R5 | 第 3、4、5 节 | 实现存在，待执行验证。           |
+| R6    | 第 6 节       | 部分：提醒重设和通知边界待确认。 |
+| R7    | 第 3、7 节    | 实现存在，重启/多窗口仍待补验。  |
 
 ## 10. 已确认修复方案（待实施）
 
@@ -134,11 +134,11 @@ macOS/Linux/Windows 均使用 Electron 与原生日期输入；`datetime-local` 
 
 ### 10.5 实施验证设计
 
-| 层级 | 针对性验证 |
-| --- | --- |
-| 单元 | persistence 的 global/project 列表迁移与清理；handler 的 null/undefined、finite reminder、delivered 重置、完成清除与全窗口四事件广播；slice generation 防旧响应；My Day 按 `todo.repoId` 路由。 |
-| Renderer | Todo Tab 往返保留 scope/nav、repo/list 无效回退、四订阅注册/清理、列表删除后的任务即时刷新、跨 scope My Day 编辑/删除/完成。 |
-| 后台 E2E | `ORCA_BACKGROUND_LAUNCH=1` 下以 CDP 验证重启恢复、两个 renderer 的 mutation 刷新和本机 Todo 提醒不产生移动端 dispatch；不显示或聚焦窗口。 |
+| 层级     | 针对性验证                                                                                                                                                                                      |
+| -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 单元     | persistence 的 global/project 列表迁移与清理；handler 的 null/undefined、finite reminder、delivered 重置、完成清除与全窗口四事件广播；slice generation 防旧响应；My Day 按 `todo.repoId` 路由。 |
+| Renderer | Todo Tab 往返保留 scope/nav、repo/list 无效回退、四订阅注册/清理、列表删除后的任务即时刷新、跨 scope My Day 编辑/删除/完成。                                                                    |
+| 后台 E2E | `ORCA_BACKGROUND_LAUNCH=1` 下以 CDP 验证重启恢复、两个 renderer 的 mutation 刷新和本机 Todo 提醒不产生移动端 dispatch；不显示或聚焦窗口。                                                       |
 
 ### 10.6 风险、取舍与回滚
 

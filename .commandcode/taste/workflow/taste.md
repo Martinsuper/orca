@@ -1,0 +1,21 @@
+# Workflow preferences
+
+- Core release loop: pull/merge upstream → build macOS installer → open installer → verify installed version → commit & push. Expects the whole chain to be handled. Confidence: 0.95
+- Upstream merge protocol: before merging, create a timestamped backup branch (backup/pre-upstream-merge-<yyyymmdd-hhmm>), save the HEAD sha and a `git diff` patch into the scratchpad, stash the local WIP with a descriptive message, merge, then pop the stash and re-resolve. Confidence: 0.9
+- Resolves merge conflicts by first establishing each side's intent (compares `git show upstream/main:<file>` with the merge base and local HEAD) instead of mechanically keeping both sides; when the local file is a duplicate that upstream's refactor superseded, takes upstream's version and deletes the stale local file. Confidence: 0.85
+- Treats generated artifacts (i18n locale JSON, en-runtime-required.json) as generated: takes the upstream version and re-runs the repo's own extraction/sync scripts rather than hand-merging keys. Confidence: 0.9
+- Attributes test failures by running the same tests in a separate `git worktree` checked out at the pre-merge backup branch and at upstream/main, then comparing per-file failure counts to separate merge-induced regressions from pre-existing and environment failures (macOS /var symlinks, missing release tags, missing mobile deps). Confidence: 0.85
+- Runs the repo's ratchet gates after a merge (check:ratchets, check:id-only-store-write-ratchet, check:e2e-typecheck-ratchet --prune, verify:localization-catalog); when a local feature legitimately trips a gate, records the exemption in the gate's baseline/exemption map with a written reason comment instead of disabling the check. Confidence: 0.8
+- Removes temporary analysis/merge scripts (e.g. .merge-scripts/) before finishing, since lint runs over the whole repo. Confidence: 0.8
+- When a merge pushes a file past the lint max-lines limit (300 in this repo), extracts a helper module instead of adding an exception. Confidence: 0.75
+- Always verifies outcomes rather than trusting them: "检查下是否编译构建成功", "检查下当前版本是否已经是最新版本", "检查下任务状态". Confidence: 0.9
+- Prefers one squashed commit per change set ("一个提交"). Confidence: 0.9
+- Works on a feature branch and merges upstream main into it; cares that local-only features survive the merge ("是否有丢失本地特有的功能", "如何避免后续上游更新覆盖本地的修改"). Expects an explicit strategy for preserving local patches. Confidence: 0.9
+- When a local build cannot complete, prefers pushing to the remote and triggering the CI/release action instead. Confidence: 0.85
+- For UI iteration, prefers a quick web dev-server preview over rebuilding the installer each round; only packages after the result looks right. Confidence: 0.85
+- Expects typecheck/tests to pass before committing, with lint fixes folded into the same commit. Confidence: 0.8
+- Opens the installer and installs it manually rather than letting the agent install silently. Confidence: 0.8
+- Disk cleanup: starts with low-risk caches (dist/, out/, electron-builder, Homebrew, Playwright) before touching heavy data such as local model files. Confidence: 0.85
+- Asks for summaries of what upstream changed ("上游都更新了什么/提供了什么新功能") as part of the merge workflow. Confidence: 0.85
+- For questions about Command Code's own capabilities/configuration, expects the answer to be grounded in the bundled knowledge base and reference docs (skills such as `command-code-knowledge` / `config`, files under `~/.commandcode/`) rather than recalled from memory — cite exact config paths, file names, and copy-pasteable JSON. Confidence: 0.65
+- For provider/model porting tasks, expects empirical validation rather than config-and-hope: probe every model id against the live endpoint, then re-check with the target tool's own model listing and a headless run, and report per-model failures and quirks (broken ids, missing reasoning fields, id-collision rules) explicitly instead of silently dropping them. Verification must reach the surface the user actually uses — a change that parses and lists fine in CLI can still be invisible after restarting the tool's UI (plugin layers may filter lists), so confirm there before declaring done. Confidence: 0.75
