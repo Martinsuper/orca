@@ -1,7 +1,5 @@
 import type { RepoSlice } from './repos/repo-state'
 import type { SparsePresetsSlice } from './slices/sparse-presets'
-import type { ProjectLinksSlice } from './slices/project-links'
-import type { TodosSlice } from './slices/todos'
 import type { WorktreeSlice } from './slices/worktrees'
 import type { TerminalSlice } from './terminals/terminal-state'
 import type { TabsSlice } from './slices/tabs'
@@ -54,8 +52,6 @@ import type { WorkspaceAttentionSlice } from './slices/workspace-attention/works
 
 export type AppState = RepoSlice &
   SparsePresetsSlice &
-  ProjectLinksSlice &
-  TodosSlice &
   WorktreeSlice &
   TerminalSlice &
   TabsSlice &
