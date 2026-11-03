@@ -9,19 +9,15 @@ import { registerFolderWorkspaceHandlers } from './repos/folder-workspace-handle
 import { registerNestedRepoImportHandler } from './repos/nested-repo-import-handler'
 import { registerRepoUpdateHandler } from './repos/repo-update-handler'
 import { registerSparsePresetHandlers } from './repos/sparse-preset-handlers'
-import { registerProjectLinkHandlers } from './repos/project-link-handlers'
-import { registerTodoHandlers } from './repos/todo-handlers'
 import { registerRepoFolderPickerHandlers } from './repos/repo-folder-picker-handlers'
 import { registerRepoCloneHandlers } from './repos/repo-clone-lifecycle'
 import { registerBaseRefQueryHandlers } from './repos/base-ref-query-handlers'
-import type { TodoReminderScheduler } from '../persistence/loading-store/todo-reminder-scheduler'
 import type { OrcaRuntimeService } from '../runtime/orca-runtime'
 
 export function registerRepoHandlers(
   mainWindow: BrowserWindow,
   store: Store,
-  runtime: OrcaRuntimeService,
-  reminderScheduler?: TodoReminderScheduler
+  runtime: OrcaRuntimeService
 ): void {
   // macOS window recreation re-registers these handlers.
   ipcMain.removeHandler('repos:list')
@@ -75,8 +71,6 @@ export function registerRepoHandlers(
   registerNestedRepoImportHandler(mainWindow, store)
   registerRepoUpdateHandler(mainWindow, store)
   registerSparsePresetHandlers(mainWindow, store)
-  registerProjectLinkHandlers(mainWindow, store)
-  registerTodoHandlers(mainWindow, store, reminderScheduler)
   registerRepoFolderPickerHandlers(mainWindow)
   registerRepoCloneHandlers(mainWindow, store)
   registerBaseRefQueryHandlers(store)
