@@ -155,8 +155,7 @@ export function attachMainWindowCoreServices(
       onBeforeUpdateQuit: () => preserveStateBeforeUpdateRestart({ codexRuntimeHome, store }),
       onBeforeUpdateQuitFailure: 'abort',
       updateInstallMode: resolveUpdateInstallMode(state.isServeMode),
-      onWorktreeLifecycle: emitPluginWorktreeLifecycle,
-      reminderScheduler: state.todoReminderScheduler ?? undefined
+      onWorktreeLifecycle: emitPluginWorktreeLifecycle
     }
   )
   // Attach durable diagnostic pulls now, defer process launch past first paint.
