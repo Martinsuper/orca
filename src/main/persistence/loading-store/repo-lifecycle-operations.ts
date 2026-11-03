@@ -30,7 +30,6 @@ import type { StoreRuntimeState } from './store-runtime-state'
 import type { WriteSchedulingOperations } from './write-scheduling'
 import { scheduleSave } from './write-scheduling'
 import { pruneDeregisteredRepoUiResidue } from './repo-lifecycle-ui-residue'
-import type { PersistedState } from '../../../shared/persisted-state-types'
 import { isWslMoveProjectSessionFrozen } from '../moving-wsl-projects/wsl-move-scope-guard'
 import { dropOrcadTerminalRestoreHintsForWorktrees } from '../migrating-orcad-catalog/orcad-terminal-restore-hint-store'
 import { getRepoIdFromWorktreeId } from '../../../shared/worktree/id'
@@ -104,7 +103,8 @@ export class RepoLifecycleOperations {
       retireLocalWorktreeScanGeneration(id)
       releaseWslStoppedWorktreeRescan(id)
       dropRepoRestoreHints(this, id)
-      deleteRepoScopedState(this[repoLifecycleOperationsContext].runtime.state, id)
+      delete this[repoLifecycleOperationsContext].runtime.state.sparsePresetsByRepo[id]
+      delete this[repoLifecycleOperationsContext].runtime.state.retiredWorktreeNamesByRepo?.[id]
     }
     syncProjectHostSetupCompatibilityState(this)
     // Paired repos may be absent locally while same-ID rows remain on another host; prune only this host.
@@ -150,7 +150,6 @@ export class RepoLifecycleOperations {
         state.workspaceSessionsByHostId,
         repoId
       )
-      deleteRepoScopedState(state, repoId)
     }
     pruneDeregisteredRepoUiResidue(state.ui, orphanRepoIds)
     return [...orphanRepoIds]
@@ -214,13 +213,6 @@ export function getRepoOrderOperations(
       scheduleSave: () => scheduleSave(owner[repoLifecycleOperationsContext].scheduling)
     })
   return owner[repoLifecycleOperationsContext].runtime.repoOrderOperations
-}
-
-function deleteRepoScopedState(state: PersistedState, repoId: string): void {
-  delete state.sparsePresetsByRepo[repoId]
-  delete state.retiredWorktreeNamesByRepo?.[repoId]
-  delete state.todosByRepo[repoId]
-  delete state.todoListsByRepo?.[repoId]
 }
 
 export function pruneWorktreeStateForRepo(

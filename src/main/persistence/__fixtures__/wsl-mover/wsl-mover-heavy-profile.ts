@@ -171,9 +171,6 @@ export function heavyWslMoverProfile(paths: WslMoverPaths): WslMoveProjectionInp
       projectGroups: [],
       folderWorkspaces: [],
       sparsePresetsByRepo: { 'repo-a': [] },
-      projectLinksByRepo: { 'repo-a': [] },
-      projectLinkFoldersByRepo: { 'repo-a': [] },
-      todosByRepo: { 'repo-a': [] },
       retiredWorktreeNamesByRepo: {},
       worktreeMeta: {
         [wtA]: { ...worktreeMeta('app'), ...movedFrom(wtA) },

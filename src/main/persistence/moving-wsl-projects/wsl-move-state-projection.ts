@@ -46,10 +46,6 @@ export type WslMoveProjectionInput = {
     | 'projectGroups'
     | 'folderWorkspaces'
     | 'sparsePresetsByRepo'
-    | 'projectLinksByRepo'
-    | 'projectLinkFoldersByRepo'
-    | 'todosByRepo'
-    | 'todoListsByRepo'
     | 'retiredWorktreeNamesByRepo'
     | 'mobileClientTabSelectionsByDeviceId'
     | 'worktreeMeta'
@@ -80,10 +76,6 @@ export const WSL_MOVE_PROJECTED_STATE_FIELDS = [
   'folderWorkspaces',
   'projectGroups',
   'sparsePresetsByRepo',
-  'projectLinksByRepo',
-  'projectLinkFoldersByRepo',
-  'todosByRepo',
-  'todoListsByRepo',
   'retiredWorktreeNamesByRepo',
   'mobileClientTabSelectionsByDeviceId',
   'worktreeMeta',
@@ -172,12 +164,6 @@ export function projectWslMoveState(
       withoutKeys(collectProjectGroups(state.projectGroups, groupIds), HOST_BINDINGS.projectGroups)
     ),
     sparsePresetsByRepo: pickKeys(state.sparsePresetsByRepo, (key) => scope.repoIds.has(key)),
-    projectLinksByRepo: pickKeys(state.projectLinksByRepo, (key) => scope.repoIds.has(key)),
-    projectLinkFoldersByRepo: pickKeys(state.projectLinkFoldersByRepo, (key) =>
-      scope.repoIds.has(key)
-    ),
-    todosByRepo: pickKeys(state.todosByRepo, (key) => scope.repoIds.has(key)),
-    todoListsByRepo: pickKeys(state.todoListsByRepo ?? {}, (key) => scope.repoIds.has(key)),
     retiredWorktreeNamesByRepo: pickKeys(state.retiredWorktreeNamesByRepo ?? {}, (key) =>
       scope.repoIds.has(key)
     ),

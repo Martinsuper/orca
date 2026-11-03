@@ -55,14 +55,6 @@ export function collectDeregisteredRepoIds(state: PersistedState): Set<string> {
     }
   }
   const orphanRepoIds = new Set<string>()
-  for (const repoId of [
-    ...Object.keys(state.todosByRepo ?? {}),
-    ...Object.keys(state.todoListsByRepo ?? {})
-  ]) {
-    if (repoId && !liveRepoIds.has(repoId)) {
-      orphanRepoIds.add(repoId)
-    }
-  }
   // Only full repo::path locators prove repo identity; bare folder/revision keys could delete live sessions.
   const addWorktreeId = (worktreeId: string | null | undefined): void => {
     const repoId = worktreeId ? splitWorktreeId(worktreeId)?.repoId : undefined

@@ -16,9 +16,6 @@ import { pluginsApi } from './api/plugins-bridge'
 import { reposApi } from './api/repos-bridge'
 import { projectsApi } from './api/projects-bridge'
 import { projectGroupsApi } from './api/project-groups-bridge'
-import { projectLinksApi, projectLinkFoldersApi } from './api/project-links-bridge'
-import { todosApi } from './api/todo-bridge'
-import { plantumlApi } from './api/plantuml-bridge'
 import { folderWorkspacesApi } from './api/folder-workspaces-bridge'
 import { sparsePresetsApi } from './api/sparse-presets-bridge'
 import { worktreesApi } from './api/worktrees-bridge'
@@ -119,9 +116,6 @@ const api = {
   repos: reposApi,
   projects: projectsApi,
   projectGroups: projectGroupsApi,
-  projectLinks: projectLinksApi,
-  projectLinkFolders: projectLinkFoldersApi,
-  todos: todosApi,
   folderWorkspaces: folderWorkspacesApi,
   sparsePresets: sparsePresetsApi,
   worktrees: worktreesApi,
@@ -130,7 +124,6 @@ const api = {
   workspacePorts: workspacePortsApi,
   linkPreview: linkPreviewApi,
   pty: ptyApi,
-  plantuml: plantumlApi,
   feedback: feedbackApi,
   crashReports: crashReportsApi,
   export: exportApi,
