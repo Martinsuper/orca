@@ -28,14 +28,6 @@ export function buildNotificationOptions(
     }
   }
 
-  if (args.source === 'todo-reminder') {
-    const body = args.agentLastAssistantMessage || 'You have a task due.'
-    return {
-      title: 'Task reminder',
-      body
-    }
-  }
-
   if (args.source === 'test') {
     return {
       title: translate('notifications.test.title', 'Orca notifications are on'),
