@@ -150,7 +150,7 @@ export type {
   MRInfo,
   MRListState
 } from './gitlab-types'
-export type { GhosttyImportPreview, GlobalSettings } from './global-settings-types'
+export type { GlobalSettings } from './global-settings-types'
 export type {
   GitHubCreateIssueResult,
   GitHubIssueUpdate,
