@@ -4,7 +4,7 @@ import type { StateCreator } from 'zustand'
 import type { AppState } from '../types'
 import { getRepoIdFromWorktreeId } from '../../../../shared/worktree/id'
 import { getWorktreeIdFromVisitKey, getWorktreeVisitKey } from '@/lib/worktree-visit-recency'
-import { omitRepoScopedRowsForRepos } from '../slices/repo-scoped-row-pruning'
+import { omitSparsePresetsForRepos } from '../slices/sparse-presets'
 import { repoMatchesHostIdentity } from '../slices/repo-host-identity'
 import { callRuntimeRpc } from '../../runtime/runtime-rpc-client'
 import { hasRuntimeRpcErrorCode } from '../../../../shared/runtime-rpc-error-code'
@@ -280,8 +280,8 @@ export function createRepoRemovalActions(
           const removedRepoIds = s.repos.filter((r) => !survivingRepoIds.has(r.id)).map((r) => r.id)
           return {
             repos: nextRepos,
-            // Why: drop removed repos' repo-scoped rows so they don't outlive the repo for the whole session.
-            ...omitRepoScopedRowsForRepos(s, removedRepoIds),
+            // Why: drop removed repos' sparse-preset maps so they don't outlive the repo for the whole session.
+            ...omitSparsePresetsForRepos(s, removedRepoIds),
             ...mergeProjectCompatibilityForHostRepoChange({
               previous: { projects: s.projects, projectHostSetups: s.projectHostSetups },
               nextRepos,
