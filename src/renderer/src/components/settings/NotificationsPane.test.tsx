@@ -27,7 +27,6 @@ function createSettings(): GlobalSettings {
       agentTaskComplete: true,
       agentNeedsInput: true,
       terminalBell: true,
-      todoReminder: true,
       suppressWhenFocused: true,
       customSoundId: 'system',
       customSoundPath: null,
