@@ -22,7 +22,6 @@ import { registerDaemonManagementHandlers } from '../ipc/pty/pty-management'
 import { registerSshHandlers } from '../ipc/ssh/ssh'
 import { browserManager } from '../browser/browser-manager'
 import { hasSystemMediaAccess, requestSystemMediaAccess } from '../browser/browser-media-access'
-import type { TodoReminderScheduler } from '../persistence/loading-store/todo-reminder-scheduler'
 import type { OrcaRuntimeService, RuntimeWorktreeLifecycleEvent } from '../runtime/orca-runtime'
 import type {
   PreQuitCleanupFailureMode,
@@ -76,11 +75,10 @@ export function attachMainWindowServices(
     onBeforeUpdateQuitFailure?: PreQuitCleanupFailureMode
     updateInstallMode?: UpdateInstallMode
     onWorktreeLifecycle?: (event: RuntimeWorktreeLifecycleEvent) => void
-    reminderScheduler?: TodoReminderScheduler
   }
 ): void {
   registerAppReloadHandler(mainWindow, options?.onBeforeRendererReload)
-  registerRepoHandlers(mainWindow, store, runtime, options?.reminderScheduler)
+  registerRepoHandlers(mainWindow, store, runtime)
   // Repo IPC mutations must invalidate paired-client catalogs too (#11994).
   setRepoRemoteClientNotifier(runtime)
   setWorktreeCatalogRemoteClientNotifier(runtime)
