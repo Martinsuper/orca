@@ -36,8 +36,6 @@ import {
 import { loadWorktreeRemovalRecordsForStore } from './worktree-removal-records-load'
 import { runAfterFirstWindowShown } from './first-window-deferral'
 import { logStartupMilestone } from './startup-diagnostics'
-import { TodoReminderScheduler } from '../persistence/loading-store/todo-reminder-scheduler'
-import { getActiveNotificationDispatcher } from '../ipc/notifications'
 import { refreshInstalledOpenCodeStatusPlugins } from '../opencode/opencode-status-plugin-startup-refresh'
 import { pruneDesktopOrcadArtifactCache } from '../orcad/orcad-artifact-cache-retention'
 import { runGatedWslMoveDesktopRewritePass } from '../persistence/moving-wsl-projects/wsl-move-desktop-rewrite'
@@ -163,15 +161,5 @@ export async function initializeReadyRuntimeServices(): Promise<void> {
   if (ORCA_LAYOUT_OWNER_IS_MAIN) {
     await repairDuplicatePtyPanesOnStart(store, runtime)
   }
-  state.todoReminderScheduler = new TodoReminderScheduler({
-    store,
-    dispatch: (request) => {
-      const dispatcher = getActiveNotificationDispatcher()
-      if (dispatcher) {
-        void dispatcher(request)
-      }
-    }
-  })
-  state.todoReminderScheduler.hydrate()
   logStartupMilestone('services-initialized')
 }
