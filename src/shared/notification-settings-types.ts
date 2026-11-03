@@ -12,7 +12,6 @@ export type NotificationSettings = {
   agentTaskComplete: boolean
   agentNeedsInput: boolean
   terminalBell: boolean
-  todoReminder: boolean
   suppressWhenFocused: boolean
   customSoundId:
     | 'system'
@@ -34,11 +33,7 @@ export type NotificationSettings = {
   notifyHiddenWorkspaces: boolean
 }
 
-export type NotificationEventSource =
-  | 'agent-task-complete'
-  | 'terminal-bell'
-  | 'todo-reminder'
-  | 'test'
+export type NotificationEventSource = 'agent-task-complete' | 'terminal-bell' | 'test'
 
 export type StructuredNotificationRead = StructuredAttentionRead & {
   paneKey: string
