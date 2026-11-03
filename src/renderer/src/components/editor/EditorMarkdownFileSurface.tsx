@@ -111,6 +111,7 @@ export function EditorMarkdownFileSurface({
               worktreeId={activeFile.worktreeId}
               externalSshTargetId={activeFile.externalSshTargetId}
               runtimeEnvironmentId={activeFile.runtimeEnvironmentId}
+              operationProvenance={activeFile.operationProvenance}
               scrollCacheKey={`${editorViewStateKey}:rich`}
               onContentChange={onContentChange}
               onDirtyStateHint={handleDirtyStateHint}
@@ -142,7 +143,7 @@ export function EditorMarkdownFileSurface({
     return (
       <div className="flex h-full min-h-0 flex-col">
         {shouldExplainRichFallback ? (
-          <div className="border-b border-border/60 bg-amber-500/10 px-3 py-2 text-xs text-amber-950 dark:text-amber-100">
+          <div className="border-b border-border/60 bg-muted/40 px-3 py-2 text-xs text-muted-foreground">
             {richModeUnsupportedMessage}
           </div>
         ) : null}

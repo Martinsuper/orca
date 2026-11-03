@@ -1,3 +1,5 @@
+import type * as WorktreeScanCacheModule from '../git/worktree-scan-cache'
+import type * as WorktreeListingModule from '../git/worktree-listing'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { TerminalInputKind } from '../../shared/terminal-input-kind'
 import { writePtyFromRuntimeController } from '../ipc/pty/runtime/operations'
@@ -11,9 +13,24 @@ import { sendTerminalStreamInput } from './rpc/methods/terminal/terminal-input-d
 import { makeStore } from './runtime-rpc-worktree-store-fixtures'
 import {
   pasteWorktreeStartupDraftWhenReady,
-  sendWorktreeStartupFollowupWhenReady,
   type WorktreeStartupReadinessHost
 } from './runtime-worktree-startup-readiness'
+
+vi.mock('../git/worktree-scan-cache', async (importOriginal) => {
+  const facade = await vi.importMock<typeof WorktreeScanCacheModule>('../git/worktree')
+  return {
+    ...(await importOriginal<typeof WorktreeScanCacheModule>()),
+    listWorktrees: facade.listWorktrees
+  }
+})
+
+vi.mock('../git/worktree-listing', async (importOriginal) => {
+  const facade = await vi.importMock<typeof WorktreeListingModule>('../git/worktree')
+  return {
+    ...(await importOriginal<typeof WorktreeListingModule>()),
+    listWorktreesStrict: facade.listWorktreesStrict
+  }
+})
 
 vi.mock('../git/worktree', () => {
   const worktrees = [
@@ -235,20 +252,16 @@ describe('run facts: a created worktree’s startup writes', () => {
     }
   }
 
-  it('reads a run whose only input was its create-time draft and follow-up as untyped', async () => {
+  it('reads a run whose only input was its create-time draft as untyped', async () => {
     vi.useFakeTimers()
     const run = await createFreshRun()
     const host = readinessHost(run)
 
     pasteWorktreeStartupDraftWhenReady(host, run.handle, { agent: 'aider', content: 'plan it' })
-    sendWorktreeStartupFollowupWhenReady(host, run.handle, {
-      expectedProcess: 'aider',
-      prompt: 'and ship it'
-    })
     await vi.runAllTimersAsync()
 
-    expect(run.kinds).toEqual(['launch', 'launch'])
-    expect(run.writes).toHaveLength(2)
+    expect(run.kinds).toEqual(['launch'])
+    expect(run.writes).toHaveLength(1)
     expect(run.firstUserInputAt()).toBeNull()
   })
 })

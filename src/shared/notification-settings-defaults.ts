@@ -4,6 +4,7 @@ export function getDefaultNotificationSettings(): NotificationSettings {
   return {
     enabled: true,
     agentTaskComplete: true,
+    agentNeedsInput: true,
     terminalBell: false,
     todoReminder: true,
     suppressWhenFocused: true,

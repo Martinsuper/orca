@@ -16,11 +16,14 @@ const {
   ORCAD_TEMPLATE_TARGETS_DIR
 } = require('../../src/shared/orcad-artifacts.ts')
 const { verifyPackagedOrcadTemplate } = require('./verify-packaged-orcad-template.cjs')
-const { ORCAD_TEMPLATE_TARGETS } = require('../../src/shared/node-runtime-pin.ts')
 const {
   compactPackagedOrcadRipgrep,
   resealSignedPackagedRipgrep
 } = require('./compact-packaged-orcad-ripgrep.cjs')
+const {
+  referencePackagedOrcadBrowser,
+  resealSignedPackagedBrowser
+} = require('./packaged-orcad-browser.cjs')
 
 const ORCAD_TEMPLATE_RESOURCE_DIR = 'orcad-template'
 const orcadTemplateExtraResource = { from: 'out/orcad-template', to: ORCAD_TEMPLATE_RESOURCE_DIR }
@@ -125,14 +128,8 @@ async function finalizePackagedOrcadTemplate(resourcesDir, options) {
     }
     resealOrcadTemplateManifest(templateDir, machO)
   }
-  const localTargets =
-    env.ORCA_LOCAL_BUILD_VERSION && env.ORCA_LOCAL_ORCAD_TARGETS
-      ? env.ORCA_LOCAL_ORCAD_TARGETS.split(',')
-      : undefined
-  if (localTargets && localTargets.some((target) => !ORCAD_TEMPLATE_TARGETS.includes(target))) {
-    throw new Error('ORCA_LOCAL_ORCAD_TARGETS must name supported orcad template targets')
-  }
-  compactPackagedOrcadRipgrep(resourcesDir, localTargets)
+  compactPackagedOrcadRipgrep(resourcesDir)
+  referencePackagedOrcadBrowser(resourcesDir)
 }
 
 /** `inner-signing-list.txt` lines are app-relative Windows paths; keep the template's. */
@@ -153,10 +150,11 @@ function resealSignedWindowsApp(appDir, signedListFile) {
     return
   }
   resealOrcadTemplateManifest(join(resourcesDir, ORCAD_TEMPLATE_RESOURCE_DIR), signed)
-  resealSignedPackagedRipgrep(
-    resourcesDir,
-    signedAppPaths.filter((path) => path.startsWith('resources/')).map((path) => path.slice(10))
-  )
+  const signedResources = signedAppPaths
+    .filter((path) => path.startsWith('resources/'))
+    .map((path) => path.slice(10))
+  resealSignedPackagedRipgrep(resourcesDir, signedResources)
+  resealSignedPackagedBrowser(resourcesDir, signedResources)
   verifyPackagedOrcadTemplate(resourcesDir)
   console.log(`[packaged-orcad-template] resealed ${signed.length} signed template file(s)`)
 }

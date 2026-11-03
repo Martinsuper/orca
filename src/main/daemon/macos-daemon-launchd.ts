@@ -5,11 +5,15 @@ import { getAppEnvironment } from '../../shared/app-environment'
 import { LOCAL_BUILD_COMPATIBILITY_CONTRACT } from '../../shared/local-build-compatibility-contract'
 import { NODE_RUNTIME_DARWIN_MINIMUM_OS } from '../../shared/node-runtime-pin'
 import { runProcess } from '@orca/process-host'
-import { rm } from '../asar-transparent-fs'
+import { rm } from '../filesystem/asar-transparent-fs'
 import { compareDottedVersions } from '../orcad/native-host-abi'
 import { DaemonClient } from './client'
 import { DaemonEndpointOwnershipError, holdDaemonAdoptionLease } from './daemon-endpoint-adoption'
-import { buildDaemonScriptArgs, type DaemonChildSpawnOptions } from './daemon-launched-child-spawn'
+import {
+  buildDaemonScriptArgs,
+  DAEMON_V8_FLAGS,
+  type DaemonChildSpawnOptions
+} from './daemon-launched-child-spawn'
 import { macDaemonJobLabel } from './macos-daemon-job-label'
 import type { DaemonProcessHandle } from './daemon-spawner'
 import { DAEMON_SHUTDOWN_TIMEOUT_MS } from './daemon-shutdown-deadline'
@@ -65,6 +69,7 @@ function buildMacDaemonLaunchJob(
     Label: label,
     ProgramArguments: [
       bundle.execPath,
+      ...DAEMON_V8_FLAGS,
       bundle.entryPath,
       ...buildDaemonScriptArgs(options, bundle.execPath)
     ],

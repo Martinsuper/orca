@@ -10,6 +10,7 @@ import { buildNotificationOptions } from '../ipc/notification-options'
 import { translateMain } from '../i18n/main-i18n'
 import { reserveNotificationCooldown } from '../../shared/notification-burst-cooldown'
 import { toHostSessionPaneKey } from '../../shared/terminal-surface-id'
+import { isNotificationSourceEnabled } from '../../shared/notification-source-gate'
 
 export type NotificationDeliveryDependencies = {
   readNotificationSettings: () => NotificationSettings
@@ -66,13 +67,8 @@ export function createNotificationDeliveryService(
 
   return {
     dispatch: (request) => {
-      // Why: light the tray attention dot before the cooldown/focus/enabled gates so they
-      // can't hold it back (clears on window show/restore; see index.ts).
-      if (
-        request.source === 'agent-task-complete' ||
-        request.source === 'terminal-bell' ||
-        request.source === 'todo-reminder'
-      ) {
+      // Desktop gates must not suppress tray attention.
+      if (request.source === 'agent-task-complete' || request.source === 'terminal-bell') {
         if (!deps.isWindowVisible(deps.findActiveWindow())) {
           deps.setTrayAttention(true)
         }
@@ -83,11 +79,11 @@ export function createNotificationDeliveryService(
         request.notificationSourceId !== undefined &&
         settings.mutedNotificationSourceIds.includes(request.notificationSourceId)
       // Machine mutes leave mobile eligibility and its cooldown unchanged.
-      const desktopAllowed =
-        settings.enabled &&
-        (request.source !== 'agent-task-complete' || settings.agentTaskComplete) &&
-        (request.source !== 'terminal-bell' || settings.terminalBell) &&
-        (request.source !== 'todo-reminder' || settings.todoReminder)
+      const desktopAllowed = isNotificationSourceEnabled(
+        settings,
+        request.source,
+        request.agentState
+      )
 
       const notificationOptions = buildNotificationOptions(request, translateMain)
 
@@ -95,8 +91,7 @@ export function createNotificationDeliveryService(
       if (
         !request.mobileDeliveredByHost &&
         deps.dispatchMobileNotification &&
-        request.source !== 'test' &&
-        request.source !== 'todo-reminder'
+        request.source !== 'test'
       ) {
         if (
           reserveNotificationCooldown(
@@ -148,8 +143,8 @@ export function createNotificationDeliveryService(
         return { delivered: false, reason: 'suppressed-focus' }
       }
 
-      // Why: Settings tests and repeated todo reminders bypass burst dedupe.
-      if (request.source !== 'test' && request.source !== 'todo-reminder') {
+      // Explicit Settings tests bypass burst deduplication.
+      if (request.source !== 'test') {
         // Collapse unkeyed worktree events across sources; attention keys isolate their own repeats.
         if (
           !reserveNotificationCooldown(

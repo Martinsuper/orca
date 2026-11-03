@@ -3,7 +3,7 @@ import { join, sep } from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AiVaultListResult, AiVaultSession } from '../../shared/ai-vault-types'
 import type * as CachedSessionListModule from '../ai-vault/cached-session-list'
-import type * as SessionParseCacheModule from '../ai-vault/session-scanner-parse-cache'
+import type * as SessionParseCacheModule from '../ai-vault/parse-cache/session-parse-cache-store'
 
 const mocks = vi.hoisted(() => ({
   scanLocalSessions: vi.fn(),
@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   scanRuntimeAiVaultSessions: vi.fn(),
   getAiVaultWslHomeDirs: vi.fn(),
   ipcHandle: vi.fn(),
+  trashItem: vi.fn(),
   deleteAiVaultSessionFile: vi.fn(),
   invalidateAiVaultSessionListCache: vi.fn(),
   invalidateSessionParseCacheEntry: vi.fn()
@@ -19,10 +20,11 @@ const mocks = vi.hoisted(() => ({
 
 vi.mock('electron', () => ({
   app: { on: vi.fn() },
-  ipcMain: { handle: mocks.ipcHandle }
+  ipcMain: { handle: mocks.ipcHandle },
+  shell: { trashItem: mocks.trashItem }
 }))
 
-vi.mock('../ai-vault/session-scanner-service-spawn', async (importOriginal) => ({
+vi.mock('../ai-vault/scan-service/session-scanner-service-spawn', async (importOriginal) => ({
   ...(await importOriginal<object>()),
   scanAiVaultSessionsInService: mocks.scanLocalSessions,
   resolveAiVaultSessionTitlesInService: mocks.resolveAiVaultSessionTitlesInService,
@@ -42,7 +44,7 @@ vi.mock('../ai-vault/cached-session-list', async (importOriginal) => {
   }
 })
 
-vi.mock('../ai-vault/session-scanner-parse-cache', async (importOriginal) => {
+vi.mock('../ai-vault/parse-cache/session-parse-cache-store', async (importOriginal) => {
   const actual = await importOriginal<typeof SessionParseCacheModule>()
   return {
     ...actual,
@@ -50,15 +52,16 @@ vi.mock('../ai-vault/session-scanner-parse-cache', async (importOriginal) => {
   }
 })
 
-vi.mock('../wsl', () => ({
+vi.mock('../wsl/discovery/distro-catalog', () => ({
   listRunningWslDistrosAsync: vi.fn().mockResolvedValue([]),
   listRunningWslHomeDirsAsync: vi.fn().mockResolvedValue([]),
   hasCachedWslDistros: vi.fn(() => false)
 }))
 
-const { resolveOmpSessionsDir } = await import('../ai-vault/omp-session-root')
+const { resolveOmpSessionsDir } = await import('../ai-vault/scanners/omp/omp-session-root')
 const { _internals, registerAiVaultHandlers } = await import('./ai-vault')
 const { deleteAiVaultSession: deleteAiVaultSessionWithDeps } = await import('./ai-vault-delete')
+const { deleteAiVaultSessionForRemoteClient } = await import('../ai-vault/host-session-delete')
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -407,7 +410,8 @@ describe('deleteAiVaultSession', () => {
         sessionId: args.sessionId,
         filePath: args.filePath,
         executionHostId: 'local'
-      })
+      }),
+      expect.any(Function)
     )
     expect(invalidateMultiHostListCache).toHaveBeenCalledTimes(1)
     expect(mocks.invalidateAiVaultSessionListCache).toHaveBeenCalledTimes(1)
@@ -458,9 +462,65 @@ describe('deleteAiVaultSession', () => {
       reason: 'invalid-path'
     })
     expect(mocks.deleteAiVaultSessionFile).toHaveBeenCalledWith(
-      expect.objectContaining({ filePath: '' })
+      expect.objectContaining({ filePath: '' }),
+      expect.any(Function)
     )
     expect(mocks.invalidateAiVaultSessionListCache).not.toHaveBeenCalled()
+  })
+
+  it("routes a server-hosted session to its owning host and drops that host's cached list", async () => {
+    const deleteRuntimeAiVaultSession = vi.fn().mockResolvedValue({ outcome: 'deleted' })
+    const invalidateMultiHostListCache = vi.fn()
+
+    const result = await deleteAiVaultSessionWithDeps(
+      { ...args, executionHostId: 'runtime:gpu%20box' },
+      { invalidateMultiHostListCache, deleteRuntimeSession: deleteRuntimeAiVaultSession }
+    )
+
+    expect(result).toEqual({ outcome: 'deleted' })
+    expect(deleteRuntimeAiVaultSession).toHaveBeenCalledWith(
+      'gpu box',
+      expect.objectContaining({ agent: 'gemini', filePath: args.filePath })
+    )
+    expect(invalidateMultiHostListCache).toHaveBeenCalledTimes(1)
+    // This computer never touches a path that belongs to another host.
+    expect(mocks.deleteAiVaultSessionFile).not.toHaveBeenCalled()
+  })
+
+  it('never routes the unresolved-owner sentinel to a host', async () => {
+    const deleteRuntimeAiVaultSession = vi.fn()
+    mocks.deleteAiVaultSessionFile.mockResolvedValue({
+      outcome: 'rejected',
+      agent: 'gemini',
+      reason: 'non-local-host'
+    })
+
+    await deleteAiVaultSessionWithDeps(
+      { ...args, executionHostId: 'runtime:unresolved-owner' },
+      {
+        invalidateMultiHostListCache: vi.fn(),
+        deleteRuntimeSession: deleteRuntimeAiVaultSession
+      }
+    )
+
+    expect(deleteRuntimeAiVaultSession).not.toHaveBeenCalled()
+  })
+
+  it("gives a paired client's delete on this desktop the Trash and the host-leg fence", async () => {
+    registerAiVaultHandlers()
+    mocks.deleteAiVaultSessionFile.mockResolvedValue({ outcome: 'deleted' })
+
+    const result = await deleteAiVaultSessionForRemoteClient({
+      agent: 'gemini',
+      filePath: args.filePath
+    })
+
+    expect(result).toEqual({ outcome: 'deleted' })
+    const [target, removePath] = mocks.deleteAiVaultSessionFile.mock.calls[0]
+    expect(target).toMatchObject({ executionHostId: 'local', filePath: args.filePath })
+    await removePath({ path: args.filePath, kind: 'file', roots: [] })
+    expect(mocks.trashItem).toHaveBeenCalledWith(args.filePath)
+    expect(mocks.invalidateAiVaultSessionListCache).toHaveBeenCalledTimes(1)
   })
 
   it('registers the aiVault:deleteSession IPC channel', () => {

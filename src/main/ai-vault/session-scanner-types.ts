@@ -8,9 +8,9 @@ import type { ExecutionHostId } from '../../shared/execution-host'
 import type {
   TranscriptMessageSink,
   TranscriptSessionIdentity
-} from './session-transcript-consumers'
-import type { SessionSidecarObservation } from './session-sidecar-stat'
-import type { OpenCodeWslRuntime } from './session-scanner-opencode-wsl-runtime'
+} from './transcripts/session-transcript-consumers'
+import type { SessionSidecarObservation } from './parse-cache/session-sidecar-stat'
+import type { OpenCodeWslRuntime } from './scanners/opencode/reader-transport/session-scanner-opencode-wsl-runtime'
 
 export type AiVaultScanOptions = {
   claudeProjectsDir?: string
@@ -32,6 +32,8 @@ export type AiVaultScanOptions = {
   cursorProjectsDir?: string
   opencodeStorageDir?: string
   opencodeDbPaths?: readonly string[]
+  /** Managed account OpenCode data directories; resolved by the host process. */
+  opencodeAccountDataDirs?: readonly string[]
   zcodeDbPath?: string
   grokSessionsDir?: string
   devinTranscriptsDir?: string

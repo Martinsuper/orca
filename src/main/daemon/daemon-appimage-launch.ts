@@ -2,9 +2,9 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { relativePathInsideRoot } from '../../shared/cross-platform-path'
-import { resolveAppImageRuntimeIdentity } from '../appimage-runtime-identity'
+import { resolveAppImageRuntimeIdentity } from '../updater/linux-package/appimage-runtime-identity'
 import type { DurableDaemonScopeCommand } from './daemon-cgroup-scope'
-import { removeAppImageRuntimeEnv } from '../pty/appimage-terminal-env'
+import { envWithoutAppImageRuntime } from '../pty/shell-startup/appimage-terminal-env'
 
 export type AppImageDaemonLaunch = {
   appImagePath: string
@@ -95,14 +95,8 @@ export function buildAppImageDaemonCommand(
   scriptArgs: string[],
   env: NodeJS.ProcessEnv
 ): DurableDaemonScopeCommand {
-  const childEnv: Record<string, string> = {}
-  for (const [key, value] of Object.entries(env)) {
-    if (value !== undefined) {
-      childEnv[key] = value
-    }
-  }
   // AppRun prepends the new mount but retains old PATH and loader entries unless scrubbed.
-  removeAppImageRuntimeEnv(childEnv)
+  const childEnv = envWithoutAppImageRuntime(env)
   return {
     command: launch.appImagePath,
     // Suppress AppRun's injected Node-incompatible flag by placing --no-sandbox after the script.

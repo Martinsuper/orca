@@ -4,7 +4,7 @@ import {
   type OrcadMigrationDependencyKind
 } from '../../../shared/orcad-migration/orcad-migration-preflight'
 import type { PersistedState } from '../../../shared/persisted-state-types'
-import type { TerminalScrollbackSnapshotStorage } from '../../terminal-scrollback-snapshots'
+import type { TerminalScrollbackSnapshotStorage } from '../../pty/scrollback/terminal-scrollback-snapshots'
 import {
   inspectOrcadMigrationSourceSessions,
   type OrcadMigrationSourceSessionInspection
@@ -66,10 +66,14 @@ export function collectOrcadMigrationUntransferredDependencyCensus(
   return {
     counts,
     totalCount: ORCAD_MIGRATION_DEPENDENCY_KINDS.reduce((total, kind) => total + counts[kind], 0),
-    names:
-      dormant.blockedSessionItems.length > 0
+    names: {
+      ...(dormant.blockedSessionItems.length > 0
         ? { 'workspace-session': dormant.blockedSessionItems }
-        : {}
+        : {}),
+      ...(dormant.runningAutomationItems.length > 0
+        ? { 'automation-run': dormant.runningAutomationItems }
+        : {})
+    }
   }
 }
 

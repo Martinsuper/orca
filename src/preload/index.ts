@@ -1,4 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import { HIDDEN_WINDOW_FRAME_PUMP_STOP_CHANNEL } from '../shared/hidden-window-frame-pump'
+import { installHiddenWindowFramePump } from './hidden-window-frame-pump'
 import type { PreloadApi } from './api-types'
 import { installBrowserFindListener } from './preload-runtime-support'
 import { appApi } from './api/app-bridge'
@@ -6,6 +8,8 @@ import { orcaProfilesApi } from './api/orca-profiles-bridge'
 import { platformApi } from './api/platform-bridge'
 import { wslApi } from './api/wsl-bridge'
 import { wslMoveApi } from './api/wsl-move-bridge'
+import { wslDriveProjectApi } from './api/wsl-drive-project-bridge'
+import { wslDriveUncConversionApi } from './api/wsl-drive-unc-conversion-bridge'
 import { pwshApi } from './api/pwsh-bridge'
 import { gitBashApi } from './api/git-bash-bridge'
 import { pluginsApi } from './api/plugins-bridge'
@@ -21,6 +25,7 @@ import { worktreesApi } from './api/worktrees-bridge'
 import { workspaceCleanupApi } from './api/workspace-cleanup-bridge'
 import { workspaceSpaceApi } from './api/workspace-space-bridge'
 import { workspacePortsApi } from './api/workspace-ports-bridge'
+import { linkPreviewApi } from './api/link-preview-bridge'
 import { ptyApi } from './api/pty-bridge'
 import { feedbackApi } from './api/feedback-bridge'
 import { crashReportsApi } from './api/crash-reports-bridge'
@@ -52,7 +57,7 @@ import { computerUsePermissionsApi } from './api/computer-use-permissions-bridge
 import { shellApi } from './api/shell-bridge'
 import { skillsApi } from './api/skills-bridge'
 import { petApi } from './api/pet-bridge'
-import { browserApi } from './api/browser-bridge'
+import { browserApi } from './api/browser/browser-bridge'
 import { emulatorApi } from './api/emulator-bridge'
 import { hooksApi } from './api/hooks-bridge'
 import { ephemeralVmApi } from './api/ephemeral-vm-bridge'
@@ -106,6 +111,8 @@ const api = {
   platform: platformApi,
   wsl: wslApi,
   wslMove: wslMoveApi,
+  wslDriveProject: wslDriveProjectApi,
+  wslDriveUnc: wslDriveUncConversionApi,
   pwsh: pwshApi,
   gitBash: gitBashApi,
   plugins: pluginsApi,
@@ -121,6 +128,7 @@ const api = {
   workspaceCleanup: workspaceCleanupApi,
   workspaceSpace: workspaceSpaceApi,
   workspacePorts: workspacePortsApi,
+  linkPreview: linkPreviewApi,
   pty: ptyApi,
   plantuml: plantumlApi,
   feedback: feedbackApi,
@@ -204,3 +212,16 @@ if (process.contextIsolated) {
 } else {
   window.api = api
 }
+
+installHiddenWindowFramePump(
+  process.argv,
+  (stop) => ipcRenderer.once(HIDDEN_WINDOW_FRAME_PUMP_STOP_CHANNEL, stop),
+  {
+    rootStyle: () => document.documentElement?.style ?? null,
+    requestAnimationFrame: (callback) => window.requestAnimationFrame(callback),
+    every: (callback, ms) => {
+      const handle = window.setInterval(callback, ms)
+      return () => window.clearInterval(handle)
+    }
+  }
+)

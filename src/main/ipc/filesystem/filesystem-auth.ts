@@ -1,6 +1,10 @@
 import { resolve, dirname, basename } from 'node:path'
 import type { RuntimeStore } from '../../runtime/runtime-store-contract'
-import { lstat, realpath } from 'node:fs/promises'
+import { lstat } from 'node:fs/promises'
+import {
+  realpathAcrossWslDriveMount,
+  windowsFsPath
+} from '../../wsl/filesystem/wsl-unc-drive-fs-path'
 import { PATH_OUTSIDE_ALLOWED_DIRECTORIES } from '../../../shared/local-file-access'
 import { getAllowedRoots } from './filesystem-allowed-roots'
 import { isDescendantOrEqual, isENOENT, normalizeExistingPath } from './filesystem-path-containment'
@@ -8,7 +12,7 @@ import {
   ensureAuthorizedRootsCache,
   isPathAllowedByCanonicalRegisteredRoot,
   isRegisteredWorktreePath
-} from '../registered-worktree-roots-cache'
+} from '../worktrees/removal/registered-worktree-roots-cache'
 
 export const PATH_ACCESS_DENIED_MESSAGE = `${PATH_OUTSIDE_ALLOWED_DIRECTORIES}. If this blocks a legitimate workflow, please file a GitHub issue.`
 /** Lazily share allowed roots across every check in one authorization. */
@@ -58,7 +62,7 @@ export async function resolveAuthorizedPath(
     // Canonicalize the parent so ancestor symlinks can't redirect outside allowed roots, but keep the leaf so delete/rename act on the link itself.
     let realParent: string
     try {
-      realParent = await realpath(dirname(resolvedTarget))
+      realParent = await realpathAcrossWslDriveMount(dirname(resolvedTarget))
     } catch (error) {
       if (isENOENT(error)) {
         return resolveAuthorizedMissingPath(resolvedTarget, store, allowedRoots)
@@ -79,7 +83,7 @@ export async function resolveAuthorizedPath(
 
   try {
     // Normalize Windows/WSL realpath output before comparing allow-list roots.
-    const realTarget = resolve(await realpath(resolvedTarget))
+    const realTarget = resolve(await realpathAcrossWslDriveMount(resolvedTarget))
     if (
       !(await isPathAllowedIncludingRegisteredWorktrees(realTarget, store, {
         canonicalSourcePath: resolvedTarget,
@@ -107,7 +111,7 @@ async function resolveAuthorizedMissingPath(
 
   while (true) {
     try {
-      const realAncestor = await realpath(existingAncestor)
+      const realAncestor = await realpathAcrossWslDriveMount(existingAncestor)
       const candidateTarget = resolve(realAncestor, ...missingSegments)
       if (
         !(await isPathAllowedIncludingRegisteredWorktrees(candidateTarget, store, {
@@ -139,7 +143,8 @@ async function resolveAuthorizedMissingPath(
 
 async function isSymlink(path: string): Promise<boolean> {
   try {
-    return (await lstat(path)).isSymbolicLink()
+    // A UNC drive-mount path opens only through its drive path; lstat there still sees links.
+    return (await lstat(windowsFsPath(path))).isSymbolicLink()
   } catch (error) {
     if (isENOENT(error)) {
       return false

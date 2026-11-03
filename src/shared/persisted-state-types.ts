@@ -56,6 +56,7 @@ export type PersistedMobileClientTabSelections = Record<
   Record<string, PersistedMobileClientTabSelection>
 >
 
+// ─── Persistence shape ──────────────────────────────────────────────
 export type PersistedState = {
   schemaVersion: number
   repos: Repo[]
@@ -63,9 +64,13 @@ export type PersistedState = {
   projectHostSetups: ProjectHostSetup[]
   projectGroups: ProjectGroup[]
   folderWorkspaces: FolderWorkspace[]
-  /** Keep folder review notes top-level: older normalizers strip nested fields but round-trip unknown top-level keys.
-   * Write-only projection: load hydrates FolderWorkspace.diffComments and deletes this key from Store state;
-   * only buildStateToSave produces it. Never read Store.state.folderWorkspaceDiffComments outside load. */
+  /** Folder-workspace review notes, keyed by FolderWorkspace.id. Top-level, NOT nested in
+   *  folderWorkspaces[]: normalizeFolderWorkspaces rebuilds each record field-by-field, so an
+   *  older build drops nested fields, while unknown top-level keys round-trip untouched.
+   *
+   *  WRITE-ONLY PROJECTION. FolderWorkspace.diffComments is the single in-memory home; load()
+   *  hydrates from this key and then deletes it from Store state, and buildStateToSave() is the
+   *  only producer of it. Never read Store.state.folderWorkspaceDiffComments outside load(). */
   folderWorkspaceDiffComments?: Record<string, DiffComment[]>
   /** Sparse-checkout presets keyed by repoId. */
   sparsePresetsByRepo: Record<string, SparsePreset[]>
@@ -91,8 +96,13 @@ export type PersistedState = {
   globalTodoLists?: TodoList[]
   /** Remembered scope selection in the Todos panel: 'project' or 'global'. */
   todoScope?: 'project' | 'global'
-  /** Never reuse issued workspace names: cwd-keyed agent state could leak from prior occupants. Keep compact watermark tiers
-   * for each repo; deletion does not free names. Union repos sharing a cwd namespace and retain remote namespace tombstones. */
+  /** Generated workspace names already issued, keyed by repoId. Suppresses reissuing a name so a
+   *  recreated workspace never lands on a prior occupant's path and inherits agent state keyed to
+   *  that cwd. Grows monotonically within a repo — entries are never removed on workspace deletion
+   *  — and the repo-keyed copy is dropped when the repo is removed. Readers union across repos
+   *  that create into the same cwd namespace; remote namespaces also retain a compact tombstone.
+   *
+   *  Stored compacted, not as a flat list: a fully spent tier collapses into the row's watermark. */
   retiredWorktreeNamesByRepo?: Record<string, RetiredNameRegistry>
   /** Compacted remote cwd tombstones outlive repo ids, so remove/re-add cannot reissue a path. */
   retiredWorktreeNamesByNamespace?: Record<string, RetiredNameRegistry>
@@ -115,8 +125,9 @@ export type PersistedState = {
   workspaceSession: WorkspaceSessionState
   /** Per-execution-host session partitions for non-'local' hosts (ssh:/runtime:); 'local' stays in workspaceSession so pre-partition builds keep working. */
   workspaceSessionsByHostId?: Partial<Record<ExecutionHostId, WorkspaceSessionState>>
-  /** Paired server’s last display layout, keyed by environment and written only by the snapshot recorder;
-   * separate from runtime:<env> partitions that older builds overwrite. */
+  /** Display-only snapshot of each paired server's last layout, keyed by environment id. Written
+   *  only by the remote layout snapshot recorder; a separate domain because older builds write
+   *  the `runtime:<env>` partitions. */
   remoteLayoutSnapshots?: Record<string, RemoteLayoutSnapshot>
   sshTargets: SshTarget[]
   /** Highest SSH target registration generation issued; prevents identity reuse after rollback. */

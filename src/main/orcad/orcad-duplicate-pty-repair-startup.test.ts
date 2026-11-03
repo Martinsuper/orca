@@ -59,6 +59,9 @@ vi.mock('../agent-hooks/local-agent-cli-presence', async (importOriginal) => ({
 vi.mock('../agent-hooks/agent-home-login-shell', () => ({
   adoptLoginShellAgentHomes: async () => {}
 }))
+vi.mock('../claude/agent-view/agent-view-service', () => ({
+  getClaudeAgentViewService: () => ({ reconcile: async () => {} })
+}))
 vi.mock('../opencode/opencode-status-plugin-startup-refresh', () => ({
   refreshInstalledOpenCodeStatusPlugins: vi.fn()
 }))
@@ -161,6 +164,7 @@ vi.mock('../runtime/orca-runtime', () => ({
     }
     async closeNotificationDismissals() {}
     syncWindowGraph() {}
+    setAgentSenderPeerKey() {}
   }
 }))
 vi.mock('../runtime/runtime-rpc', () => ({

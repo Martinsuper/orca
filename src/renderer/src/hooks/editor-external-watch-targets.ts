@@ -1,5 +1,7 @@
 import type { AppState } from '@/store'
 import type { OpenFile } from '@/store/slices/editor'
+import { getIndexedWorktreesById } from '@/store/worktree-repo-index'
+import { folderWorkspaceKey } from '../../../shared/workspace-scope'
 import { findWorktreeById } from '@/store/slices/worktree-helpers'
 import { isVirtualEditorFile } from '@/store/slices/editor/tabs/editor-tab-content-type'
 import { findRepoForHost } from '@/store/slices/repo-host-identity'
@@ -12,8 +14,6 @@ import {
   type ExecutionHostId
 } from '../../../shared/execution-host'
 import { isGitRepoKind } from '../../../shared/repo-kind'
-import { FLOATING_TERMINAL_WORKTREE_ID } from '../../../shared/constants'
-import { isFloatingWorkspaceId } from '../../../shared/floating-workspace-worktree'
 import {
   canWatchLocalWindowsWslAliases,
   resolveEditorExternalWatchTargetRows
@@ -47,10 +47,7 @@ export type EditorExternalWatchTargetState = Pick<
   Partial<
     Pick<
       AppState,
-      | 'activeWorkspaceExecutionHostId'
-      | 'rightSidebarEffectiveTab'
-      | 'lastVisitedAtByWorktreeId'
-      | 'floatingWorkspacePath'
+      'activeWorkspaceExecutionHostId' | 'rightSidebarEffectiveTab' | 'lastVisitedAtByWorktreeId'
     >
   >
 
@@ -77,7 +74,6 @@ let cachedSshConnectionStates: AppState['sshConnectionStates'] | null = null
 let cachedFolderWorkspaces: AppState['folderWorkspaces'] | null = null
 let cachedProjectGroups: AppState['projectGroups'] | null = null
 let cachedLastVisitedAtByWorktreeId: AppState['lastVisitedAtByWorktreeId'] | undefined
-let cachedFloatingWorkspacePath: AppState['floatingWorkspacePath'] | undefined
 let cachedWatchedTargetsSnapshot: WatchedTargetsSnapshot = {
   targets: [],
   targetsKey: '',
@@ -170,27 +166,21 @@ export function selectEditorExternalWatchTargets(
     cachedSshConnectionStates === state.sshConnectionStates &&
     cachedFolderWorkspaces === selectFolderWorkspaces(state) &&
     cachedProjectGroups === state.projectGroups &&
-    cachedLastVisitedAtByWorktreeId === state.lastVisitedAtByWorktreeId &&
-    cachedFloatingWorkspacePath === state.floatingWorkspacePath
+    cachedLastVisitedAtByWorktreeId === state.lastVisitedAtByWorktreeId
   ) {
     return cachedWatchedTargetsSnapshot
   }
 
   const consumersByWorktreeId = new Map<string, Map<string, WatchConsumer>>()
   const unwatchedConsumersByWorktreeId = new Map<string, Map<string, WatchConsumer>>()
-  const watchEligibleIds = new Set(
-    selectWatchEligibleWorkspaceIds({
-      activeWorktreeId: state.activeWorktreeId,
-      lastVisitedAtByWorktreeId: state.lastVisitedAtByWorktreeId,
-      openFiles: state.openFiles,
-      exists: (id) => resolveEditorExternalWatchTargetRows(state, id, null) !== null
-    })
-  )
-  // Why: the floating workspace is the live scratch space, not one of many background workspaces,
-  // so a tab in it keeps its watch.
-  if (state.openFiles.some((file) => isFloatingWorkspaceId(file.worktreeId))) {
-    watchEligibleIds.add(FLOATING_TERMINAL_WORKTREE_ID)
-  }
+  const watchEligibleIds = selectWatchEligibleWorkspaceIds({
+    activeWorktreeId: state.activeWorktreeId,
+    lastVisitedAtByWorktreeId: state.lastVisitedAtByWorktreeId,
+    openFiles: state.openFiles,
+    exists: (id) =>
+      getIndexedWorktreesById(selectWorktreesByRepo(state), id).length > 0 ||
+      selectFolderWorkspaces(state).some((workspace) => folderWorkspaceKey(workspace.id) === id)
+  })
   // Key watchers by workspace and execution host, matching reads/saves: same id may be open locally, over SSH and in a runtime.
   for (const file of state.openFiles) {
     // Why: a virtual tab (CI details, chat visual) has no file in the workspace to watch.
@@ -267,7 +257,6 @@ export function selectEditorExternalWatchTargets(
   cachedFolderWorkspaces = selectFolderWorkspaces(state)
   cachedProjectGroups = state.projectGroups
   cachedLastVisitedAtByWorktreeId = state.lastVisitedAtByWorktreeId
-  cachedFloatingWorkspacePath = state.floatingWorkspacePath
 
   if (
     targetsKey === cachedWatchedTargetsSnapshot.targetsKey &&

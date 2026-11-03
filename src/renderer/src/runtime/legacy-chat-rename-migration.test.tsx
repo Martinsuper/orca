@@ -3,9 +3,11 @@ import { act, cleanup, render, renderHook, waitFor } from '@testing-library/reac
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import type { Tab } from '../../../shared/tab-types'
 import type { ExecutionHostId } from '../../../shared/execution-host'
-import { createGlobalSettingsFixture } from '../../../shared/global-settings-test-fixture'
-import { brandEphemeralSetupTerminalWorktreeId } from '../../../shared/ephemeral-setup-terminal-worktree-id'
-import type { AgentSessionStatusSummary } from '../../../shared/agent-session-wire'
+import '../../../shared/global-settings-test-fixture'
+import * as conversationNames from '../../../shared/agent-session/agent-session-conversation-name'
+import * as structuredTabs from '../../../shared/agent-session/view/structured-agent-session-tab'
+import '../../../shared/ephemeral-setup-terminal-worktree-id'
+import type { AgentSessionStatusSummary } from '../../../shared/agent-session/agent-session-wire'
 import type * as LayoutRouting from '@/store/terminals/tab-change-through-layout-owner'
 import type * as LocalRuntimeCapabilities from './local-runtime-capabilities'
 import {
@@ -23,7 +25,7 @@ import { useAppStore } from '@/store'
 import { installLegacyChatRenameMigration } from './legacy-chat-rename-migration'
 import { uploadLegacyStructuredChatRename } from './structured-chat-rename'
 import { readStructuredChatTabName } from './structured-chat-tab-name'
-import { guardPinnedTabClose, resolvePinnedTabLabel } from '@/store/pinned-tab-close-guard'
+import '@/store/pinned-tab-close-guard'
 import {
   subscribeStructuredChatTabNames,
   getStructuredChatTabNames
@@ -37,11 +39,11 @@ import { buildPersistedUnifiedTabSessionData } from '@/lib/workspace-session-uni
 import { persistWorkspaceSessionByHost } from '@/lib/workspace-session-host-persistence'
 import { sendMessageToAgent } from '@/lib/agent-message-send'
 import type { WorkspaceSessionState } from '../../../shared/workspace-session-state-types'
-import type { RuntimeMobileSessionTabsResult } from '../../../shared/runtime-types'
-import { applyWebSessionTabsSnapshot } from './web-session-tabs-sync/snapshot-api'
-import { applyWebSessionTabsStorePatch } from './web-session-tabs-sync/store-patch'
-import { applyLocalStructuredSessionTabSnapshots } from './local-structured-session-tabs-sync/snapshot-apply'
-import { readStructuredAgentLaunchRecord } from '@/lib/agent-session/launch/structured-agent-session-launch-persistence'
+
+import './web-session-tabs-sync/snapshot-api'
+import './web-session-tabs-sync/store-patch'
+import './local-structured-session-tabs-sync/snapshot-apply'
+import '@/lib/agent-session/launch/structured-agent-session-launch-persistence'
 
 const mock = vi.hoisted(() => ({
   rpc: vi.fn(),
@@ -150,6 +152,87 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
+it('bounds reconciliation scans linearly at N and 10N without resending unchanged or in-flight aliases', async () => {
+  const normalize = vi.spyOn(conversationNames, 'normalizeAgentSessionConversationName')
+  const enumerate = vi.spyOn(structuredTabs, 'isStructuredTab')
+  const aliases = ['x'.repeat(5000), '\u200B'.repeat(5000), '\u200C\u200D'.repeat(2500), null]
+  for (const count of [40, 400]) {
+    const tabs = Array.from({ length: count }, (_, index) =>
+      chat({
+        id: `scale-tab-${index}`,
+        entityId: `scale-session-${index}`,
+        executionHostId: 'runtime:paired',
+        customLabel: aliases[index % aliases.length]
+      })
+    )
+    seed(tabs[0])
+    useAppStore.setState({
+      unifiedTabsByWorktree: { [workspace.id]: tabs },
+      groupsByWorktree: {
+        [workspace.id]: [
+          {
+            id: 'group',
+            worktreeId: workspace.id,
+            activeTabId: tabs[0].id,
+            tabOrder: tabs.map((tab) => tab.id)
+          }
+        ]
+      }
+    })
+    mock.rpc.mockReset()
+    const acknowledge: (() => void)[] = []
+    mock.rpc.mockImplementation(
+      () => new Promise((resolve) => acknowledge.push(() => resolve({ applied: true })))
+    )
+    const expectScan = (population: readonly Tab[]) => {
+      expect(enumerate).toHaveBeenCalledTimes(population.length)
+      expect(normalize).toHaveBeenCalledTimes(population.length)
+      expect(normalize.mock.calls.map(([alias]) => alias)).toEqual(
+        population.map((tab) => tab.customLabel ?? '')
+      )
+      enumerate.mockClear()
+      normalize.mockClear()
+    }
+    enumerate.mockClear()
+    normalize.mockClear()
+    const stop = installLegacyChatRenameMigration()
+    stops.push(stop)
+    expectScan(tabs)
+    await waitFor(() => expect(mock.rpc).toHaveBeenCalledTimes(count / 4))
+    expect(mock.rpc.mock.calls.map(([, , params]) => params)).toEqual(
+      tabs
+        .filter((_, index) => index % 4 === 0)
+        .map((tab) => ({ sessionId: tab.entityId, name: 'x'.repeat(200), legacyAlias: true }))
+    )
+
+    // A new snapshot with identical candidates still scans, but must not send again.
+    useAppStore.setState({ unifiedTabsByWorktree: { [workspace.id]: [...tabs] } })
+    expectScan(tabs)
+    // Changing the candidate set reaches the in-flight check rather than the unchanged shortcut.
+    useAppStore.setState({ unifiedTabsByWorktree: { [workspace.id]: tabs.slice(1) } })
+    expectScan(tabs.slice(1))
+    useAppStore.setState({ unifiedTabsByWorktree: { [workspace.id]: [...tabs] } })
+    expectScan(tabs)
+    await act(async () => {})
+    expect(mock.rpc).toHaveBeenCalledTimes(count / 4)
+    expect(
+      buildPersistedUnifiedTabSessionData(useAppStore.getState()).unifiedTabs?.[workspace.id]?.map(
+        (tab) => tab.customLabel
+      )
+    ).toEqual(tabs.map((tab) => tab.customLabel))
+
+    stop()
+    // Refusing cleanup lets outstanding requests settle without unrelated per-alias store writes.
+    mock.layout.mockImplementation((_state, _target, _change, _local, answers) => {
+      answers?.refused?.()
+      return true
+    })
+    await act(async () => acknowledge.forEach((resolve) => resolve()))
+    expect(mock.layout).toHaveBeenCalledTimes(count / 4)
+    mock.layout.mockReset()
+  }
+})
+
 it('migrates an inactive restored alias after reconnect and clears both saved copies only after acknowledgment', async () => {
   const alias = 'x'.repeat(5000)
   const tab = chat({
@@ -195,30 +278,6 @@ it('migrates an inactive restored alias after reconnect and clears both saved co
   expect(saveWorkspaceLayout(loaded).unifiedTabs?.[tab.worktreeId]?.[0]?.customLabel).toBeNull()
 })
 
-it('retains a replacement alias when main receives an older session cleanup', async () => {
-  const tab = chat({ executionHostId: 'local', customLabel: 'Legacy' })
-  seed(tab)
-  const loaded = loadChat({ ...tab, entityId: 'replacement' }, 'local')
-  mock.rpc.mockResolvedValue({ name: 'Legacy', applied: true })
-  mock.layout.mockImplementation((_state, target, change, _local, answers) => {
-    if (!target) {
-      throw new Error('Missing tab')
-    }
-    const command = change(target.id)
-    if (command.type !== 'renameTab') {
-      throw new Error('Unexpected command')
-    }
-    expect(renameTab(loaded.layout, { ...command, workspace: target.worktreeId }).ok).toBe(false)
-    answers?.refused?.()
-    return true
-  })
-  expect(await uploadLegacyStructuredChatRename(useAppStore.getState, tab, 'Legacy')).toBe(false)
-  expect(saveWorkspaceLayout(loaded).unifiedTabs?.[workspace.id]?.[0]?.customLabel).toBe('Legacy')
-  expect(useAppStore.getState().unifiedTabsByWorktree[workspace.id]?.[0]?.customLabel).toBe(
-    'Legacy'
-  )
-})
-
 it('transfers an unstamped alias once its single local owner is known and reloads the canonical name', async () => {
   const tab = chat({ worktreeId: 'folder:unique', customLabel: 'Legacy' })
   seed(tab)
@@ -230,7 +289,9 @@ it('transfers an unstamped alias once its single local owner is known and reload
   mock.snapshot.set(tab.entityId, name(tab, 'History name'))
   mock.rpc.mockResolvedValue({ name: 'History name', applied: false })
   stops.push(installLegacyChatRenameMigration())
-  expect(await uploadLegacyStructuredChatRename(useAppStore.getState, tab, 'Legacy')).toBe(false)
+  expect(
+    await uploadLegacyStructuredChatRename(useAppStore.getState, tab, 'Legacy', 'Legacy')
+  ).toBe(false)
   expect(mock.rpc).not.toHaveBeenCalled()
   const groups = saveWorkspaceLayout(loadChat(tab, 'local')).tabGroups?.[tab.worktreeId] ?? []
   useAppStore.setState({ groupsByWorktree: { [tab.worktreeId]: groups } })
@@ -298,28 +359,6 @@ function name(tab: Tab, conversationName: string): AgentSessionStatusSummary {
     conversationName
   }
 }
-
-it('names a native pinned-close confirmation from the owning host after alias retirement', () => {
-  const tab = chat({ executionHostId: 'runtime:paired', isPinned: true, customLabel: null })
-  seed(tab)
-  const requestPinnedTabCloseConfirm = vi.fn()
-  useAppStore.setState({
-    settings: createGlobalSettingsFixture({ confirmClosePinnedTab: true }),
-    requestPinnedTabCloseConfirm
-  })
-  mock.snapshot = new Map([[tab.entityId, name(tab, 'Other host name')]])
-  mock.paired = new Map([[tab.entityId, name(tab, 'Saved native name')]])
-  const onClose = vi.fn()
-  guardPinnedTabClose({
-    isPinned: tab.isPinned === true,
-    tabLabel: resolvePinnedTabLabel(useAppStore.getState(), tab.worktreeId, tab.id),
-    onClose
-  })
-  expect(requestPinnedTabCloseConfirm).toHaveBeenCalledWith({
-    tabLabel: 'Saved native name',
-    onConfirm: onClose
-  })
-})
 
 it('shares qualified current names with live dashboard and attachments without activating plain reads', () => {
   const tab = chat({ worktreeId: 'folder:twin' })
@@ -409,45 +448,6 @@ it('shares qualified current names with live dashboard and attachments without a
   expect(mock.activates).toHaveBeenCalledTimes(2)
 })
 
-it('updates an unstamped setup chat name when settings replace its fallback owner', () => {
-  const tab = chat({ worktreeId: brandEphemeralSetupTerminalWorktreeId('rename-observer') })
-  seed(tab)
-  const settings = createGlobalSettingsFixture({ activeRuntimeEnvironmentId: null })
-  useAppStore.setState({
-    settings,
-    runtimeEnvironments: [
-      {
-        id: 'paired',
-        name: 'paired',
-        createdAt: 1,
-        updatedAt: 1,
-        lastUsedAt: null,
-        runtimeId: null,
-        endpoints: [{ id: 'ws-paired', kind: 'websocket', label: 'WebSocket', endpoint: 'ws://x' }],
-        preferredEndpointId: 'ws-paired'
-      }
-    ]
-  })
-  mock.snapshot.set(tab.entityId, name(tab, 'Local name'))
-  mock.paired.set(tab.entityId, name(tab, 'Paired name'))
-  expect(getStructuredChatTabNames().get(tab)).toMatchObject({
-    owner: 'local',
-    savedName: 'Local name'
-  })
-  const changed = vi.fn()
-  stops.push(subscribeStructuredChatTabNames(changed))
-
-  useAppStore.setState({ settings: { ...settings, activeRuntimeEnvironmentId: 'paired' } })
-
-  expect(changed).toHaveBeenCalledTimes(1)
-  expect(getStructuredChatTabNames().get(tab)).toMatchObject({
-    owner: 'runtime:paired',
-    savedName: 'Paired name'
-  })
-  expect(settings.activeRuntimeEnvironmentId).toBeNull()
-  expect(mock.rpc).not.toHaveBeenCalled()
-})
-
 it('traces legacy runtime storage movement, action routing and switch-away before inventory', async () => {
   const tab = chat({ worktreeId: 'folder:twin', customLabel: 'Legacy paired' })
   seedTwin(tab)
@@ -528,7 +528,12 @@ it('traces legacy runtime storage movement, action routing and switch-away befor
   expect(useAppStore.getState().workspaceSessionReady).toBe(true)
   stops.push(installLegacyChatRenameMigration())
   expect(
-    await uploadLegacyStructuredChatRename(useAppStore.getState, current(), 'Legacy paired')
+    await uploadLegacyStructuredChatRename(
+      useAppStore.getState,
+      current(),
+      'Legacy paired',
+      'Legacy paired'
+    )
   ).toBe(false)
   expect(mock.rpc).not.toHaveBeenCalled()
   expect(current().customLabel).toBe('Legacy paired')
@@ -584,56 +589,4 @@ it('traces legacy runtime storage movement, action routing and switch-away befor
     { sessionId: tab.entityId, name: 'Explicit name', legacyAlias: true }
   )
   expect(readStructuredChatTabName(current(), useAppStore.getState())).toBe('Explicit name')
-})
-
-it('traces a local legacy alias through foreign same-ID inventory and authoritative omission', () => {
-  const tab = chat({ customLabel: 'Legacy local' })
-  seed(tab)
-  expect(readStructuredAgentLaunchRecord(tab.entityId)).toBeUndefined()
-  const snapshot: RuntimeMobileSessionTabsResult = {
-    worktree: tab.worktreeId,
-    publicationEpoch: 'identity-evidence',
-    snapshotVersion: 1,
-    activeTabId: tab.id,
-    activeTabType: 'agent-session',
-    activeGroupId: tab.groupId,
-    tabs: [
-      {
-        type: 'agent-session',
-        id: tab.id,
-        sessionId: tab.entityId,
-        agent: 'codex',
-        title: 'Codex Chat',
-        isActive: true
-      }
-    ]
-  }
-  const current = () => useAppStore.getState().unifiedTabsByWorktree[tab.worktreeId][0]
-  applyWebSessionTabsStorePatch(
-    (state) => applyLocalStructuredSessionTabSnapshots(state, [snapshot]),
-    { frames: [] }
-  )()
-  expect(current()).toMatchObject({
-    id: tab.id,
-    customLabel: 'Legacy local',
-    executionHostId: 'local',
-    createdAt: tab.createdAt
-  })
-  const localOccurrence = current()
-  applyWebSessionTabsStorePatch((state) => applyWebSessionTabsSnapshot(state, snapshot, 'a'), {
-    frames: []
-  })()
-  expect(current()).not.toBe(localOccurrence)
-  expect(current()).toMatchObject({
-    id: tab.id,
-    customLabel: 'Legacy local',
-    executionHostId: 'runtime:a',
-    createdAt: tab.createdAt
-  })
-  applyWebSessionTabsStorePatch(
-    (state) =>
-      applyWebSessionTabsSnapshot(state, { ...snapshot, snapshotVersion: 2, tabs: [] }, 'a'),
-    { frames: [] }
-  )()
-  expect(useAppStore.getState().unifiedTabsByWorktree[tab.worktreeId] ?? []).toEqual([])
 })

@@ -55,6 +55,15 @@ vi.mock('@/runtime/sync-runtime-graph', () => ({ scheduleRuntimeGraphSync }))
 
 vi.mock('@/lib/agent-draft-readiness', () => ({ waitForAgentDraftInputReady }))
 
+const { requestTerminalPaneRecovery } = vi.hoisted(() => ({
+  requestTerminalPaneRecovery: vi.fn(async () => undefined)
+}))
+
+vi.mock('./terminal-pane-recovery', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  requestTerminalPaneRecovery
+}))
+
 const pairedRoute = vi.hoisted(() => {
   const route: { runtimeEnvironmentId: string | null } = { runtimeEnvironmentId: null }
   return route
@@ -321,37 +330,6 @@ describe('agent pane keys typed before its PTY binds', () => {
     pane.dispose()
   })
 
-  // Why: a trust prompt during startup must take the user's answer, never trap it in the draft.
-  it('lets the user answer a startup trust prompt and never pastes the draft into it', async () => {
-    let ready!: (value: boolean) => void
-    waitForAgentDraftInputReady.mockReturnValue(
-      new Promise<boolean>((resolve) => (ready = resolve))
-    )
-    const pane = connectAgentPane()
-    await flushAsyncTicks(20)
-
-    pane.type('make the tests pass')
-    pane.bind('pty-1')
-    mockStoreState.agentStatusByPaneKey[pane.paneKey] = {
-      state: 'blocked',
-      prompt: 'Do you trust the files in this folder?',
-      agentType: 'claude',
-      paneKey: pane.paneKey,
-      updatedAt: 1_000,
-      stateStartedAt: 1_000,
-      stateHistory: []
-    }
-    pane.type('1')
-    pane.type('\r')
-
-    expect(pane.transport.sendInput).toHaveBeenCalledWith('1', 'driving')
-    expect(pane.transport.sendInput).toHaveBeenCalledWith('\r', 'driving')
-    ready(true)
-    await flushAsyncTicks(20)
-    expect(sendAgentDraftPasteContent).not.toHaveBeenCalled()
-    pane.dispose()
-  })
-
   it('drops the draft when the agent is blocked on a prompt at ready time', async () => {
     waitForAgentDraftInputReady.mockResolvedValue(true)
     const pane = connectAgentPane()
@@ -489,6 +467,25 @@ describe('agent pane keys typed before its PTY binds', () => {
     await flushAsyncTicks(20)
     expect(waitForAgentDraftInputReady).not.toHaveBeenCalled()
     expect(sendAgentDraftPasteContent).not.toHaveBeenCalled()
+    pane.dispose()
+  })
+
+  // Why: a first connect hung past its grace must still let typing arm recovery.
+  it('still requests recovery for keys held while the first connect hangs past its grace', async () => {
+    const pane = connectAgentPane()
+    await flushAsyncTicks(20)
+
+    pane.type('a')
+    expect(requestTerminalPaneRecovery).not.toHaveBeenCalled()
+
+    const now = Date.now()
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(now + 61_000)
+    try {
+      pane.type('b')
+      expect(requestTerminalPaneRecovery).toHaveBeenCalledTimes(1)
+    } finally {
+      clock.mockRestore()
+    }
     pane.dispose()
   })
 

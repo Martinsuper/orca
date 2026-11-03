@@ -3,7 +3,7 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { OrcaRuntimeService } from './orca-runtime'
 import { RpcDispatcher } from './rpc/dispatcher'
 import { AGENT_SESSION_METHODS } from './rpc/methods/agent-session'
-import { _resetWslCachesForTests, _setWslCachesForTests } from '../wsl'
+import { _resetWslCachesForTests, _setWslCachesForTests } from '../wsl/discovery/distro-catalog'
 import { PROJECT_RUNTIME_REPAIR_REQUIRED_CODE } from '../../shared/project-runtime-repair-message'
 import {
   partialRuntimeStore,
@@ -21,8 +21,7 @@ vi.mock('../opencode/opencode-launch-capabilities', () => ({
     promptMode: 'submit'
   })
 }))
-vi.mock('../opencode/opencode-model-availability', () => ({
-  probeOpenCodeModelAvailability: async () => true,
+vi.mock('../opencode/opencode-model-executable', () => ({
   resolveOpenCodeDirectModelExecutable: async () => 'opencode'
 }))
 
@@ -109,6 +108,6 @@ it('refuses an OpenCode model in a WSL-share repo set to Windows host', async ()
   Object.assign(runtime, { resolveTerminalWorkspaceLaunchScope: async () => shareScope })
   const request = { clientOperationId, worktree: 'id:s', agent: 'opencode' } as const
   const picked = runtime.createAgentSession({ ...request, launchPreferences: { model: 'm' } })
-  await expect(picked).rejects.toThrow('cannot verify this OpenCode')
+  await expect(picked).rejects.toThrow('OpenCode cannot apply this model choice')
   expect(spawned()).toEqual([])
 })

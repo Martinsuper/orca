@@ -1,5 +1,7 @@
 import { cancelScheduledHiddenOutputRestore } from '../hidden-output-restore-scheduler'
+import { advanceTerminalEscapeBoundary } from '../../../../../shared/terminal-partial-escape-tail'
 import { shouldWritePtyOutputForeground } from './foreground-output-scan'
+import { admitResumedAppChunk } from './resume-escape-admission'
 
 import type { ConnectPanePtySession } from './connect-pane-pty-session'
 
@@ -76,11 +78,11 @@ export function bindAbandonHiddenOutputRestore(session: ConnectPanePtySession): 
       return
     }
     const replayedSeq = typeof replayingSnapshot?.seq === 'number' ? replayingSnapshot.seq : null
-    let pendingData = ''
+    const pendingWrites: { data: string; chunk: (typeof pendingChunks)[number] }[] = []
     for (const chunk of pendingChunks) {
       const sliced =
         replayedSeq === null ? chunk.data : session.getChunkDataAfterSnapshot(chunk, replayedSeq)
-      pendingData += sliced ?? chunk.data
+      pendingWrites.push({ data: sliced ?? chunk.data, chunk })
     }
     if (replayingSnapshot && replayedSeq !== null) {
       session.setRestoredSnapshotBaseline(
@@ -96,6 +98,18 @@ export function bindAbandonHiddenOutputRestore(session: ConnectPanePtySession): 
           )
         }
       }
+    }
+    // One coalesced write; track the parser boundary locally so each admission sees the bytes queued before it.
+    let parserEscape: string = session.idleCursorReset.parserEscape
+    let pendingData = ''
+    for (const { data, chunk } of pendingWrites) {
+      if (data) {
+        // A reset above aborted any open escape; admission skips the tail a resuming chunk would print (#33766).
+        const admitted = admitResumedAppChunk(session, data, chunk, parserEscape)
+        parserEscape = advanceTerminalEscapeBoundary(parserEscape, admitted)
+        pendingData += admitted
+      }
+      session.recordRendererOrderedSeq(chunk)
     }
     if (pendingData) {
       session.writePtyOutputToXterm(pendingData, true)

@@ -6,15 +6,15 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import {
   OVERLAY_ONLY_FEATURES,
   STARTUP_COMMAND_FEATURES
-} from '../shell-startup-launch-intent-fixtures'
-import { makeUserZdotdir } from '../zsh-user-config-dir-fixture'
-import { getZshShellReadyMarkerRegistrationBlock } from '../shell-templates'
+} from '../pty/shell-startup/shell-startup-launch-intent-fixtures'
+import { makeUserZdotdir } from '../pty/shell-startup/zsh-user-config-dir-fixture'
+import { getZshShellReadyMarkerRegistrationBlock } from '../pty/shell-startup/shell-templates'
 import { fishRequirementViolation, resolveFishBinary } from '../../shared/fish-binary-requirement'
 import {
   createShellStartupOutputScanState,
   drainShellStartupOutputScanState,
   scanShellStartupOutput
-} from '../shell-startup-output-scanner'
+} from '../pty/shell-startup/shell-startup-output-scanner'
 import { HeadlessEmulator } from './headless-emulator'
 import { getShellReadyWrapperRoot } from './shell-ready'
 
@@ -552,7 +552,7 @@ describePosix('daemon shell-ready launch config', () => {
     const restoreLine =
       '[[ -n "${ORCA_OPENCODE_CONFIG_DIR:-}" ]] && export OPENCODE_CONFIG_DIR="${ORCA_OPENCODE_CONFIG_DIR}"'
     const mimoRestoreLine =
-      '[[ -n "${ORCA_MIMOCODE_HOME:-}" ]] && export MIMOCODE_HOME="${ORCA_MIMOCODE_HOME}"'
+      '[[ -n "${ORCA_MIMOCODE_CONFIG_DIR:-}" ]] && export MIMOCODE_CONFIG_DIR="${ORCA_MIMOCODE_CONFIG_DIR}"'
     const codexRestoreLine =
       '[[ -n "${ORCA_CODEX_HOME:-}" ]] && export CODEX_HOME="${ORCA_CODEX_HOME}"'
     const agentTeamsPathRestoreLine = '[[ -n "${ORCA_AGENT_TEAMS_SHIM_DIR:-}" ]] || return 0'

@@ -25,6 +25,7 @@ const MEMBER =
 /** `Class.param` first parameters whose id has no host twin, with the reason. */
 export const NOT_HOST_TWINNED_PARAMS = new Map([
   ['AutomationPersistence.automationId', 'automation ids are minted UUIDs'],
+  ['HostRepoCatalogSnapshotPersistence.environmentId', 'the id names the host itself'],
   ['OrcadSourceExportPersistence.targetId', 'the id names the host itself'],
   ['ProjectLinkPersistence.linkId', 'a minted project-link id'],
   ['RemoteLayoutSnapshotPersistence.environmentId', 'the id names the host itself'],
@@ -44,6 +45,7 @@ const UNIQUE_FOLDER_ID = 'folder workspace ids are minted UUIDs, one row per id 
 export const NOT_HOST_TWINNED = new Map([
   ['AutomationPersistence.advanceAutomationNextRun', 'automation ids are minted UUIDs'],
   ['AutomationPersistence.deleteAutomation', 'automation ids are minted UUIDs'],
+  ['AutomationPersistence.disableAutomations', 'automation ids are minted UUIDs'],
   ['AutomationPersistence.updateAutomation', 'automation ids are minted UUIDs'],
   [
     'MetadataLineageOperations.removeUnhostedWorktreeMeta',

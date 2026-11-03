@@ -1,3 +1,4 @@
+import { deleteProjectChatDrafts } from '../slices/worktrees/teardown/removed-worktree-chat-drafts'
 import type { StateCreator } from 'zustand'
 import { toast } from 'sonner'
 import type { AppState } from '../types'
@@ -80,9 +81,7 @@ export function createProjectHostSetupActions(
           const nextProjects = s.projects.some((entry) => entry.id === project.id)
             ? s.projects.map((entry) => (entry.id === project.id ? project : entry))
             : [...s.projects, project]
-          const nextSetups = s.projectHostSetups.some((entry) => entry.id === setup.id)
-            ? s.projectHostSetups.map((entry) => (entry.id === setup.id ? setup : entry))
-            : [...s.projectHostSetups, setup]
+          const nextSetups = upsertProjectHostSetup(s.projectHostSetups, setup)
           return {
             repos: nextRepos,
             projects: nextProjects,
@@ -214,6 +213,9 @@ export function createProjectHostSetupActions(
           ? adoptFromEndpoint(target, { kind: 'repo', row: result.repo })
           : undefined
         const repoHostId = repo ? getRepoExecutionHostId(repo) : null
+        if (repo && repoHostId) {
+          deleteProjectChatDrafts(repo.id, repoHostId)
+        }
         const removedSetup = adoptFromEndpoint(target, {
           kind: 'projectHostSetup',
           row: result.setup

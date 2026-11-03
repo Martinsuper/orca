@@ -1,6 +1,7 @@
 import { joinPath } from '@/lib/path'
 import type { OpenFile } from '@/store/slices/editor'
 import { areLocalWindowsWslPathAliases } from '../../../../shared/cross-platform-path'
+import { externalChangePathKeyFor } from '@/store/slices/editor/buffers/editor-buffer-identity'
 import { isLocalWindowsDesktopClient } from '@/lib/desktop-window-chrome'
 import {
   DEFAULT_EDITOR_AUTO_SAVE_DELAY_MS,
@@ -70,7 +71,7 @@ export type EditorSaveAndCloseDetail = {
 export type EditorSaveFileDetail = EditorSaveFileTarget & {
   claim: () => void
   resolve: () => void
-  reject: (message: string) => void
+  reject: (reason: string | Error) => void
 }
 
 export type EditorFileSavedDetail = {
@@ -140,6 +141,8 @@ export function getOpenFilesForExternalFileChange(
     return target.indexedOpenFiles.matches(openFiles)
   }
   const absolutePath = joinPath(target.worktreePath, target.relativePath)
+  const pathKey = externalChangePathKeyFor(target.worktreePath)
+  const absolutePathKey = pathKey(absolutePath)
   const hasRuntimeOwnerFilter = Object.hasOwn(target, 'runtimeEnvironmentId')
   const targetRuntimeOwner = target.runtimeEnvironmentId?.trim() || null
   return openFiles.filter((file) => {
@@ -154,7 +157,7 @@ export function getOpenFilesForExternalFileChange(
     }
     if (file.mode === 'edit' || file.mode === 'markdown-preview') {
       return (
-        file.filePath === absolutePath ||
+        pathKey(file.filePath) === absolutePathKey ||
         (target.allowLocalWindowsWslAliases === true &&
           isLocalWindowsDesktopClient() &&
           areLocalWindowsWslPathAliases(file.filePath, absolutePath))
@@ -211,7 +214,7 @@ export async function requestEditorFileSave(target: EditorSaveFileTarget): Promi
             claimed = true
           },
           resolve,
-          reject: (message) => reject(new Error(message))
+          reject: (reason) => reject(reason instanceof Error ? reason : new Error(reason))
         }
       })
     )

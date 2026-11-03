@@ -5,7 +5,7 @@ import { NodeViewContent, NodeViewWrapper } from '@tiptap/react'
 import type { NodeViewProps } from '@tiptap/react'
 import { Copy, Check } from 'lucide-react'
 import MermaidBlock from './MermaidBlock'
-import PlantUmlBlock from './PlantUmlBlock'
+import { useMermaidDiagramExpand } from './use-mermaid-diagram-expand'
 import { useDocumentDarkTheme } from '@/hooks/use-document-dark-theme'
 import { translate } from '@/i18n/i18n'
 import {
@@ -27,11 +27,9 @@ export function RichMarkdownCodeBlock({
   // Clipboard IPC may settle after unmount; do not start an orphan reset timer.
   const isMountedRef = useRef(false)
   const isDark = useDocumentDarkTheme()
+  const expandMermaidDiagram = useMermaidDiagramExpand()
 
   const isMermaid = language === 'mermaid'
-  const isPlantuml = language === 'plantuml'
-  const hasPlantumlDiagram = isPlantuml && node.textContent.trim() !== ''
-  const [sourceExpanded, setSourceExpanded] = useState(false)
 
   const clearCopiedResetTimer = useCallback((): void => {
     if (copiedResetTimerRef.current !== null) {
@@ -89,45 +87,8 @@ export function RichMarkdownCodeBlock({
     [clearCopiedResetTimer, node]
   )
 
-  const togglePlantumlSource = useCallback(() => {
-    setSourceExpanded((expanded) => !expanded)
-  }, [])
-
-  const plantumlSourceToggleLabel = sourceExpanded
-    ? translate(
-        'auto.components.editor.RichMarkdownCodeBlock.plantumlcollapse',
-        'Click to hide source'
-      )
-    : translate(
-        'auto.components.editor.RichMarkdownCodeBlock.plantumlexpand',
-        'Click to edit source'
-      )
-
   return (
-    <NodeViewWrapper
-      className={`rich-markdown-code-block-wrapper${
-        hasPlantumlDiagram && !sourceExpanded ? ' plantuml-source-collapsed' : ''
-      }`}
-    >
-      {hasPlantumlDiagram && (
-        <div
-          contentEditable={false}
-          className="plantuml-preview"
-          role="button"
-          tabIndex={0}
-          aria-label={plantumlSourceToggleLabel}
-          title={plantumlSourceToggleLabel}
-          onClick={togglePlantumlSource}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter' || event.key === ' ') {
-              event.preventDefault()
-              togglePlantumlSource()
-            }
-          }}
-        >
-          <PlantUmlBlock content={node.textContent.trim()} />
-        </div>
-      )}
+    <NodeViewWrapper className="rich-markdown-code-block-wrapper">
       <select
         className="rich-markdown-code-block-lang"
         contentEditable={false}
@@ -177,10 +138,14 @@ export function RichMarkdownCodeBlock({
         )}
       </button>
       <NodeViewContent<'pre'> as="pre" />
-      {/* Keep Mermaid source editable; native SVG labels survive the preview’s sanitization. */}
+      {/* Keep Mermaid source editable; the diagram below is read-only output. */}
       {isMermaid && node.textContent.trim() && (
         <div contentEditable={false} className="mermaid-preview">
-          <MermaidBlock content={node.textContent.trim()} isDark={isDark} htmlLabels={false} />
+          <MermaidBlock
+            content={node.textContent.trim()}
+            isDark={isDark}
+            onExpand={expandMermaidDiagram}
+          />
         </div>
       )}
     </NodeViewWrapper>
