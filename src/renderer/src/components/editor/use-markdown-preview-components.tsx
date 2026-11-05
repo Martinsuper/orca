@@ -4,6 +4,7 @@ import type { MarkdownDocument } from '../../../../shared/filesystem-entry-types
 import CodeBlockCopyButton from './CodeBlockCopyButton'
 import MermaidBlock from './MermaidBlock'
 import { useMermaidDiagramExpand } from './use-mermaid-diagram-expand'
+import PlantUmlBlock from './PlantUmlBlock'
 import {
   getMarkdownDocLinkAnchor,
   parseMarkdownDocLinkHref,
@@ -29,6 +30,10 @@ import { translate } from '@/i18n/i18n'
 
 function hasMermaidCodeClass(value: unknown): boolean {
   return typeof value === 'string' && /language-mermaid/.test(value)
+}
+
+function hasPlantumlCodeClass(value: unknown): boolean {
+  return typeof value === 'string' && /language-plantuml/.test(value)
 }
 
 export function useMarkdownPreviewComponents({
@@ -183,6 +188,9 @@ export function useMarkdownPreviewComponents({
             />
           )
         }
+        if (hasPlantumlCodeClass(className)) {
+          return <PlantUmlBlock content={String(children).trimEnd()} />
+        }
         return (
           <code className={className} {...props}>
             {children}
@@ -190,17 +198,21 @@ export function useMarkdownPreviewComponents({
         )
       },
       pre: ({ node, children, ...props }) => {
-        const isMermaid = node?.children.some(
+        const codeChild = node?.children.find(
           (child) =>
             child.type === 'element' &&
             child.tagName === 'code' &&
-            Array.isArray(child.properties.className) &&
-            child.properties.className.some(hasMermaidCodeClass)
-        )
+            Array.isArray(child.properties.className)
+        ) as { properties: { className: unknown[] } } | undefined
+        const codeClasses = Array.isArray(codeChild?.properties.className)
+          ? codeChild.properties.className
+          : []
+        const isMermaid = codeClasses.some(hasMermaidCodeClass)
+        const isPlantuml = codeClasses.some(hasPlantumlCodeClass)
         return wrapAnnotatedBlock(
           'pre',
           node,
-          <CodeBlockCopyButton {...props} wrapInPre={!isMermaid}>
+          <CodeBlockCopyButton {...props} wrapInPre={!(isMermaid || isPlantuml)}>
             {children}
           </CodeBlockCopyButton>
         )

@@ -1,3 +1,4 @@
+import type { PlantumlRenderArgs, PlantumlRenderResult } from '../shared/types'
 import type {
   ClaudeAccountsApi,
   CodexAccountsApi,
@@ -91,6 +92,10 @@ export type PreloadApi = {
   workspacePorts: WorkspacePortsApi
   linkPreview: LinkPreviewApi
   pty: PtyApi
+  // Fork: local plantuml.jar rendering for markdown preview.
+  plantuml: {
+    render: (args: PlantumlRenderArgs) => Promise<PlantumlRenderResult>
+  }
   feedback: FeedbackApi
   crashReports: CrashReportsApi
   export: ExportApi

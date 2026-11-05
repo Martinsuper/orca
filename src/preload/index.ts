@@ -24,6 +24,7 @@ import { workspaceSpaceApi } from './api/workspace-space-bridge'
 import { workspacePortsApi } from './api/workspace-ports-bridge'
 import { linkPreviewApi } from './api/link-preview-bridge'
 import { ptyApi } from './api/pty-bridge'
+import { plantumlApi } from './api/plantuml-bridge'
 import { feedbackApi } from './api/feedback-bridge'
 import { crashReportsApi } from './api/crash-reports-bridge'
 import { exportApi } from './api/export-bridge'
@@ -124,6 +125,7 @@ const api = {
   workspacePorts: workspacePortsApi,
   linkPreview: linkPreviewApi,
   pty: ptyApi,
+  plantuml: plantumlApi,
   feedback: feedbackApi,
   crashReports: crashReportsApi,
   export: exportApi,

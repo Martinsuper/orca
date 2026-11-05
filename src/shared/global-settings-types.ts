@@ -89,6 +89,10 @@ export type GlobalSettings = GlobalSettingsBase & {
   editorWordWrap?: boolean
   /** Persisted opt-out for browser spellcheck noise in rich Markdown editing surfaces. */
   richMarkdownSpellcheckEnabled?: boolean
+  /** Optional local plantuml.jar path enabling PlantUML rendering of ```plantuml
+   *  blocks in markdown preview. Empty/unset disables PlantUML rendering, which
+   *  keeps diagram source on the local machine (no remote PlantUML server). */
+  plantumlJarPath?: string
   /** Whether local markdown review note controls and the review panel are shown. */
   markdownReviewToolsEnabled: boolean
   /** Selection paste preserves the normal clipboard; defaults on for Linux/macOS, off for Windows. */

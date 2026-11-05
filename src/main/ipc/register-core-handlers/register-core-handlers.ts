@@ -210,6 +210,7 @@ export function registerCoreHandlers(
   registerFeedbackHandlers()
   registerPlantumlHandlers()
   if (crashReports) {
+    registerPlantumlHandlers()
     registerCrashReportingHandlers(crashReports)
   }
   registerExportHandlers()
