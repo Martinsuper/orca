@@ -1,12 +1,12 @@
 import { z } from 'zod'
-import { isTuiAgent } from '../../../../shared/tui-agent-config'
+import { isTuiAgent } from '../../../../shared/agent-launch/catalog/tui-agent-config'
 import { isTaskProvider } from '../../../../shared/task-providers'
-import { normalizeDisabledTuiAgents } from '../../../../shared/tui-agent-selection'
-import { normalizePRBotAuthorOverrides } from '../../../../shared/pr-bot-author-overrides'
+import { normalizeDisabledTuiAgents } from '../../../../shared/agent-launch/catalog/tui-agent-selection'
+import { normalizePRBotAuthorOverrides } from '../../../../shared/source-control/review-comments/pr-bot-author-overrides'
 import {
   normalizeTuiAgentArgsRecord,
   normalizeTuiAgentEnvRecord
-} from '../../../../shared/tui-agent-launch-defaults'
+} from '../../../../shared/agent-launch/choices/tui-agent-launch-defaults'
 import type { TaskProvider } from '../../../../shared/types'
 
 const TaskProviderParam = z.custom<TaskProvider>(isTaskProvider, {

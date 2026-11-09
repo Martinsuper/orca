@@ -4,7 +4,7 @@ import { translate } from '@/i18n/i18n'
 import { Input } from '../ui/input'
 import { Label } from '../ui/label'
 import { Button } from '../ui/button'
-import { SearchableSetting } from './SearchableSetting'
+import { SearchableSetting } from './section-layout/SearchableSetting'
 
 type PlantumlJarPathSettingProps = {
   settings: Pick<GlobalSettings, 'plantumlJarPath'>

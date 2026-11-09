@@ -1,4 +1,4 @@
-import type { WorkspaceSessionState } from './workspace-session-state-types'
+import type { WorkspaceSessionState } from './workspace-session/workspace-session-state-types'
 
 export function getDefaultWorkspaceSession(): WorkspaceSessionState {
   return {

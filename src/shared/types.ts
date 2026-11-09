@@ -85,19 +85,19 @@ export type {
   FsChangedPayload,
   MarkdownDocument
 } from './filesystem-entry-types'
-export type { FolderWorkspace } from './folder-workspace-types'
+export type { FolderWorkspace } from './folder-workspaces/folder-workspace-types'
 export type {
   GitBranchCompareResult,
   GitCommitCompareResult,
   GitDiffResult
-} from './git-diff-compare-types'
-export type { GitForkSyncExpectedUpstream, GitForkSyncResult } from './git-fork-sync'
+} from './git/diff/git-diff-compare-types'
+export type { GitForkSyncExpectedUpstream, GitForkSyncResult } from './git/remotes/git-fork-sync'
 export type {
   GitConflictOperation,
   GitStagingArea,
   GitStatusResult,
   GitUpstreamStatus
-} from './git-status-types'
+} from './git/status/git-status-types'
 export type { PRCheckDetail, PRCheckRunDetails } from './github/check-types'
 export type {
   GitHubCommentResult,
@@ -226,9 +226,9 @@ export type {
   ProjectUpdateArgs
 } from './project-types'
 export type { BaseRefDefaultResult, BaseRefSearchResult, Repo } from './repo-types'
-export type { PathSource, ShellHydrationFailureReason } from './shell-path-hydration-types'
+export type { PathSource, ShellHydrationFailureReason } from './shell/launch/shell-path-hydration-types'
 export type { TaskProvider } from './task-providers'
-export type { TuiAgent } from './tui-agent'
+export type { TuiAgent } from './agent-launch/catalog/tui-agent'
 export type { FloatingTerminalCwdRequest } from './ui-chrome-types'
 export type {
   LinuxPackageInstallInstructions,
@@ -236,7 +236,7 @@ export type {
   UpdateCheckOptions,
   UpdateStatus
 } from './update-status-types'
-export type { WorkspaceSessionPatch, WorkspaceSessionState } from './workspace-session-state-types'
+export type { WorkspaceSessionPatch, WorkspaceSessionState } from './workspace-session/workspace-session-state-types'
 export type {
   WorktreeBaseStatusEvent,
   WorktreeRemoteBranchConflictEvent

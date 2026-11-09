@@ -1,5 +1,6 @@
 import React, { createContext, useContext } from 'react'
 import { isMermaidFence, isMermaidPre, renderMermaidFence } from './comment-mermaid-fence'
+import { isPlantumlFence, isPlantumlPre, renderPlantumlFence } from './comment-plantuml-fence'
 import type { DocumentCodeBlockRenderer } from './comment-markdown-element-renderers'
 
 import {
@@ -25,6 +26,9 @@ export function CommentMarkdownDocumentCode({
   if (renderMermaid && !keepSource && isMermaidFence(className)) {
     return renderMermaidFence(children, diagramClassName)
   }
+  if (isPlantumlFence(className)) {
+    return renderPlantumlFence(children, diagramClassName)
+  }
   return (
     <code className="rounded bg-accent px-1.5 py-0.5 font-mono text-[0.92em] [overflow-wrap:anywhere]">
       {children}
@@ -46,6 +50,9 @@ export function CommentMarkdownDocumentPre({
   const keepSource = useContext(CommentMarkdownMermaidSourceContext)
   const blockStartLine = useContext(CommentMarkdownBlockLineContext)
   if (renderMermaid && !keepSource && isMermaidPre(children)) {
+    return <>{children}</>
+  }
+  if (isPlantumlPre(children)) {
     return <>{children}</>
   }
   const child = React.Children.toArray(children)[0]
